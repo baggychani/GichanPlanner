@@ -1,0 +1,40 @@
+@import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css");
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Pretendard", sans-serif;
+  --font-task: "GriunXHangeul_DAHL-Rg", sans-serif;
+
+  --color-primary: #FFD951;
+  --color-text-primary: #333333;
+  --color-bg-primary: #FAFAFA;
+}
+
+@font-face {
+  font-family: 'GriunXHangeul_DAHL-Rg';
+  src: url('https://cdn.jsdelivr.net/gh/Project-Noonnu/2607161334@x/x/GriunXHangeul_DAHL-Rg.woff2') format('woff2');
+  font-weight: 400;
+  font-display: swap;
+}
+
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+::selection {
+  background-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
+}
+
+@keyframes task-drop-feedback {
+  0% { box-shadow: 0 0 0 0 rgb(255 217 81 / 0.9); }
+  55% { box-shadow: 0 0 0 7px rgb(255 217 81 / 0); }
+  100% { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1); }
+}
+
+.task-drop-feedback {
+  animation: task-drop-feedback 420ms ease-out;
+}
