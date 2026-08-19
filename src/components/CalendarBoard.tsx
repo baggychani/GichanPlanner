@@ -93,7 +93,7 @@ export function CalendarBoard({
           key={day.toString()}
           onClick={() => onCellClick(cloneDay)}
           className={clsx(
-            'min-h-[110px] p-2 border-line transition-all cursor-pointer relative group max-[1200px]:min-h-[88px]',
+            'min-h-[110px] p-2 border-line transition-[filter] duration-150 cursor-pointer relative group max-[1200px]:min-h-[88px]',
             isSelecting ? 'hover:bg-primary/20' : 'hover:brightness-95',
             isWeekend && !isSelecting ? (i === 6 ? 'bg-red-50/30 dark:bg-red-950/25' : 'bg-blue-50/30 dark:bg-blue-950/25') : 'bg-surface',
             !isSameMonth(day, monthStart) ? 'opacity-40' : '',
@@ -146,7 +146,7 @@ export function CalendarBoard({
       <div className="relative grid grid-cols-7" key={cloneWeekStart.toString()}>
         <div
           className={clsx(
-            'absolute -left-16 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border shadow-sm flex items-center justify-center cursor-pointer transition-all z-10 max-[900px]:hidden',
+            'absolute -left-16 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border shadow-sm flex items-center justify-center cursor-pointer transition-transform duration-200 z-10 max-[900px]:hidden',
             isSelectedWeek ? 'bg-primary border-primary text-on-primary scale-110' : 'bg-surface border-line-strong text-fg-subtle hover:text-primary hover:bg-surface-muted hover:scale-110',
           )}
           onClick={() => onSelectWeek(cloneWeekStart)}

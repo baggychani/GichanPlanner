@@ -3,6 +3,7 @@ import { Clock, Star } from 'lucide-react';
 import type { DraggableProvided, DraggableStateSnapshot } from '@hello-pangea/dnd';
 import type { Task } from '../lib/db';
 import { formatScheduledTime } from '../lib/datetime';
+import { useObjectUrl } from '../hooks/useObjectUrl';
 
 // 이전 카드형 할 일 UI. 지금은 텍스트 행을 쓰지만 레거시 스타일은 남겨 둔다.
 const useLegacyTaskCards = false;
@@ -32,6 +33,7 @@ export function TaskRow({
 }: TaskRowProps) {
   const scheduledLabel = formatScheduledTime(task.scheduled_time);
   const hasBody = Boolean(scheduledLabel || task.memo);
+  const imageUrl = useObjectUrl(task.image_blob ?? null) ?? task.image_data ?? null;
 
   return (
     <div
@@ -81,15 +83,15 @@ export function TaskRow({
         )}
       </div>
 
-      {task.image_data && (
+      {imageUrl && (
         <div
           className="w-12 h-12 rounded-lg shrink-0 overflow-hidden cursor-pointer border border-line-strong shadow-sm hover:opacity-90"
           onClick={(event) => {
             event.stopPropagation();
-            onViewImage(task.image_data || '');
+            onViewImage(imageUrl);
           }}
         >
-          <img src={task.image_data} alt="첨부" className="w-full h-full object-cover" />
+          <img src={imageUrl} alt="첨부" className="w-full h-full object-cover" />
         </div>
       )}
     </div>

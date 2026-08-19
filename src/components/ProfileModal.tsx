@@ -5,6 +5,7 @@ import type { UserLogin } from 'dexie-cloud-addon';
 import { AvatarCropDialog } from './AvatarCropDialog';
 import { Overlay } from './Overlay';
 import { db, isDexieCloudConfigured } from '../lib/db';
+import { downloadPortablePlannerExport } from '../lib/portablePlannerExport';
 
 export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; onClose: () => void }) {
   const profile = useLiveQuery(() => db.profiles.get('#profile'));
@@ -24,9 +25,32 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
     return () => URL.revokeObjectURL(url);
   }, [profile?.avatar]);
 
+  useEffect(() => {
+    if (!isLoggedIn || !user?.userId) return;
+    const now = new Date().toISOString();
+    void db.profiles.get('#profile').then(existing => db.profiles.put({
+      id: '#profile',
+      nickname: existing?.nickname || fallbackName,
+      avatar: existing?.avatar ?? null,
+      legacy_dexie_user_id: user.userId ?? null,
+      email: user.email ?? null,
+      created_at: existing?.created_at ?? now,
+      updated_at: now,
+    }));
+  }, [fallbackName, isLoggedIn, user?.email, user?.userId]);
+
   const saveProfile = async (avatar = profile?.avatar ?? null) => {
     if (!nickname.trim()) return;
-    await db.profiles.put({ id: '#profile', nickname: nickname.trim(), avatar, updated_at: new Date().toISOString() });
+    const now = new Date().toISOString();
+    await db.profiles.put({
+      id: '#profile',
+      nickname: nickname.trim(),
+      avatar,
+      legacy_dexie_user_id: user?.userId ?? profile?.legacy_dexie_user_id ?? null,
+      email: user?.email ?? profile?.email ?? null,
+      created_at: profile?.created_at ?? now,
+      updated_at: now,
+    });
   };
   const loginWithEmail = async (event: React.FormEvent) => {
     event.preventDefault(); if (!email.trim()) return;
@@ -50,6 +74,7 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
         <label className="block text-sm font-medium">닉네임<input value={nickname} onChange={event => setNickname(event.target.value)} maxLength={40} className="mt-1.5 w-full rounded-xl border border-line bg-surface-muted px-3 py-2.5 outline-none focus:border-indigo-500" /></label>
         {notice && <p role="status" className="rounded-xl bg-surface-muted p-3 text-sm text-fg-muted">{notice}</p>}
         <button onClick={() => { void saveProfile().then(() => setNotice('프로필을 저장했습니다.')); }} disabled={!nickname.trim()} className="w-full rounded-xl bg-ink py-3 font-semibold text-on-ink disabled:opacity-40">프로필 저장</button>
+        <button onClick={() => { void downloadPortablePlannerExport().then(() => setNotice('사진을 포함한 이식용 백업을 내려받았습니다.')).catch(() => setNotice('백업을 만들지 못했습니다.')); }} className="w-full rounded-xl border border-line py-3 text-sm font-medium text-fg-muted hover:bg-surface-muted">내 데이터 백업 다운로드</button>
         <button onClick={() => { void db.cloud.logout(); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-line py-3 text-sm font-medium text-fg-muted hover:bg-surface-muted"><LogOut size={16} />이 기기에서 로그아웃</button>
       </div> : <form onSubmit={event => { void loginWithEmail(event); }} className="space-y-4"><p className="text-sm leading-6 text-fg-muted">비밀번호를 저장하지 않는 이메일 일회용 코드 로그인입니다. Google 로그인도 사용할 수 있습니다.</p><label className="block text-sm font-medium">이메일<input value={email} onChange={event => setEmail(event.target.value)} type="email" autoComplete="email" required className="mt-1.5 w-full rounded-xl border border-line bg-surface-muted px-3 py-2.5 outline-none focus:border-indigo-500" /></label>{notice && <p role="status" className="rounded-xl bg-surface-muted p-3 text-sm text-fg-muted">{notice}</p>}<button disabled={isSubmitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-3 font-semibold text-on-ink disabled:opacity-40"><Mail size={17} />이메일 코드 받기</button><button type="button" disabled={isSubmitting} onClick={() => { void loginWithGoogle(); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-line py-3 font-medium hover:bg-surface-muted disabled:opacity-40"><Globe2 size={17} />Google로 계속하기</button></form>}
     </section>

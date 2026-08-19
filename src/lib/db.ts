@@ -18,6 +18,8 @@ export interface Task {
   is_completed: boolean;
   memo: string;
   order: number;
+  // New uploads are compressed Blobs. `image_data` remains only for upgrading old local records.
+  image_blob?: Blob | null;
   image_data?: string | null;
 }
 
@@ -96,6 +98,9 @@ export interface Profile {
   id: '#profile';
   nickname: string;
   avatar: Blob | null;
+  legacy_dexie_user_id: string | null;
+  email: string | null;
+  created_at: string;
   updated_at: string;
 }
 
@@ -142,6 +147,16 @@ db.version(7).stores({
 });
 
 db.version(8).stores({
+  tasks: 'id, target_date, is_completed, is_important, deleted_at, domain_id, order',
+  schedules: 'id, target_date, start_time, deleted_at',
+  routines: 'id, start_date, deleted_at',
+  domains: 'id, deleted_at, order',
+  goals: 'id, time_frame, start_date, deleted_at',
+  deadlines: 'id, due_date, deleted_at',
+  profiles: 'id',
+});
+
+db.version(9).stores({
   tasks: 'id, target_date, is_completed, is_important, deleted_at, domain_id, order',
   schedules: 'id, target_date, start_time, deleted_at',
   routines: 'id, start_date, deleted_at',

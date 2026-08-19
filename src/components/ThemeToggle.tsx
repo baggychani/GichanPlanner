@@ -11,10 +11,17 @@ export function ThemeToggle({ className = '' }: ThemeToggleProps) {
   const [isDark, setIsDark] = useState(() => document.documentElement.classList.contains('dark'));
 
   const toggle = () => {
+    const root = document.documentElement;
     const next = !isDark;
-    document.documentElement.classList.toggle('dark', next);
+    root.classList.add('theme-switching');
+    root.classList.toggle('dark', next);
     localStorage.setItem(THEME_KEY, next ? 'dark' : 'light');
     setIsDark(next);
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        root.classList.remove('theme-switching');
+      });
+    });
   };
 
   return (

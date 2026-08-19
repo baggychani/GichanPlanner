@@ -26,6 +26,7 @@ import { TimePickerModal } from './components/TimePickerModal';
 import { WeeklyPanel } from './components/WeeklyPanel';
 import { ProfileModal } from './components/ProfileModal';
 import { useObservable } from 'dexie-react-hooks';
+import { migrateLegacyTaskImages } from './lib/imageAttachment';
 
 // Typography principle: small text is readable at normal weight. Reserve bold for page titles and primary actions only.
 // 빠른 만들기·일별 메뉴는 바깥을 눌러도 닫히지 않게 둔다. 달력 클릭과 메뉴 조작이 겹치지 않게 하려는 의도다.
@@ -116,6 +117,8 @@ function App() {
     if (dropFeedbackTimer.current !== null) window.clearTimeout(dropFeedbackTimer.current);
     if (optimisticClearTimer.current !== null) window.clearTimeout(optimisticClearTimer.current);
   }, []);
+
+  useEffect(() => { void migrateLegacyTaskImages(); }, []);
 
   const closeTaskEditor = () => {
     setEditingTask(null);

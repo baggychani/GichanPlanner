@@ -20,6 +20,7 @@ export function createBlankTask(targetDate: string): Task {
     is_important: false,
     is_completed: false,
     order: 0,
+    image_blob: null,
     image_data: null,
   };
 }

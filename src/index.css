@@ -57,13 +57,18 @@ html.dark {
   color-scheme: dark;
 }
 
+/* 테마를 바꾸는 동안에는 칸마다 배경이 따로 보간되지 않게 전환을 끈다. */
+html.theme-switching,
+html.theme-switching * {
+  transition: none !important;
+}
+
 body {
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  transition: background-color 180ms ease, color 180ms ease;
 }
 
 ::selection {

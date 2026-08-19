@@ -4,6 +4,8 @@ import { Calendar as CalendarIcon, Image as ImageIcon, Star, Trash2, Upload, X }
 import clsx from 'clsx';
 import type { Domain, Task } from '../lib/db';
 import { formatScheduledTime, parseDay } from '../lib/datetime';
+import { compressImage } from '../lib/imageAttachment';
+import { useObjectUrl } from '../hooks/useObjectUrl';
 import { Overlay } from './Overlay';
 
 type TaskEditModalProps = {
@@ -30,16 +32,18 @@ export function TaskEditModal({
   onSave,
 }: TaskEditModalProps) {
   const [isFileHover, setIsFileHover] = useState(false);
+  const [imageError, setImageError] = useState<string | null>(null);
+  const imageUrl = useObjectUrl(task.image_blob ?? null) ?? task.image_data ?? null;
 
-  const handleImageUpload = (file: File | null) => {
+  const handleImageUpload = async (file: File | null) => {
     if (!file || !file.type.startsWith('image/')) return;
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const image_data = event.target?.result;
-      if (typeof image_data !== 'string') return;
-      onChange({ ...task, image_data });
-    };
-    reader.readAsDataURL(file);
+    setImageError(null);
+    try {
+      const image_blob = await compressImage(file);
+      onChange({ ...task, image_blob, image_data: null });
+    } catch {
+      setImageError('사진을 압축하지 못했습니다. 다른 이미지 파일을 선택해 주세요.');
+    }
   };
 
   return (
@@ -102,9 +106,9 @@ export function TaskEditModal({
 
           <div>
             <label className="block text-xs font-medium text-fg-subtle mb-1">이미지 첨부</label>
-            {task.image_data ? (
+            {imageUrl ? (
               <div className="w-full bg-surface-muted rounded-xl border border-line-strong overflow-hidden">
-                <img src={task.image_data} alt="첨부" className="w-full object-contain max-h-[300px] bg-surface-hover" />
+                <img src={imageUrl} alt="첨부" className="w-full object-contain max-h-[300px] bg-surface-hover" />
                 <div className="p-2 flex justify-end gap-2 bg-surface border-t border-line-strong">
                   <label className="px-3 py-1.5 bg-surface-hover rounded-lg text-sm font-medium cursor-pointer transition-colors text-fg flex items-center gap-1.5">
                     <Upload size={14} />
@@ -112,7 +116,7 @@ export function TaskEditModal({
                     <input type="file" accept="image/*" className="hidden" onChange={(event) => handleImageUpload(event.target.files?.[0] ?? null)} />
                   </label>
                   <button
-                    onClick={() => onChange({ ...task, image_data: null })}
+                    onClick={() => onChange({ ...task, image_blob: null, image_data: null })}
                     className="px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/70 rounded-lg text-sm font-medium text-red-500 transition-colors flex items-center gap-1.5"
                   >
                     <Trash2 size={14} />
@@ -139,6 +143,7 @@ export function TaskEditModal({
                 <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(event) => handleImageUpload(event.target.files?.[0] ?? null)} />
               </div>
             )}
+            {imageError && <p role="alert" className="mt-2 text-xs text-red-500">{imageError}</p>}
           </div>
 
           <div>

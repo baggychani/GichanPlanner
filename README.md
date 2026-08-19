@@ -13,7 +13,13 @@
 
 ## 향후 Supabase 전환
 
-도메인 데이터는 Dexie Cloud에 직접 묶이지 않도록 UUID, 버전, 수정·삭제 시각을 유지합니다. `supabase/migrations/`에는 이후 Postgres·Storage 기반으로 옮길 때 사용할 초안이 있습니다. 현재 앱은 Supabase 환경 변수를 요구하지 않습니다.
+도메인 데이터는 Dexie Cloud에 직접 묶이지 않도록 UUID, 버전, 수정·삭제 시각을 유지합니다. 프로필에는 Dexie Cloud의 사용자 ID와 이메일을 함께 보존합니다. 이것은 Supabase 로그인 뒤 새 `auth.uid()`에 기존 데이터를 안전하게 연결하기 위한 매핑 키입니다.
+
+- 프로필 메뉴의 **내 데이터 백업 다운로드**는 할 일·일정·카테고리·프로필·압축 사진 Blob을 단일 JSON으로 내보냅니다.
+- `src/lib/supabasePlannerImport.ts`는 그 JSON을 Supabase Postgres와 Storage로 올리고, `legacy_dexie_identities`에 기존 Dexie 사용자 ID ↔ 새 Supabase 사용자 ID를 기록합니다.
+- `supabase/migrations/`에는 그 매핑 테이블, task/profile 사진 버킷, RLS 정책이 포함됩니다.
+
+Supabase 전환 당일에는 Dexie Cloud 쓰기를 잠시 멈추고 최종 백업을 만든 뒤, Supabase에서 각 사용자가 이메일 OTP 또는 Google로 한 번 로그인한 뒤 import를 실행합니다. Dexie OTP의 로그인 세션이나 비밀번호는 옮기지 않고, 검증된 새 로그인에 기존 데이터를 연결합니다. 현재 앱은 Supabase 환경 변수를 요구하지 않습니다.
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
 
