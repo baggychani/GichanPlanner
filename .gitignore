@@ -11,6 +11,8 @@ node_modules
 dist
 dist-ssr
 *.local
+dexie-cloud.json
+dexie-cloud.key
 
 # Editor directories and files
 .vscode/*
