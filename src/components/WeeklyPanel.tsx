@@ -57,12 +57,12 @@ export function WeeklyPanel({
         <button type="submit" className="w-10 h-10 flex items-center justify-center bg-primary text-on-primary rounded-xl font-bold hover:bg-yellow-400 transition-colors shrink-0"><Plus size={20} /></button>
       </form>
 
-      <div className="flex items-center justify-between px-1">
-        <span className="text-sm font-bold text-fg-muted">이번 주 체크리스트</span>
+      <div className="flex h-[22px] items-center justify-between px-1">
+        <span className="text-sm font-bold leading-none text-fg-muted">이번 주 체크리스트</span>
         {weekGoals.length > 0 && completedGoalCount === weekGoals.length ? (
           <ClearMark />
         ) : (
-          <span className="rounded-full border border-line-strong bg-surface-muted px-2 py-1 text-xs font-bold text-fg-muted">완료 {completedGoalCount}/{weekGoals.length}</span>
+          <span className="inline-flex h-[22px] items-center rounded-full border border-line-strong bg-surface-muted px-2 text-xs font-bold leading-none text-fg-muted">완료 {completedGoalCount}/{weekGoals.length}</span>
         )}
       </div>
 
