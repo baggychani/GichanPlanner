@@ -89,6 +89,7 @@ export interface Deadline {
   title: string;
   memo: string;
   due_date: string; // YYYY-MM-DD
+  due_time: string | null; // ISO string, optional time on the due date
   reminder_days: number | null;
 }
 
@@ -164,6 +165,20 @@ db.version(9).stores({
   goals: 'id, time_frame, start_date, deleted_at',
   deadlines: 'id, due_date, deleted_at',
   profiles: 'id',
+});
+
+db.version(10).stores({
+  tasks: 'id, target_date, is_completed, is_important, deleted_at, domain_id, order',
+  schedules: 'id, target_date, start_time, deleted_at',
+  routines: 'id, start_date, deleted_at',
+  domains: 'id, deleted_at, order',
+  goals: 'id, time_frame, start_date, deleted_at',
+  deadlines: 'id, due_date, deleted_at',
+  profiles: 'id',
+}).upgrade(async (transaction) => {
+  await transaction.table('deadlines').toCollection().modify((deadline: Deadline) => {
+    if (deadline.due_time === undefined) deadline.due_time = null;
+  });
 });
 
 const dexieCloudUrl = import.meta.env.VITE_DEXIE_CLOUD_URL;

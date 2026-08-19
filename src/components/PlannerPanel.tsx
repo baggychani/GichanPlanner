@@ -4,7 +4,7 @@ import { ArrowRight, CalendarDays, CircleX, Copy, MoreHorizontal, Trash2 } from 
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import type { Deadline } from '../lib/db';
-import { parseDay } from '../lib/datetime';
+import { formatScheduledTime, parseDay } from '../lib/datetime';
 
 type DeadlineNotice = { deadline: Deadline; remainingDays: number };
 
@@ -40,12 +40,14 @@ export function PlannerPanel({
   onOpenDeadline,
 }: PlannerPanelProps) {
   return (
-    <div className="w-[650px] bg-surface flex flex-col h-[calc(100vh-3rem)] sticky top-6 rounded-3xl shadow-sm border border-line overflow-hidden max-[1200px]:w-[calc(55vw-3rem)] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:h-[min(720px,calc(100vh-2rem))] max-[900px]:static">
+    <div className="w-[650px] bg-surface flex flex-col h-[calc(100vh-3.5rem)] sticky top-7 rounded-3xl shadow-sm border border-line overflow-hidden max-[1200px]:w-[calc(55vw-3rem)] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:static">
       <div className="flex items-center justify-between mb-6 shrink-0 px-8 pt-8 max-[1200px]:px-6 max-[1200px]:pt-6">
         <h2 className="text-2xl font-bold">
           {viewMode === 'DAILY'
             ? format(selectedDate, 'M월 d일 (E)', { locale: ko })
-            : `${format(weeklyGoalWeekStart!, 'M월 d일')} 주간 목표`}
+            : weeklyGoalWeekStart
+              ? `${format(weeklyGoalWeekStart, 'M월 d일')} 주간 목표`
+              : '주간 목표'}
         </h2>
         {viewMode === 'DAILY' && (
           <div className="relative">
@@ -78,6 +80,7 @@ export function PlannerPanel({
           <p className="px-1 text-xs font-medium text-red-500">데드라인 알림</p>
           {deadlineNotices.map(({ deadline, remainingDays }) => {
             const isDueToday = remainingDays === 0;
+            const dueTimeLabel = formatScheduledTime(deadline.due_time ?? null);
             return (
               <div
                 key={deadline.id}
@@ -98,7 +101,12 @@ export function PlannerPanel({
                   <p className={clsx('truncate text-sm', isDueToday ? 'font-bold text-red-700 dark:text-red-200' : 'font-medium text-fg')}>{deadline.title}</p>
                   {deadline.memo && <p className={clsx('mt-1 line-clamp-2 text-xs', isDueToday ? 'font-medium text-red-500' : 'text-fg-muted')}>{deadline.memo}</p>}
                 </div>
-                <span className={clsx('ml-auto shrink-0 text-xs', isDueToday ? 'font-bold text-red-600' : 'text-red-500', deadline.memo ? 'mt-0.5' : '')}>{format(parseDay(deadline.due_date), 'M/d')}</span>
+                <span className={clsx('ml-auto shrink-0 text-right text-xs', isDueToday ? 'font-bold text-red-600' : 'text-red-500', deadline.memo ? 'mt-0.5' : '')}>
+                  <span className="block">{format(parseDay(deadline.due_date), 'M/d')}</span>
+                  {dueTimeLabel && (
+                    <span className="mt-0.5 block font-medium">{dueTimeLabel}</span>
+                  )}
+                </span>
               </div>
             );
           })}

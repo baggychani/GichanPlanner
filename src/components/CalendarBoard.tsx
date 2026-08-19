@@ -4,10 +4,14 @@ import {
 } from 'date-fns';
 import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Plus, Repeat2, Settings, Target, ListTodo, UserRound } from 'lucide-react';
 import clsx from 'clsx';
+import { useLiveQuery } from 'dexie-react-hooks';
 import type { Deadline, Goal } from '../lib/db';
+import { db } from '../lib/db';
 import { EMPTY_DAY_COUNTS, isDayCleared, type DayTaskCounts } from '../lib/taskCounts';
 import { CountBubble } from './CountBubble';
 import { ThemeToggle } from './ThemeToggle';
+import { useAuth } from '../hooks/useAuth';
+import { useObjectUrl } from '../hooks/useObjectUrl';
 
 export type CalendarSelectionKind = 'deadline' | 'copy' | 'move' | null;
 
@@ -35,6 +39,39 @@ type CalendarBoardProps = {
 };
 
 const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일'];
+
+function CalendarAccountBar({ onOpen }: { onOpen: () => void }) {
+  const { session } = useAuth();
+  const isLoggedIn = Boolean(session);
+  const profile = useLiveQuery(
+    () => (isLoggedIn ? db.profiles.get('#profile') : undefined),
+    [isLoggedIn],
+  );
+  const avatarUrl = useObjectUrl(isLoggedIn ? profile?.avatar ?? null : null);
+  const email = session?.user?.email || '';
+  const nickname = profile?.nickname || email.split('@')[0] || '사용자';
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={isLoggedIn ? '프로필 및 계정' : '로그인'}
+      className="mb-4 flex w-full items-center gap-3 rounded-3xl border border-line bg-surface px-4 py-3 text-left shadow-sm hover:bg-surface-muted"
+    >
+      <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+        {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserRound size={22} />}
+      </span>
+      {isLoggedIn ? (
+        <span className="min-w-0">
+          <span className="block truncate text-[15px] font-semibold text-fg">{nickname}</span>
+          <span className="block truncate text-sm text-fg-muted">{email}</span>
+        </span>
+      ) : (
+        <span className="text-[15px] font-medium text-fg-muted">계정에 로그인하세요</span>
+      )}
+    </button>
+  );
+}
 
 export function CalendarBoard({
   currentDate,
@@ -93,7 +130,7 @@ export function CalendarBoard({
           key={day.toString()}
           onClick={() => onCellClick(cloneDay)}
           className={clsx(
-            'min-h-[110px] p-2 border-line transition-[filter] duration-150 cursor-pointer relative group max-[1200px]:min-h-[88px]',
+            'min-h-[102px] p-1.5 border-line transition-[filter] duration-150 cursor-pointer relative group max-[1200px]:min-h-[82px]',
             isSelecting ? 'hover:bg-primary/20' : 'hover:brightness-95',
             isWeekend && !isSelecting ? (i === 6 ? 'bg-red-50/30 dark:bg-red-950/25' : 'bg-blue-50/30 dark:bg-blue-950/25') : 'bg-surface',
             !isSameMonth(day, monthStart) ? 'opacity-40' : '',
@@ -116,7 +153,7 @@ export function CalendarBoard({
             </span>
             {hasDeadline && <AlertCircle size={18} strokeWidth={2.5} className="text-red-500 drop-shadow-sm" aria-label={`${dayDeadlines.length}개의 데드라인`} />}
           </div>
-          <div className="mt-2 flex items-center justify-center gap-1">
+          <div className="mt-1.5 flex items-center justify-center gap-1">
             {dayCleared ? (
               <>
                 {dayCounts.completedImportant > 0 && <CountBubble count={0} tone="important" size="md" />}
@@ -167,7 +204,7 @@ export function CalendarBoard({
 
   return (
     <div className="w-[760px] shrink-0 relative max-[1560px]:w-[45vw] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:pl-0">
-      <div className="flex justify-between items-center mb-6 pl-4 relative">
+      <div className="flex justify-between items-center mb-4 pl-4 relative">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold leading-tight">
             <span className="max-[600px]:hidden">{format(currentDate, 'yyyy.')}</span>
@@ -233,11 +270,13 @@ export function CalendarBoard({
         </div>
       </div>
 
+      <CalendarAccountBar onOpen={onOpenProfile} />
+
       <div className="bg-surface rounded-3xl shadow-sm border border-line relative z-0">
-        <div className="grid grid-cols-7 bg-surface rounded-t-3xl pt-2 pb-2 border-b border-line">
+        <div className="grid grid-cols-7 bg-surface rounded-t-3xl pt-1.5 pb-1.5 border-b border-line">
           {WEEKDAYS.map((label, i) => (
             <div key={label} className={clsx(
-              'text-center text-sm font-medium py-2',
+              'text-center text-sm font-medium py-1.5',
               i === 5 ? 'text-blue-500' : i === 6 ? 'text-red-500' : 'text-fg-muted',
             )}>
               {label}

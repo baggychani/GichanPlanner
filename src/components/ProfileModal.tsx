@@ -13,7 +13,7 @@ import { authErrorMessage, authInputClass, PasswordField } from './authUi';
 
 export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; onClose: () => void }) {
   const { session, isLoading } = useAuth();
-  const [openedLoggedIn, setOpenedLoggedIn] = useState<boolean | null>(null);
+  const [openedLoggedIn, setOpenedLoggedIn] = useState<boolean | null>(() => (isLoading ? null : Boolean(session)));
   const profile = useLiveQuery(() => db.profiles.get('#profile'));
   const [view, setView] = useState<'profile' | 'password'>('profile');
   const [nickname, setNickname] = useState('');
@@ -118,7 +118,17 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
   const title = view === 'password' ? '비밀번호 변경' : '프로필';
 
   return (
-    <Overlay zClassName="z-[70]" onEscape={onClose}>
+    <Overlay
+      zClassName="z-[70]"
+      onEscape={() => {
+        if (view === 'password') {
+          setView('profile');
+          setError(null);
+          return;
+        }
+        onClose();
+      }}
+    >
       <section aria-label="프로필 및 계정" className="w-full max-w-[400px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
         {openedLoggedIn === null && (
           <div className="flex justify-end">

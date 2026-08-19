@@ -3,7 +3,7 @@ import { ko } from 'date-fns/locale';
 import { AlertCircle, Calendar as CalendarIcon, X } from 'lucide-react';
 import clsx from 'clsx';
 import { db, type Deadline } from '../lib/db';
-import { parseDay } from '../lib/datetime';
+import { formatScheduledTime, parseDay } from '../lib/datetime';
 import { Overlay } from './Overlay';
 
 const REMINDER_DAYS = [null, 1, 3, 7, 14, 30] as const;
@@ -38,11 +38,13 @@ type DeadlineCreateModalProps = {
   title: string;
   memo: string;
   dueDate: string;
+  dueTime: string | null;
   reminderDays: number | null;
   onTitleChange: (value: string) => void;
   onMemoChange: (value: string) => void;
   onReminderChange: (days: number | null) => void;
   onPickDate: () => void;
+  onOpenTimePicker: () => void;
   onClose: () => void;
   onSave: () => void;
 };
@@ -51,11 +53,13 @@ export function DeadlineCreateModal({
   title,
   memo,
   dueDate,
+  dueTime,
   reminderDays,
   onTitleChange,
   onMemoChange,
   onReminderChange,
   onPickDate,
+  onOpenTimePicker,
   onClose,
   onSave,
 }: DeadlineCreateModalProps) {
@@ -83,6 +87,13 @@ export function DeadlineCreateModal({
             </div>
           </div>
           <div>
+            <label className="mb-1 block text-xs font-medium text-fg-subtle">시간</label>
+            <div className="flex items-center justify-between rounded-xl bg-surface-muted p-3">
+              <span className="text-sm text-fg-muted">{formatScheduledTime(dueTime) ?? '시간 없음'}</span>
+              <button onClick={onOpenTimePicker} className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover"><CalendarIcon size={14} /> 시간 설정</button>
+            </div>
+          </div>
+          <div>
             <label className="mb-2 block text-xs font-medium text-fg-subtle">알림 시작</label>
             <ReminderPicker value={reminderDays} onChange={onReminderChange} />
             <p className="mt-2 text-xs text-fg-subtle">설정한 기간에만 오른쪽 일정 창에서 디데이를 표시합니다.</p>
@@ -101,11 +112,13 @@ export function DeadlineEditModal({
   deadline,
   onChange,
   onPickDate,
+  onOpenTimePicker,
   onClose,
 }: {
   deadline: Deadline;
   onChange: (deadline: Deadline) => void;
   onPickDate: () => void;
+  onOpenTimePicker: () => void;
   onClose: () => void;
 }) {
   return (
@@ -129,6 +142,13 @@ export function DeadlineEditModal({
             <div className="flex items-center justify-between rounded-xl bg-surface-muted p-3">
               <span className="text-sm text-fg">{format(parseDay(deadline.due_date), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
               <button onClick={onPickDate} className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover"><CalendarIcon size={14} /> 날짜 변경</button>
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-fg-subtle">시간</label>
+            <div className="flex items-center justify-between rounded-xl bg-surface-muted p-3">
+              <span className="text-sm text-fg-muted">{formatScheduledTime(deadline.due_time ?? null) ?? '시간 없음'}</span>
+              <button onClick={onOpenTimePicker} className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover"><CalendarIcon size={14} /> 시간 설정</button>
             </div>
           </div>
           <div>

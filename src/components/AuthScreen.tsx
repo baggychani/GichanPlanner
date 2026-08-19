@@ -27,7 +27,10 @@ export function AuthPanel({ onSuccess }: { onSuccess: () => void }) {
       setError('로그인 설정이 되어 있지 않습니다.');
       return;
     }
-    if (!email.trim()) return;
+    if (!email.trim()) {
+      setError('이메일을 입력하세요.');
+      return;
+    }
     setIsSubmitting(true);
     setError(null);
     try {
@@ -46,6 +49,11 @@ export function AuthPanel({ onSuccess }: { onSuccess: () => void }) {
     event.preventDefault();
     if (!supabase) {
       setError('로그인 설정이 되어 있지 않습니다.');
+      return;
+    }
+
+    if ((view === 'login' || view === 'signup' || view === 'forgot-code') && !email.trim()) {
+      setError('이메일을 입력하세요.');
       return;
     }
 

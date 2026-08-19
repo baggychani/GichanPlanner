@@ -13,12 +13,16 @@ export function Overlay({
   children,
   className,
   zClassName = 'z-50',
+  align = 'center',
   onEscape,
+  onBackdropClick,
 }: {
   children: ReactNode;
   className?: string;
   zClassName?: string;
+  align?: 'center' | 'bottom';
   onEscape?: () => void;
+  onBackdropClick?: () => void;
 }) {
   const onEscapeRef = useRef(onEscape);
   onEscapeRef.current = onEscape;
@@ -43,7 +47,15 @@ export function Overlay({
   }, [onEscape != null]);
 
   return (
-    <div className={clsx('fixed inset-0 flex items-center justify-center bg-black/20 p-4 dark:bg-black/55', zClassName, className)}>
+    <div
+      className={clsx(
+        'fixed inset-0 flex justify-center bg-black/20 p-4 dark:bg-black/55',
+        align === 'bottom' ? 'items-end sm:items-center' : 'items-center',
+        zClassName,
+        className,
+      )}
+      onClick={onBackdropClick ? (event) => { if (event.target === event.currentTarget) onBackdropClick(); } : undefined}
+    >
       {children}
     </div>
   );

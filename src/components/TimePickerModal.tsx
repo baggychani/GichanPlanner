@@ -1,5 +1,6 @@
 import clsx from 'clsx';
 import type { Meridiem } from '../lib/datetime';
+import { Overlay } from './Overlay';
 
 type TimePickerModalProps = {
   meridiem: Meridiem;
@@ -8,6 +9,7 @@ type TimePickerModalProps = {
   onMeridiemChange: (meridiem: Meridiem) => void;
   onHourChange: (hour: number) => void;
   onMinuteChange: (minute: number) => void;
+  onClose: () => void;
   onClear: () => void;
   onConfirm: () => void;
 };
@@ -19,11 +21,12 @@ export function TimePickerModal({
   onMeridiemChange,
   onHourChange,
   onMinuteChange,
+  onClose,
   onClear,
   onConfirm,
 }: TimePickerModalProps) {
   return (
-    <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 dark:bg-black/55 p-4 sm:items-center">
+    <Overlay zClassName="z-[60]" align="bottom" onEscape={onClose}>
       <div className="w-full max-w-[420px] rounded-3xl bg-surface p-5 shadow-2xl">
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line-strong" />
         <h3 className="mb-4 text-center text-base font-medium text-fg">시간 설정</h3>
@@ -51,6 +54,6 @@ export function TimePickerModal({
           <button onClick={onConfirm} className="rounded-xl bg-ink py-2.5 text-sm font-medium text-on-ink hover:opacity-90">완료</button>
         </div>
       </div>
-    </div>
+    </Overlay>
   );
 }

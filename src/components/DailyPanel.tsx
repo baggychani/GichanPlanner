@@ -142,7 +142,7 @@ export function DailyPanel({
               )}
 
               {!isAdding && categoryTasks.length === 0 && !snapshot.isDraggingOver && (
-                <div className="pl-9 pt-2 pb-1 text-sm text-fg-faint font-sans">오늘은 등록된 할 일이 없습니다</div>
+                <div className="pl-9 pt-2 pb-1 text-sm text-fg-faint font-sans">등록된 할 일이 없습니다</div>
               )}
             </div>
           </div>

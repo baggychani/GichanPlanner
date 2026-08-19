@@ -56,7 +56,9 @@ function PlannerApp() {
   const [deadlineTitle, setDeadlineTitle] = useState('');
   const [deadlineMemo, setDeadlineMemo] = useState('');
   const [deadlineDueDate, setDeadlineDueDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [deadlineDueTime, setDeadlineDueTime] = useState<string | null>(null);
   const [deadlineReminderDays, setDeadlineReminderDays] = useState<number | null>(null);
+  const [timePickerKind, setTimePickerKind] = useState<'task' | 'deadline'>('task');
 
   const [quickAddCategoryId, setQuickAddCategoryId] = useState<string | null>(null);
   const [quickAddTitle, setQuickAddTitle] = useState('');
@@ -104,21 +106,22 @@ function PlannerApp() {
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      if (viewingImage) setViewingImage(null);
-      else if (isTimePickerOpen) setIsTimePickerOpen(false);
-      else if (hasEscapeOverlay()) return;
-      else if (isQuickCreateMenuOpen) setIsQuickCreateMenuOpen(false);
-      else if (isSelectingDeadlineDate) { setIsSelectingDeadlineDate(false); setIsDeadlineModalOpen(true); }
-      else if (isDailyMenuOpen) setIsDailyMenuOpen(false);
-      else if (confirmDailyAction) setConfirmDailyAction(null);
-      else if (isNoIncompleteNoticeOpen) setIsNoIncompleteNoticeOpen(false);
-      else if (selectingDateForDeadline) setSelectingDateForDeadline(null);
-      else if (selectingDateForTask) setSelectingDateForTask(null);
-      else if (dateSelectionMode) setDateSelectionMode(null);
+      if (hasEscapeOverlay()) return;
+      const consume = (fn: () => void) => {
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        fn();
+      };
+      if (isQuickCreateMenuOpen) consume(() => setIsQuickCreateMenuOpen(false));
+      else if (isSelectingDeadlineDate) consume(() => { setIsSelectingDeadlineDate(false); setIsDeadlineModalOpen(true); });
+      else if (isDailyMenuOpen) consume(() => setIsDailyMenuOpen(false));
+      else if (selectingDateForDeadline) consume(() => setSelectingDateForDeadline(null));
+      else if (selectingDateForTask) consume(() => setSelectingDateForTask(null));
+      else if (dateSelectionMode) consume(() => setDateSelectionMode(null));
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewingImage, isQuickCreateMenuOpen, isSelectingDeadlineDate, isDailyMenuOpen, isTimePickerOpen, confirmDailyAction, isNoIncompleteNoticeOpen, selectingDateForDeadline, selectingDateForTask, dateSelectionMode]);
+  }, [isQuickCreateMenuOpen, isSelectingDeadlineDate, isDailyMenuOpen, selectingDateForDeadline, selectingDateForTask, dateSelectionMode]);
 
   useEffect(() => () => {
     if (dropFeedbackTimer.current !== null) window.clearTimeout(dropFeedbackTimer.current);
@@ -137,12 +140,30 @@ function PlannerApp() {
     setIsCreatingTask(false);
     setEditingDeadline(null);
     setConfirmDailyAction(null);
+    setIsTimePickerOpen(false);
   }, [isLoggedIn]);
 
   const closeTaskEditor = () => {
     setEditingTask(null);
     setIsCreatingTask(false);
     setIsTimePickerOpen(false);
+  };
+
+  const openTimePicker = (kind: 'task' | 'deadline') => {
+    const dueDate = kind === 'task'
+      ? editingTask?.target_date
+      : editingDeadline?.due_date ?? deadlineDueDate;
+    const current = kind === 'task'
+      ? editingTask?.scheduled_time
+      : editingDeadline?.due_time ?? deadlineDueTime;
+    if (!dueDate) return;
+    const date = current ? parseISO(current) : new Date(`${dueDate}T09:00:00`);
+    const parts = timePartsFromDate(date);
+    setTimeMeridiem(parts.meridiem);
+    setTimeHour(parts.hour);
+    setTimeMinute(parts.minute);
+    setTimePickerKind(kind);
+    setIsTimePickerOpen(true);
   };
 
   const saveQuickAdd = async (categoryId: string | null, closeAfterSave = false) => {
@@ -184,16 +205,6 @@ function PlannerApp() {
     }
   };
 
-  const openTimePicker = () => {
-    if (!editingTask) return;
-    const date = editingTask.scheduled_time ? parseISO(editingTask.scheduled_time) : new Date(`${editingTask.target_date}T09:00:00`);
-    const parts = timePartsFromDate(date);
-    setTimeMeridiem(parts.meridiem);
-    setTimeHour(parts.hour);
-    setTimeMinute(parts.minute);
-    setIsTimePickerOpen(true);
-  };
-
   const saveDeadline = async () => {
     if (!deadlineTitle.trim()) return;
     const now = new Date().toISOString();
@@ -206,12 +217,15 @@ function PlannerApp() {
       title: deadlineTitle.trim(),
       memo: deadlineMemo.trim(),
       due_date: deadlineDueDate,
+      due_time: deadlineDueTime,
       reminder_days: deadlineReminderDays,
     });
     setDeadlineTitle('');
     setDeadlineMemo('');
+    setDeadlineDueTime(null);
     setDeadlineReminderDays(null);
     setIsDeadlineModalOpen(false);
+    setIsTimePickerOpen(false);
   };
 
   const saveEditingTask = async () => {
@@ -245,12 +259,19 @@ function PlannerApp() {
     const destinationDate = format(day, 'yyyy-MM-dd');
     if (isSelectingDeadlineDate) {
       setDeadlineDueDate(destinationDate);
+      setDeadlineDueTime(current => deadlineOnDate(current, destinationDate));
       setIsSelectingDeadlineDate(false);
       setIsDeadlineModalOpen(true);
     } else if (selectingDateForDeadline) {
       const deadline = await db.deadlines.get(selectingDateForDeadline);
       if (deadline && deadline.deleted_at === null) {
-        const updatedDeadline = { ...deadline, due_date: destinationDate, updated_at: new Date().toISOString(), version: deadline.version + 1 };
+        const updatedDeadline = {
+          ...deadline,
+          due_date: destinationDate,
+          due_time: deadlineOnDate(deadline.due_time, destinationDate),
+          updated_at: new Date().toISOString(),
+          version: deadline.version + 1,
+        };
         await db.deadlines.put(updatedDeadline);
         setEditingDeadline(updatedDeadline);
       }
@@ -290,7 +311,7 @@ function PlannerApp() {
   };
 
   return (
-    <div className="min-h-screen flex justify-center p-6 gap-10 bg-bgPrimary pl-24 max-[1560px]:pl-6 max-[1560px]:gap-6 max-[1200px]:gap-3 max-[1200px]:p-3 max-[900px]:flex-col max-[900px]:items-center max-[900px]:gap-5 max-[900px]:p-4">
+    <div className="min-h-screen flex justify-center px-6 py-7 gap-10 bg-bgPrimary pl-24 max-[1560px]:pl-6 max-[1560px]:gap-6 max-[1200px]:gap-3 max-[1200px]:px-3 max-[1200px]:py-4 max-[900px]:flex-col max-[900px]:items-center max-[900px]:gap-5 max-[900px]:px-4 max-[900px]:py-5">
       <CalendarBoard
         currentDate={currentDate}
         selectedDate={selectedDate}
@@ -321,6 +342,7 @@ function PlannerApp() {
         onCreateDeadline={() => {
           if (!requireLogin()) return;
           setDeadlineDueDate(format(selectedDate, 'yyyy-MM-dd'));
+          setDeadlineDueTime(null);
           setIsDeadlineModalOpen(true);
           setIsQuickCreateMenuOpen(false);
         }}
@@ -389,6 +411,7 @@ function PlannerApp() {
         }}
       >
         {viewMode === 'DAILY' ? (
+          isLoggedIn ? (
           <DailyPanel
             selectedDate={selectedDate}
             categories={categories}
@@ -416,7 +439,8 @@ function PlannerApp() {
             onOpenTask={(task) => { setIsCreatingTask(false); setEditingTask(task); }}
             onViewImage={setViewingImage}
           />
-        ) : weeklyGoalWeekStart ? (
+          ) : null
+        ) : weeklyGoalWeekStart && isLoggedIn ? (
           <WeeklyPanel
             weekStart={weeklyGoalWeekStart}
             goals={goals}
@@ -434,12 +458,14 @@ function PlannerApp() {
           title={deadlineTitle}
           memo={deadlineMemo}
           dueDate={deadlineDueDate}
+          dueTime={deadlineDueTime}
           reminderDays={deadlineReminderDays}
           onTitleChange={setDeadlineTitle}
           onMemoChange={setDeadlineMemo}
           onReminderChange={setDeadlineReminderDays}
-          onPickDate={() => { setIsDeadlineModalOpen(false); setIsSelectingDeadlineDate(true); }}
-          onClose={() => setIsDeadlineModalOpen(false)}
+          onPickDate={() => { setIsTimePickerOpen(false); setIsDeadlineModalOpen(false); setIsSelectingDeadlineDate(true); }}
+          onOpenTimePicker={() => openTimePicker('deadline')}
+          onClose={() => { setIsTimePickerOpen(false); setIsDeadlineModalOpen(false); }}
           onSave={() => { void saveDeadline(); }}
         />
       )}
@@ -448,8 +474,9 @@ function PlannerApp() {
         <DeadlineEditModal
           deadline={editingDeadline}
           onChange={setEditingDeadline}
-          onPickDate={() => { setSelectingDateForDeadline(editingDeadline.id); setEditingDeadline(null); }}
-          onClose={() => setEditingDeadline(null)}
+          onPickDate={() => { setIsTimePickerOpen(false); setSelectingDateForDeadline(editingDeadline.id); setEditingDeadline(null); }}
+          onOpenTimePicker={() => openTimePicker('deadline')}
+          onClose={() => { setIsTimePickerOpen(false); setEditingDeadline(null); }}
         />
       )}
 
@@ -465,7 +492,7 @@ function PlannerApp() {
             setSelectingDateForTask(editingTask.id);
             if (!isCreatingTask) setEditingTask(null);
           }}
-          onOpenTimePicker={openTimePicker}
+          onOpenTimePicker={() => openTimePicker('task')}
           onDelete={async () => {
             const now = new Date().toISOString();
             await db.tasks.update(editingTask.id, { deleted_at: now, updated_at: now, version: editingTask.version + 1 });
@@ -475,7 +502,7 @@ function PlannerApp() {
         />
       )}
 
-      {isTimePickerOpen && editingTask && !selectingDateForTask && (
+      {isTimePickerOpen && (timePickerKind === 'task' ? editingTask && !selectingDateForTask : isDeadlineModalOpen || editingDeadline) && (
         <TimePickerModal
           meridiem={timeMeridiem}
           hour={timeHour}
@@ -483,9 +510,22 @@ function PlannerApp() {
           onMeridiemChange={setTimeMeridiem}
           onHourChange={setTimeHour}
           onMinuteChange={setTimeMinute}
-          onClear={() => { setEditingTask({ ...editingTask, scheduled_time: null }); setIsTimePickerOpen(false); }}
+          onClose={() => setIsTimePickerOpen(false)}
+          onClear={() => {
+            if (timePickerKind === 'task' && editingTask) setEditingTask({ ...editingTask, scheduled_time: null });
+            else if (editingDeadline) setEditingDeadline({ ...editingDeadline, due_time: null });
+            else setDeadlineDueTime(null);
+            setIsTimePickerOpen(false);
+          }}
           onConfirm={() => {
-            setEditingTask({ ...editingTask, scheduled_time: isoFromTimeParts(editingTask.target_date, timeMeridiem, timeHour, timeMinute) });
+            const dueDate = timePickerKind === 'task'
+              ? editingTask?.target_date
+              : editingDeadline?.due_date ?? deadlineDueDate;
+            if (!dueDate) return;
+            const next = isoFromTimeParts(dueDate, timeMeridiem, timeHour, timeMinute);
+            if (timePickerKind === 'task' && editingTask) setEditingTask({ ...editingTask, scheduled_time: next });
+            else if (editingDeadline) setEditingDeadline({ ...editingDeadline, due_time: next });
+            else setDeadlineDueTime(next);
             setIsTimePickerOpen(false);
           }}
         />
