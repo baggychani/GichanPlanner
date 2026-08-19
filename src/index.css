@@ -1,6 +1,8 @@
 @import url("https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard-dynamic-subset.min.css");
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Pretendard", sans-serif;
   /* 할 일 제목용 레거시 글꼴. 현재 행 스타일에서는 쓰지 않지만 삭제하지 말 것. */
@@ -9,6 +11,35 @@
   --color-primary: #FFD951;
   --color-text-primary: #333333;
   --color-bg-primary: #FAFAFA;
+  --color-surface: #ffffff;
+  --color-surface-muted: #f9fafb;
+  --color-surface-hover: #f3f4f6;
+  --color-line: #f3f4f6;
+  --color-line-strong: #e5e7eb;
+  --color-fg: #1f2937;
+  --color-fg-muted: #6b7280;
+  --color-fg-subtle: #9ca3af;
+  --color-fg-faint: #d1d5db;
+  --color-on-primary: #333333;
+  --color-ink: #111827;
+  --color-on-ink: #ffffff;
+}
+
+.dark {
+  color-scheme: dark;
+  --color-text-primary: #f3f4f6;
+  --color-bg-primary: #121212;
+  --color-surface: #1c1c1c;
+  --color-surface-muted: #262626;
+  --color-surface-hover: #333333;
+  --color-line: #2a2a2a;
+  --color-line-strong: #3f3f46;
+  --color-fg: #f4f4f5;
+  --color-fg-muted: #a1a1aa;
+  --color-fg-subtle: #71717a;
+  --color-fg-faint: #52525b;
+  --color-ink: #f4f4f5;
+  --color-on-ink: #18181b;
 }
 
 @font-face {
@@ -18,12 +49,21 @@
   font-display: swap;
 }
 
+html {
+  color-scheme: light;
+}
+
+html.dark {
+  color-scheme: dark;
+}
+
 body {
   background-color: var(--color-bg-primary);
   color: var(--color-text-primary);
   font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  transition: background-color 180ms ease, color 180ms ease;
 }
 
 ::selection {
@@ -38,4 +78,29 @@ body {
 
 .task-drop-feedback {
   animation: task-drop-feedback 420ms ease-out;
+}
+
+/* 스크롤바는 카드 오른쪽 패딩에 얹혀 본문 폭을 줄이지 않는다. */
+.panel-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin-right: -20px;
+  padding-right: 20px;
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--color-fg) 28%, transparent) transparent;
+}
+
+.panel-scroll::-webkit-scrollbar {
+  width: 8px;
+}
+
+.panel-scroll::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panel-scroll::-webkit-scrollbar-thumb {
+  background-color: color-mix(in srgb, var(--color-fg) 22%, transparent);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }

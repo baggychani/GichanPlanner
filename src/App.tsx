@@ -15,6 +15,7 @@ import { EmojiIcon } from './components/EmojiIcon';
 import { TaskRow } from './components/TaskRow';
 import { TimePickerModal } from './components/TimePickerModal';
 import { ConfirmDailyDeleteDialog, ImageViewer, NoIncompleteNoticeDialog } from './components/DailyDialogs';
+import { ThemeToggle } from './components/ThemeToggle';
 
 // Typography principle: small text is readable at normal weight. Reserve bold for page titles and primary actions only.
 // 빠른 만들기·일별 메뉴는 바깥을 눌러도 닫히지 않게 둔다. 달력 클릭과 메뉴 조작이 겹치지 않게 하려는 의도다.
@@ -341,7 +342,7 @@ function App() {
     <div className="flex justify-between items-center mb-6 pl-4 relative">
       <div className="flex items-center gap-4">
         <h1 className="text-3xl font-bold">{format(currentDate, 'yyyy. MM')}</h1>
-        <button onClick={goToToday} className="px-4 py-1.5 bg-white border border-gray-200 rounded-full text-sm font-medium hover:bg-gray-50 shadow-sm transition-colors">
+        <button onClick={goToToday} className="px-4 py-1.5 bg-surface border border-line-strong rounded-full text-sm font-medium hover:bg-surface-muted shadow-sm transition-colors">
           오늘
         </button>
       </div>
@@ -360,13 +361,13 @@ function App() {
             onClick={() => setIsQuickCreateMenuOpen(open => !open)}
             aria-label="빠른 만들기 메뉴"
             aria-expanded={isQuickCreateMenuOpen}
-            className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600"
+            className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted"
             title="빠른 만들기"
           >
             <Plus size={24} />
           </button>
           <div className={clsx(
-            "absolute top-12 right-0 w-48 overflow-hidden rounded-2xl border border-gray-100 bg-white p-1.5 shadow-xl origin-top-right transition-all duration-200 z-40",
+            "absolute top-12 right-0 w-48 overflow-hidden rounded-2xl border border-line bg-surface p-1.5 shadow-xl origin-top-right transition-all duration-200 z-40",
             isQuickCreateMenuOpen ? "scale-100 opacity-100 translate-y-0" : "pointer-events-none scale-95 opacity-0 -translate-y-1"
           )}>
             <button onClick={() => {
@@ -391,25 +392,26 @@ function App() {
                 image_data: null,
               });
               setIsQuickCreateMenuOpen(false);
-            }} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+            }} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-surface-muted hover:text-fg transition-colors">
               <ListTodo size={16} /> 할 일 만들기
             </button>
-            <button onClick={() => { setDeadlineDueDate(format(selectedDate, 'yyyy-MM-dd')); setIsDeadlineModalOpen(true); setIsQuickCreateMenuOpen(false); }} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors">
+            <button onClick={() => { setDeadlineDueDate(format(selectedDate, 'yyyy-MM-dd')); setIsDeadlineModalOpen(true); setIsQuickCreateMenuOpen(false); }} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 transition-colors">
               <AlertCircle size={16} /> 데드라인 만들기
             </button>
-            <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-gray-400 cursor-not-allowed">
+            <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
               <Repeat2 size={16} /> 루틴 만들기
             </button>
           </div>
         </div>
-        <button onClick={() => setIsCategoryModalOpen(true)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600" title="카테고리 관리">
+        <button onClick={() => setIsCategoryModalOpen(true)} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted" title="카테고리 관리">
           <Settings size={22} />
         </button>
-        <div className="w-px h-6 bg-gray-200 mx-1" />
-        <button onClick={prevMonth} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600">
+        <ThemeToggle />
+        <div className="w-px h-6 bg-line-strong mx-1" />
+        <button onClick={prevMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
           <ChevronLeft size={24} />
         </button>
-        <button onClick={nextMonth} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-600">
+        <button onClick={nextMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
           <ChevronRight size={24} />
         </button>
       </div>
@@ -419,11 +421,11 @@ function App() {
   const renderDays = () => {
     const days = ['월', '화', '수', '목', '금', '토', '일'];
     return (
-      <div className="grid grid-cols-7 bg-white rounded-t-3xl pt-2 pb-2 border-b border-gray-100">
+      <div className="grid grid-cols-7 bg-surface rounded-t-3xl pt-2 pb-2 border-b border-line">
         {days.map((day, i) => (
           <div key={day} className={clsx(
             "text-center text-sm font-medium py-2",
-            i === 5 ? "text-blue-500" : i === 6 ? "text-red-500" : "text-gray-500"
+            i === 5 ? "text-blue-500" : i === 6 ? "text-red-500" : "text-fg-muted"
           )}>
             {day}
           </div>
@@ -461,9 +463,9 @@ function App() {
             key={day.toString()}
             onClick={() => handleCellClick(cloneDay)}
             className={clsx(
-              "min-h-[110px] p-2 border-gray-100 transition-all cursor-pointer relative group",
+              "min-h-[110px] p-2 border-line transition-all cursor-pointer relative group",
               (selectingDateForTask || selectingDateForDeadline || dateSelectionMode || isSelectingDeadlineDate) ? "hover:bg-primary/20" : "hover:brightness-95",
-              isWeekend && !(selectingDateForTask || selectingDateForDeadline || dateSelectionMode || isSelectingDeadlineDate) ? (i === 6 ? "bg-red-50/30" : "bg-blue-50/30") : "bg-white",
+              isWeekend && !(selectingDateForTask || selectingDateForDeadline || dateSelectionMode || isSelectingDeadlineDate) ? (i === 6 ? "bg-red-50/30 dark:bg-red-950/25" : "bg-blue-50/30 dark:bg-blue-950/25") : "bg-surface",
               !isSameMonth(day, monthStart) ? "opacity-40" : "",
               isSameDay(day, selectedDate) && !(selectingDateForTask || selectingDateForDeadline || dateSelectionMode || isSelectingDeadlineDate) && viewMode === 'DAILY' ? "ring-2 ring-primary ring-inset z-10" : "",
               hasDeadline ? "shadow-[inset_-5px_0_12px_-7px_rgba(239,68,68,0.95)]" : "",
@@ -476,7 +478,7 @@ function App() {
             <div className="flex justify-between items-start">
               <span className={clsx(
                 "flex items-center justify-center w-8 h-8 rounded-full text-base font-semibold",
-                isToday(day) ? "bg-primary text-textPrimary" : 
+                isToday(day) ? "bg-primary text-on-primary" : 
                 i === 5 ? "text-blue-500" : 
                 i === 6 ? "text-red-500" : ""
               )}>
@@ -486,14 +488,14 @@ function App() {
             </div>
 
             <div className="mt-2 flex items-center justify-center gap-1">
-              {dayCounts.active > 0 && (
-                <div className="min-w-7 px-2 py-1 rounded-full text-sm font-bold w-max bg-gray-100 text-gray-700 text-center">
-                  {dayCounts.active}
+              {dayCounts.important > 0 && (
+                <div className="min-w-7 px-2 py-1 rounded-full text-sm font-bold w-max bg-primary text-on-primary text-center">
+                  {dayCounts.important}
                 </div>
               )}
-              {dayCounts.important > 0 && (
-                <div className="min-w-7 px-2 py-1 rounded-full text-sm font-bold w-max bg-primary text-textPrimary text-center">
-                  {dayCounts.important}
+              {dayCounts.active > 0 && (
+                <div className="min-w-7 px-2 py-1 rounded-full text-sm font-bold w-max bg-surface-hover text-fg text-center">
+                  {dayCounts.active}
                 </div>
               )}
             </div>
@@ -516,7 +518,7 @@ function App() {
           <div 
             className={clsx(
               "absolute -left-16 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border shadow-sm flex items-center justify-center cursor-pointer transition-all z-10",
-              isSelectedWeek ? "bg-primary border-primary text-textPrimary scale-110" : "bg-white border-gray-200 text-gray-400 hover:text-primary hover:bg-gray-50 hover:scale-110"
+              isSelectedWeek ? "bg-primary border-primary text-on-primary scale-110" : "bg-surface border-line-strong text-fg-subtle hover:text-primary hover:bg-surface-muted hover:scale-110"
             )}
             onClick={() => {
               setWeeklyGoalWeekStart(cloneWeekStart);
@@ -526,7 +528,7 @@ function App() {
           >
             <Target size={18} />
             {weeklyGoalCount > 0 && (
-              <span className="absolute -right-2 -top-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full border border-white bg-gray-100 text-[10px] font-medium text-gray-600">
+              <span className="absolute -right-2 -top-2 min-w-[18px] h-[18px] px-1 flex items-center justify-center rounded-full border border-surface bg-surface-hover text-[10px] font-medium text-fg-muted">
                 {weeklyGoalCount}
               </span>
             )}
@@ -536,7 +538,7 @@ function App() {
       );
       days = [];
     }
-    return <div className="bg-white rounded-b-3xl">{rows}</div>;
+    return <div className="bg-surface rounded-b-3xl">{rows}</div>;
   };
 
   const saveQuickAdd = async (categoryId: string | null, closeAfterSave = false) => {
@@ -728,12 +730,12 @@ function App() {
             >
               <div className="flex items-center justify-between group">
                 <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-100">
+                  <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-surface-muted border border-line">
                     <span className="text-sm inline-flex items-center"><EmojiIcon emoji={icon} /></span>
-                    <span className="text-sm font-medium text-gray-600">{name}</span>
+                    <span className="text-sm font-medium text-fg-muted">{name}</span>
                   </div>
                   {activeCategoryTasksCount > 0 && (
-                    <span className="min-w-[22px] h-[22px] px-1.5 flex items-center justify-center rounded-full bg-gray-100 text-[11px] font-medium text-gray-500 border border-gray-200">
+                    <span className="min-w-[22px] h-[22px] px-1.5 flex items-center justify-center rounded-full bg-surface-hover text-[11px] font-medium text-fg-muted border border-line-strong">
                       {activeCategoryTasksCount}
                     </span>
                   )}
@@ -745,7 +747,7 @@ function App() {
                   }}
                   aria-label={`${name}에 할 일 추가`}
                   title={`${name}에 할 일 추가`}
-                  className="p-1.5 bg-gray-50 text-gray-400 hover:text-gray-700 hover:bg-gray-100 rounded-full transition-colors"
+                  className="p-1.5 bg-surface-muted text-fg-subtle hover:text-fg hover:bg-surface-hover rounded-full transition-colors"
                 >
                   <Plus size={16} />
                 </button>
@@ -778,7 +780,7 @@ function App() {
 
                 {isAdding && (
                   <form onSubmit={(e) => handleQuickAdd(e, categoryId)} className="flex items-center gap-3 px-3 py-1">
-                    <span aria-hidden="true" className="h-5 w-5 shrink-0 rounded-full border-2 border-gray-200 bg-white" />
+                    <span aria-hidden="true" className="h-5 w-5 shrink-0 rounded-full border-2 border-line-strong bg-surface" />
                     <input 
                       autoFocus
                       type="text" 
@@ -795,7 +797,7 @@ function App() {
                     <button
                       type="submit"
                       aria-label={`${name} 할 일 저장`}
-                      className="p-1.5 rounded-lg text-gray-400 hover:bg-primary/20 hover:text-gray-700 transition-colors"
+                      className="p-1.5 rounded-lg text-fg-subtle hover:bg-primary/20 hover:text-fg transition-colors"
                     >
                       <Plus size={16} />
                     </button>
@@ -803,7 +805,7 @@ function App() {
                 )}
                 
                 {!isAdding && categoryTasks.length === 0 && !snapshot.isDraggingOver && (
-                  <div className="pl-9 py-2 text-sm text-gray-300 font-sans">할 일이 없습니다</div>
+                  <div className="pl-9 py-2 text-sm text-fg-faint font-sans">할 일이 없습니다</div>
                 )}
               </div>
             </div>
@@ -813,7 +815,7 @@ function App() {
     };
 
     return (
-      <div className="pr-1">
+      <div className="pr-0">
         <DragDropContext onDragStart={(start) => setDraggedTaskId(start.draggableId)} onDragEnd={handleTaskDragEnd}>
           {categories.map(c => renderCategorySection(c.id, c.name, c.icon))}
           {renderCategorySection(null, '미분류', '📥')}
@@ -828,7 +830,7 @@ function App() {
     const completedGoalCount = weekGoals.filter(goal => goal.is_completed).length;
 
     return (
-      <div className="pr-1 pb-2 flex flex-col gap-6">
+      <div className="pb-2 flex flex-col gap-6">
         <form onSubmit={async (e) => {
           e.preventDefault();
           const form = e.currentTarget;
@@ -840,23 +842,23 @@ function App() {
             domain_id: null, time_frame: 'WEEK', start_date: format(weeklyGoalWeekStart, 'yyyy-MM-dd'), end_date: format(addDays(weeklyGoalWeekStart, 6), 'yyyy-MM-dd'), title: title.trim(), is_completed: false
           });
           form.reset();
-        }} className="flex gap-2 bg-gray-50 p-2 rounded-2xl border border-gray-100">
+        }} className="flex gap-2 bg-surface-muted p-2 rounded-2xl border border-line">
           <input name="title" type="text" placeholder="새로운 주간 목표 추가..." className="flex-1 bg-transparent px-3 outline-none font-sans text-base font-medium transition-colors" />
-          <button type="submit" className="w-10 h-10 flex items-center justify-center bg-primary text-textPrimary rounded-xl font-bold hover:bg-yellow-400 transition-colors shrink-0"><Plus size={20}/></button>
+          <button type="submit" className="w-10 h-10 flex items-center justify-center bg-primary text-on-primary rounded-xl font-bold hover:bg-yellow-400 transition-colors shrink-0"><Plus size={20}/></button>
         </form>
 
         <div className="flex items-center justify-between px-1">
-          <span className="text-sm font-bold text-gray-500">이번 주 체크리스트</span>
-          <span className="rounded-full border border-gray-200 bg-gray-50 px-2 py-1 text-xs font-bold text-gray-500">완료 {completedGoalCount}/{weekGoals.length}</span>
+          <span className="text-sm font-bold text-fg-muted">이번 주 체크리스트</span>
+          <span className="rounded-full border border-line-strong bg-surface-muted px-2 py-1 text-xs font-bold text-fg-muted">완료 {completedGoalCount}/{weekGoals.length}</span>
         </div>
 
         <div className="space-y-3">
           {weekGoals.map(g => (
-            <div key={g.id} className={clsx("flex items-center gap-3 p-4 rounded-2xl bg-white border shadow-sm group transition-colors", g.is_completed ? "border-gray-100 bg-gray-50" : "border-gray-200")}>
+            <div key={g.id} className={clsx("flex items-center gap-3 p-4 rounded-2xl bg-surface border shadow-sm group transition-colors", g.is_completed ? "border-line bg-surface-muted" : "border-line-strong")}>
               <button
                 onClick={() => db.goals.update(g.id, { is_completed: !g.is_completed, updated_at: new Date().toISOString(), version: g.version + 1 })}
                 aria-label={g.is_completed ? `${g.title} 완료 취소` : `${g.title} 완료`}
-                className={clsx("w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors", g.is_completed ? "bg-primary border-primary text-gray-700" : "border-gray-300 hover:border-primary")}
+                className={clsx("w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors", g.is_completed ? "bg-primary border-primary text-fg" : "border-line-strong hover:border-primary")}
               >
                 {g.is_completed && <Check size={13} strokeWidth={3} />}
               </button>
@@ -870,24 +872,24 @@ function App() {
                     setEditingGoalId(null);
                   }}
                 >
-                  <input autoFocus value={editingGoalTitle} onChange={(e) => setEditingGoalTitle(e.target.value)} className="flex-1 min-w-0 rounded-lg bg-gray-100 px-2 py-1 font-sans text-base font-medium outline-none focus:ring-1 focus:ring-primary" />
-                  <button type="submit" className="rounded-lg px-2 py-1 text-xs font-bold text-gray-700 hover:bg-primary/20">저장</button>
-                  <button type="button" onClick={() => setEditingGoalId(null)} className="rounded-lg px-2 py-1 text-xs font-bold text-gray-400 hover:bg-gray-100">취소</button>
+                  <input autoFocus value={editingGoalTitle} onChange={(e) => setEditingGoalTitle(e.target.value)} className="flex-1 min-w-0 rounded-lg bg-surface-hover px-2 py-1 font-sans text-base font-medium outline-none focus:ring-1 focus:ring-primary" />
+                  <button type="submit" className="rounded-lg px-2 py-1 text-xs font-bold text-fg hover:bg-primary/20">저장</button>
+                  <button type="button" onClick={() => setEditingGoalId(null)} className="rounded-lg px-2 py-1 text-xs font-bold text-fg-subtle hover:bg-surface-hover">취소</button>
                 </form>
               ) : (
-                <span className={clsx("flex-1 min-w-0 font-sans text-lg font-medium", g.is_completed ? "text-gray-400 line-through" : "text-gray-800")}>{g.title}</span>
+                <span className={clsx("flex-1 min-w-0 font-sans text-lg font-medium", g.is_completed ? "text-fg-subtle line-through" : "text-fg")}>{g.title}</span>
               )}
               {editingGoalId !== g.id && (
                 <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
-                  <button onClick={() => { setEditingGoalId(g.id); setEditingGoalTitle(g.title); }} aria-label={`${g.title} 수정`} className="p-2 text-gray-300 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors"><Pencil size={16}/></button>
-                  <button onClick={() => db.goals.update(g.id, { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString(), version: g.version + 1 })} aria-label={`${g.title} 삭제`} className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors"><Trash2 size={16}/></button>
+                  <button onClick={() => { setEditingGoalId(g.id); setEditingGoalTitle(g.title); }} aria-label={`${g.title} 수정`} className="p-2 text-fg-faint hover:text-fg hover:bg-surface-hover rounded-lg transition-colors"><Pencil size={16}/></button>
+                  <button onClick={() => db.goals.update(g.id, { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString(), version: g.version + 1 })} aria-label={`${g.title} 삭제`} className="p-2 text-fg-faint hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"><Trash2 size={16}/></button>
                 </div>
               )}
             </div>
           ))}
           {weekGoals.length === 0 && (
-            <div className="text-center text-gray-400 py-12 text-sm font-sans flex flex-col items-center gap-3">
-              <Target size={32} className="text-gray-300" />
+            <div className="text-center text-fg-subtle py-12 text-sm font-sans flex flex-col items-center gap-3">
+              <Target size={32} className="text-fg-faint" />
               이번 주 목표가 없습니다
             </div>
           )}
@@ -898,7 +900,7 @@ function App() {
 
   const renderPanel = () => {
     return (
-      <div className="w-[500px] bg-white p-8 flex flex-col h-[calc(100vh-3rem)] sticky top-6 rounded-3xl shadow-sm border border-gray-100">
+      <div className="w-[500px] bg-surface p-8 flex flex-col h-[calc(100vh-3rem)] sticky top-6 rounded-3xl shadow-sm border border-line overflow-hidden">
         <div className="flex items-center justify-between mb-6 shrink-0">
           <h2 className="text-2xl font-bold">
             {viewMode === 'DAILY' 
@@ -908,37 +910,37 @@ function App() {
           {viewMode === 'DAILY' && (
             <div className="relative">
               {/* 바깥 클릭으로 닫히지 않음. 메뉴를 연 채 날짜를 확인하는 흐름을 유지하기 위한 의도. */}
-              <button onClick={() => setIsDailyMenuOpen(open => !open)} aria-label="일별 할 일 메뉴" aria-expanded={isDailyMenuOpen} className="p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
+              <button onClick={() => setIsDailyMenuOpen(open => !open)} aria-label="일별 할 일 메뉴" aria-expanded={isDailyMenuOpen} className="p-2 rounded-full text-fg-subtle hover:bg-surface-hover hover:text-fg transition-colors">
                 <MoreHorizontal size={22}/>
               </button>
               <div className={clsx(
-                "absolute right-0 top-11 z-40 w-56 origin-top-right rounded-2xl border border-gray-100 bg-white p-1.5 shadow-xl transition-all duration-200",
+                "absolute right-0 top-11 z-40 w-56 origin-top-right rounded-2xl border border-line bg-surface p-1.5 shadow-xl transition-all duration-200",
                 isDailyMenuOpen ? "scale-100 opacity-100" : "pointer-events-none scale-95 opacity-0"
               )}>
-                <button onClick={async () => { if (selectedDateIncompleteCount === 0) setIsNoIncompleteNoticeOpen(true); else await moveIncompleteTasksToDate(format(addDays(selectedDate, 1), 'yyyy-MM-dd')); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50"><ArrowRight size={16} className="text-indigo-400"/>미완료 할 일을 내일 하기</button>
-                <button onClick={() => { if (selectedDateIncompleteCount === 0) setIsNoIncompleteNoticeOpen(true); else setDateSelectionMode('MOVE_INCOMPLETE'); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50"><CalendarDays size={16} className="text-indigo-400"/>미완료 할 일을 다른 날 하기</button>
-                <button onClick={() => { if (selectedDateIncompleteCount === 0) setIsNoIncompleteNoticeOpen(true); else setConfirmDailyAction('DELETE_INCOMPLETE'); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-red-500 hover:bg-red-50"><CircleX size={16}/>미완료 할 일 삭제</button>
-                <div className="mx-2 my-1 border-t border-gray-100"/>
-                <button onClick={() => { setDateSelectionMode('COPY_ALL'); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-gray-600 hover:bg-gray-50"><Copy size={16} className="text-indigo-400"/>모든 할 일 복사</button>
-                <button onClick={() => { setConfirmDailyAction('DELETE_ALL'); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-red-500 hover:bg-red-50"><Trash2 size={16}/>모든 할 일 삭제</button>
+                <button onClick={async () => { if (selectedDateIncompleteCount === 0) setIsNoIncompleteNoticeOpen(true); else await moveIncompleteTasksToDate(format(addDays(selectedDate, 1), 'yyyy-MM-dd')); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-fg-muted hover:bg-surface-muted"><ArrowRight size={16} className="text-indigo-400"/>미완료 할 일을 내일 하기</button>
+                <button onClick={() => { if (selectedDateIncompleteCount === 0) setIsNoIncompleteNoticeOpen(true); else setDateSelectionMode('MOVE_INCOMPLETE'); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-fg-muted hover:bg-surface-muted"><CalendarDays size={16} className="text-indigo-400"/>미완료 할 일을 다른 날 하기</button>
+                <button onClick={() => { if (selectedDateIncompleteCount === 0) setIsNoIncompleteNoticeOpen(true); else setConfirmDailyAction('DELETE_INCOMPLETE'); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"><CircleX size={16}/>미완료 할 일 삭제</button>
+                <div className="mx-2 my-1 border-t border-line"/>
+                <button onClick={() => { setDateSelectionMode('COPY_ALL'); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-fg-muted hover:bg-surface-muted"><Copy size={16} className="text-indigo-400"/>모든 할 일 복사</button>
+                <button onClick={() => { setConfirmDailyAction('DELETE_ALL'); setIsDailyMenuOpen(false); }} className="w-full flex items-center gap-3 rounded-xl px-3 py-2.5 text-left text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40"><Trash2 size={16}/>모든 할 일 삭제</button>
               </div>
             </div>
           )}
         </div>
-        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+        <div className="panel-scroll flex-1 min-h-0">
           {viewMode === 'DAILY' ? renderDailyPanel() : renderWeeklyPanel()}
         </div>
         {viewMode === 'DAILY' && deadlineNotices.length > 0 && (
-          <section className="shrink-0 mt-4 max-h-[40%] overflow-y-auto border-t border-red-100 pt-4 space-y-2" aria-label="데드라인 알림">
+          <section className="panel-scroll shrink-0 mt-4 max-h-[40%] border-t border-red-100 dark:border-red-900 pt-4 space-y-2" aria-label="데드라인 알림">
             <p className="px-1 text-xs font-medium text-red-500">데드라인 알림</p>
             {deadlineNotices.map(({ deadline, remainingDays }) => {
               const isDueToday = remainingDays === 0;
               return (
-              <div key={deadline.id} role="button" tabIndex={0} onClick={() => setEditingDeadline(deadline)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setEditingDeadline(deadline); }} className={clsx("group flex cursor-pointer gap-3 rounded-2xl border px-4 py-3 shadow-sm transition-colors", isDueToday ? "border-red-500 bg-red-100 hover:bg-red-200/80" : "border-red-200 bg-red-50/60 hover:bg-red-50", deadline.memo ? "items-start" : "items-center")}>
+              <div key={deadline.id} role="button" tabIndex={0} onClick={() => setEditingDeadline(deadline)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setEditingDeadline(deadline); }} className={clsx("group flex cursor-pointer gap-3 rounded-2xl border px-4 py-3 shadow-sm transition-colors", isDueToday ? "border-red-500 bg-red-100 hover:bg-red-200/80 dark:bg-red-900/70 dark:hover:bg-red-900/90" : "border-red-200 bg-red-50/60 hover:bg-red-50 dark:hover:bg-red-950/40 dark:border-red-800 dark:bg-red-950/40 dark:hover:bg-red-950/60", deadline.memo ? "items-start" : "items-center")}>
                 <span className={clsx("shrink-0 rounded-full px-2 py-1 text-xs text-white", isDueToday ? "bg-red-600 font-bold" : "bg-red-500 font-medium", deadline.memo ? "mt-0.5" : "")}>{isDueToday ? 'D-DAY' : `D-${remainingDays}`}</span>
                 <div className="min-w-0">
-                  <p className={clsx("truncate text-sm", isDueToday ? "font-bold text-red-700" : "font-medium text-gray-800")}>{deadline.title}</p>
-                  {deadline.memo && <p className={clsx("mt-1 line-clamp-2 text-xs", isDueToday ? "font-medium text-red-500" : "text-gray-500")}>{deadline.memo}</p>}
+                  <p className={clsx("truncate text-sm", isDueToday ? "font-bold text-red-700" : "font-medium text-fg")}>{deadline.title}</p>
+                  {deadline.memo && <p className={clsx("mt-1 line-clamp-2 text-xs", isDueToday ? "font-medium text-red-500" : "text-fg-muted")}>{deadline.memo}</p>}
                 </div>
                 <span className={clsx("ml-auto shrink-0 text-xs", isDueToday ? "font-bold text-red-600" : "text-red-500", deadline.memo ? "mt-0.5" : "")}>{format(parseISO(deadline.due_date), 'M/d')}</span>
               </div>
@@ -954,7 +956,7 @@ function App() {
     <div className="min-h-screen flex justify-center p-6 gap-10 bg-bgPrimary pl-24">
       <div className="w-[800px] shrink-0 relative">
         {renderHeader()}
-        <div className="bg-white rounded-3xl shadow-sm border border-gray-100 relative z-0">
+        <div className="bg-surface rounded-3xl shadow-sm border border-line relative z-0">
           {renderDays()}
           {renderCells()}
         </div>
@@ -962,42 +964,42 @@ function App() {
       {renderPanel()}
 
       {isDeadlineModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
-          <div className="flex max-h-[90vh] w-[440px] flex-col rounded-3xl bg-white shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 dark:bg-black/55 p-4">
+          <div className="flex max-h-[90vh] w-[440px] flex-col rounded-3xl bg-surface shadow-xl">
             <div className="flex shrink-0 items-center justify-between p-6 pb-4">
-              <div className="flex items-center gap-2 text-red-500"><AlertCircle size={20} /><h3 className="text-lg font-medium text-gray-800">데드라인 만들기</h3></div>
-              <button onClick={() => setIsDeadlineModalOpen(false)} aria-label="데드라인 만들기 닫기" className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><X size={20}/></button>
+              <div className="flex items-center gap-2 text-red-500"><AlertCircle size={20} /><h3 className="text-lg font-medium text-fg">데드라인 만들기</h3></div>
+              <button onClick={() => setIsDeadlineModalOpen(false)} aria-label="데드라인 만들기 닫기" className="rounded-full p-1 text-fg-subtle hover:bg-surface-hover hover:text-fg"><X size={20}/></button>
             </div>
             <div className="space-y-4 overflow-y-auto px-6 pb-6">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-400">제목</label>
-                <input autoFocus value={deadlineTitle} onChange={(event) => setDeadlineTitle(event.target.value)} placeholder="마감할 일을 적어주세요" className="w-full rounded-xl border border-transparent bg-gray-50 p-3 text-base font-medium outline-none focus:border-red-200" />
+                <label className="mb-1 block text-xs font-medium text-fg-subtle">제목</label>
+                <input autoFocus value={deadlineTitle} onChange={(event) => setDeadlineTitle(event.target.value)} placeholder="마감할 일을 적어주세요" className="w-full rounded-xl border border-transparent bg-surface-muted p-3 text-base font-medium outline-none focus:border-red-200" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-400">메모</label>
-                <textarea value={deadlineMemo} onChange={(event) => setDeadlineMemo(event.target.value)} placeholder="필요한 메모를 적어주세요" className="h-20 w-full resize-none rounded-xl border border-transparent bg-gray-50 p-3 text-sm outline-none focus:border-red-200" />
+                <label className="mb-1 block text-xs font-medium text-fg-subtle">메모</label>
+                <textarea value={deadlineMemo} onChange={(event) => setDeadlineMemo(event.target.value)} placeholder="필요한 메모를 적어주세요" className="h-20 w-full resize-none rounded-xl border border-transparent bg-surface-muted p-3 text-sm outline-none focus:border-red-200" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-400">데드라인 날짜</label>
-                <div className="flex items-center justify-between rounded-xl bg-gray-50 p-3">
-                  <span className="text-sm text-gray-700">{format(parseISO(deadlineDueDate), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
-                  <button onClick={() => { setIsDeadlineModalOpen(false); setIsSelectingDeadlineDate(true); }} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"><CalendarIcon size={14} /> 날짜 선택</button>
+                <label className="mb-1 block text-xs font-medium text-fg-subtle">데드라인 날짜</label>
+                <div className="flex items-center justify-between rounded-xl bg-surface-muted p-3">
+                  <span className="text-sm text-fg">{format(parseISO(deadlineDueDate), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
+                  <button onClick={() => { setIsDeadlineModalOpen(false); setIsSelectingDeadlineDate(true); }} className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover"><CalendarIcon size={14} /> 날짜 선택</button>
                 </div>
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium text-gray-400">알림 시작</label>
+                <label className="mb-2 block text-xs font-medium text-fg-subtle">알림 시작</label>
                 <div className="grid grid-cols-6 gap-1.5">
                   {[null, 1, 3, 7, 14, 30].map(days => (
-                    <button key={days ?? 'none'} onClick={() => setDeadlineReminderDays(days)} className={clsx("rounded-xl px-1 py-2 text-sm font-medium transition-colors", deadlineReminderDays === days ? "bg-red-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200")}>
+                    <button key={days ?? 'none'} onClick={() => setDeadlineReminderDays(days)} className={clsx("rounded-xl px-1 py-2 text-sm font-medium transition-colors", deadlineReminderDays === days ? "bg-red-500 text-white" : "bg-surface-hover text-fg-muted hover:bg-surface-hover")}>
                       {days === null ? '없음' : `${days}일 전`}
                     </button>
                   ))}
                 </div>
-                <p className="mt-2 text-xs text-gray-400">설정한 기간에만 오른쪽 일정 창에서 디데이를 표시합니다.</p>
+                <p className="mt-2 text-xs text-fg-subtle">설정한 기간에만 오른쪽 일정 창에서 디데이를 표시합니다.</p>
               </div>
             </div>
-            <div className="flex shrink-0 justify-end gap-2 border-t border-gray-100 px-6 pb-6 pt-4">
-              <button onClick={() => setIsDeadlineModalOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100">취소</button>
+            <div className="flex shrink-0 justify-end gap-2 border-t border-line px-6 pb-6 pt-4">
+              <button onClick={() => setIsDeadlineModalOpen(false)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-fg-muted hover:bg-surface-hover">취소</button>
               <button onClick={saveDeadline} disabled={!deadlineTitle.trim()} className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-600 disabled:cursor-not-allowed disabled:bg-red-200">데드라인 만들기</button>
             </div>
           </div>
@@ -1005,42 +1007,42 @@ function App() {
       )}
 
       {editingDeadline && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 p-4">
-          <div className="flex max-h-[90vh] w-[440px] flex-col rounded-3xl bg-white shadow-xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/20 dark:bg-black/55 p-4">
+          <div className="flex max-h-[90vh] w-[440px] flex-col rounded-3xl bg-surface shadow-xl">
             <div className="flex shrink-0 items-center justify-between p-6 pb-4">
-              <div className="flex items-center gap-2 text-red-500"><AlertCircle size={20} /><h3 className="text-lg font-medium text-gray-800">데드라인 상세</h3></div>
-              <button onClick={() => setEditingDeadline(null)} aria-label="데드라인 상세 닫기" className="rounded-full p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700"><X size={20}/></button>
+              <div className="flex items-center gap-2 text-red-500"><AlertCircle size={20} /><h3 className="text-lg font-medium text-fg">데드라인 상세</h3></div>
+              <button onClick={() => setEditingDeadline(null)} aria-label="데드라인 상세 닫기" className="rounded-full p-1 text-fg-subtle hover:bg-surface-hover hover:text-fg"><X size={20}/></button>
             </div>
             <div className="space-y-4 overflow-y-auto px-6 pb-6">
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-400">제목</label>
-                <input value={editingDeadline.title} onChange={(event) => setEditingDeadline({ ...editingDeadline, title: event.target.value })} className="w-full rounded-xl border border-transparent bg-gray-50 p-3 text-base font-medium outline-none focus:border-red-200" />
+                <label className="mb-1 block text-xs font-medium text-fg-subtle">제목</label>
+                <input value={editingDeadline.title} onChange={(event) => setEditingDeadline({ ...editingDeadline, title: event.target.value })} className="w-full rounded-xl border border-transparent bg-surface-muted p-3 text-base font-medium outline-none focus:border-red-200" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-400">메모</label>
-                <textarea value={editingDeadline.memo} onChange={(event) => setEditingDeadline({ ...editingDeadline, memo: event.target.value })} placeholder="필요한 메모를 적어주세요" className="h-20 w-full resize-none rounded-xl border border-transparent bg-gray-50 p-3 text-sm outline-none focus:border-red-200" />
+                <label className="mb-1 block text-xs font-medium text-fg-subtle">메모</label>
+                <textarea value={editingDeadline.memo} onChange={(event) => setEditingDeadline({ ...editingDeadline, memo: event.target.value })} placeholder="필요한 메모를 적어주세요" className="h-20 w-full resize-none rounded-xl border border-transparent bg-surface-muted p-3 text-sm outline-none focus:border-red-200" />
               </div>
               <div>
-                <label className="mb-1 block text-xs font-medium text-gray-400">데드라인 날짜</label>
-                <div className="flex items-center justify-between rounded-xl bg-gray-50 p-3">
-                  <span className="text-sm text-gray-700">{format(parseISO(editingDeadline.due_date), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
-                  <button onClick={() => { setSelectingDateForDeadline(editingDeadline.id); setEditingDeadline(null); }} className="flex items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm hover:bg-gray-100"><CalendarIcon size={14} /> 날짜 변경</button>
+                <label className="mb-1 block text-xs font-medium text-fg-subtle">데드라인 날짜</label>
+                <div className="flex items-center justify-between rounded-xl bg-surface-muted p-3">
+                  <span className="text-sm text-fg">{format(parseISO(editingDeadline.due_date), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
+                  <button onClick={() => { setSelectingDateForDeadline(editingDeadline.id); setEditingDeadline(null); }} className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover"><CalendarIcon size={14} /> 날짜 변경</button>
                 </div>
               </div>
               <div>
-                <label className="mb-2 block text-xs font-medium text-gray-400">알림 시작</label>
+                <label className="mb-2 block text-xs font-medium text-fg-subtle">알림 시작</label>
                 <div className="grid grid-cols-6 gap-1.5">
                   {[null, 1, 3, 7, 14, 30].map(days => (
-                    <button key={days ?? 'none'} onClick={() => setEditingDeadline({ ...editingDeadline, reminder_days: days })} className={clsx("rounded-xl px-1 py-2 text-sm font-medium transition-colors", editingDeadline.reminder_days === days ? "bg-red-500 text-white" : "bg-gray-100 text-gray-500 hover:bg-gray-200")}>
+                    <button key={days ?? 'none'} onClick={() => setEditingDeadline({ ...editingDeadline, reminder_days: days })} className={clsx("rounded-xl px-1 py-2 text-sm font-medium transition-colors", editingDeadline.reminder_days === days ? "bg-red-500 text-white" : "bg-surface-hover text-fg-muted hover:bg-surface-hover")}>
                       {days === null ? '없음' : `${days}일 전`}
                     </button>
                   ))}
                 </div>
               </div>
             </div>
-            <div className="flex shrink-0 justify-between gap-2 border-t border-gray-100 px-6 pb-6 pt-4">
+            <div className="flex shrink-0 justify-between gap-2 border-t border-line px-6 pb-6 pt-4">
               <button onClick={async () => { const now = new Date().toISOString(); await db.deadlines.update(editingDeadline.id, { deleted_at: now, updated_at: now, version: editingDeadline.version + 1 }); setEditingDeadline(null); }} className="rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-100">삭제</button>
-              <button onClick={async () => { if (!editingDeadline.title.trim()) return; const now = new Date().toISOString(); await db.deadlines.put({ ...editingDeadline, title: editingDeadline.title.trim(), memo: editingDeadline.memo.trim(), updated_at: now, version: editingDeadline.version + 1 }); setEditingDeadline(null); }} className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800">저장</button>
+              <button onClick={async () => { if (!editingDeadline.title.trim()) return; const now = new Date().toISOString(); await db.deadlines.put({ ...editingDeadline, title: editingDeadline.title.trim(), memo: editingDeadline.memo.trim(), updated_at: now, version: editingDeadline.version + 1 }); setEditingDeadline(null); }} className="rounded-xl bg-ink text-on-ink px-4 py-2.5 text-sm font-medium hover:opacity-90">저장</button>
             </div>
           </div>
         </div>
@@ -1048,32 +1050,32 @@ function App() {
 
       {/* Task Edit Modal */}
       {editingTask && !selectingDateForTask && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl w-[420px] shadow-xl flex flex-col max-h-[90vh]">
+        <div className="fixed inset-0 bg-black/20 dark:bg-black/55 flex items-center justify-center p-4 z-50">
+          <div className="bg-surface rounded-3xl w-[420px] shadow-xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center p-6 pb-4 shrink-0">
               <h3 className="text-lg font-bold">{isCreatingTask ? '할 일 만들기' : '할 일 상세'}</h3>
-              <button onClick={() => { setEditingTask(null); setIsCreatingTask(false); setIsTimePickerOpen(false); }} className="p-1 hover:bg-gray-100 rounded-full"><X size={20}/></button>
+              <button onClick={() => { setEditingTask(null); setIsCreatingTask(false); setIsTimePickerOpen(false); }} className="p-1 hover:bg-surface-hover rounded-full"><X size={20}/></button>
             </div>
             
             <div className="overflow-y-auto px-6 pb-6 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">제목</label>
+                <label className="block text-xs font-medium text-fg-subtle mb-1">제목</label>
                 <input 
                   type="text" 
                   autoFocus={isCreatingTask}
                   value={editingTask.title}
                   onChange={e => setEditingTask({...editingTask, title: e.target.value})}
                   placeholder="할 일을 적어주세요"
-                  className="w-full bg-gray-50 rounded-xl p-3 outline-none font-sans text-lg font-medium border border-transparent focus:border-gray-200"
+                  className="w-full bg-surface-muted rounded-xl p-3 outline-none font-sans text-lg font-medium border border-transparent focus:border-line-strong"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">카테고리</label>
+                <label className="block text-xs font-medium text-fg-subtle mb-1">카테고리</label>
                 <div className="flex gap-2">
                   <select
                     value={editingTask.domain_id ?? ''}
                     onChange={event => setEditingTask({ ...editingTask, domain_id: event.target.value || null })}
-                    className="min-w-0 flex-1 bg-gray-50 rounded-xl p-3 outline-none font-sans text-sm border border-transparent focus:border-gray-200"
+                    className="min-w-0 flex-1 bg-surface-muted rounded-xl p-3 outline-none font-sans text-sm border border-transparent focus:border-line-strong"
                   >
                     <option value="">미분류</option>
                     {categories.map(category => (
@@ -1087,7 +1089,7 @@ function App() {
                     aria-label="중요 할 일"
                     className={clsx(
                       "shrink-0 flex items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition-colors",
-                      editingTask.is_important ? "bg-primary text-textPrimary" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                      editingTask.is_important ? "bg-primary text-on-primary" : "bg-surface-muted text-fg-muted hover:bg-surface-hover"
                     )}
                   >
                     <Star size={16} fill={editingTask.is_important ? 'currentColor' : 'none'} />
@@ -1096,22 +1098,22 @@ function App() {
                 </div>
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">메모</label>
+                <label className="block text-xs font-medium text-fg-subtle mb-1">메모</label>
                 <textarea 
                   value={editingTask.memo || ''}
                   onChange={e => setEditingTask({...editingTask, memo: e.target.value})}
                   placeholder="추가적인 메모를 적어보세요"
-                  className="w-full bg-gray-50 rounded-xl p-3 outline-none h-24 resize-none border border-transparent focus:border-gray-200 text-sm font-sans"
+                  className="w-full bg-surface-muted rounded-xl p-3 outline-none h-24 resize-none border border-transparent focus:border-line-strong text-sm font-sans"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">이미지 첨부</label>
+                <label className="block text-xs font-medium text-fg-subtle mb-1">이미지 첨부</label>
                 {editingTask.image_data ? (
-                  <div className="w-full bg-gray-50 rounded-xl border border-gray-200 overflow-hidden">
-                    <img src={editingTask.image_data} alt="첨부" className="w-full object-contain max-h-[300px] bg-gray-100" />
-                    <div className="p-2 flex justify-end gap-2 bg-white border-t border-gray-200">
-                         <label className="px-3 py-1.5 bg-gray-100 hover:bg-gray-200 rounded-lg text-sm font-medium cursor-pointer transition-colors text-gray-700 flex items-center gap-1.5">
+                  <div className="w-full bg-surface-muted rounded-xl border border-line-strong overflow-hidden">
+                    <img src={editingTask.image_data} alt="첨부" className="w-full object-contain max-h-[300px] bg-surface-hover" />
+                    <div className="p-2 flex justify-end gap-2 bg-surface border-t border-line-strong">
+                         <label className="px-3 py-1.5 bg-surface-hover hover:bg-surface-hover rounded-lg text-sm font-medium cursor-pointer transition-colors text-fg flex items-center gap-1.5">
                          <Upload size={14} />
                          변경
                          <input type="file" accept="image/*" className="hidden" onChange={(e) => {
@@ -1129,17 +1131,17 @@ function App() {
                   </div>
                 ) : (
                   <div 
-                    className="w-full bg-gray-50 rounded-xl border-2 border-dashed border-gray-200 hover:bg-gray-100 h-24 flex flex-col items-center justify-center relative transition-colors cursor-pointer"
-                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-gray-100'); }}
-                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-gray-100'); }}
+                    className="w-full bg-surface-muted rounded-xl border-2 border-dashed border-line-strong hover:bg-surface-hover h-24 flex flex-col items-center justify-center relative transition-colors cursor-pointer"
+                    onDragOver={(e) => { e.preventDefault(); e.currentTarget.classList.add('bg-surface-hover'); }}
+                    onDragLeave={(e) => { e.preventDefault(); e.currentTarget.classList.remove('bg-surface-hover'); }}
                     onDrop={(e) => {
                       e.preventDefault();
-                      e.currentTarget.classList.remove('bg-gray-100');
+                      e.currentTarget.classList.remove('bg-surface-hover');
                       if (e.dataTransfer.files && e.dataTransfer.files[0]) handleImageUpload(e.dataTransfer.files[0]);
                     }}
                   >
-                    <ImageIcon size={24} className="text-gray-400 mb-2" />
-                    <span className="text-xs text-gray-500 font-sans font-medium">클릭하거나 이미지를 드래그 앤 드롭</span>
+                    <ImageIcon size={24} className="text-fg-subtle mb-2" />
+                    <span className="text-xs text-fg-muted font-sans font-medium">클릭하거나 이미지를 드래그 앤 드롭</span>
                     <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => {
                       if (e.target.files && e.target.files[0]) handleImageUpload(e.target.files[0]);
                     }} />
@@ -1148,18 +1150,18 @@ function App() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">시간</label>
-                <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3 border border-transparent">
-                  <span className="text-sm font-sans text-gray-600">{formatScheduledTime(editingTask.scheduled_time) ?? '시간 없음'}</span>
-                  <button onClick={openTimePicker} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors shadow-sm text-gray-700">
+                <label className="block text-xs font-medium text-fg-subtle mb-1">시간</label>
+                <div className="flex items-center justify-between bg-surface-muted rounded-xl p-3 border border-transparent">
+                  <span className="text-sm font-sans text-fg-muted">{formatScheduledTime(editingTask.scheduled_time) ?? '시간 없음'}</span>
+                  <button onClick={openTimePicker} className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line-strong rounded-lg text-sm font-medium hover:bg-surface-hover transition-colors shadow-sm text-fg">
                     <CalendarIcon size={14} /> 시간 설정
                   </button>
                 </div>
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-gray-400 mb-1">날짜</label>
-                <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3 border border-transparent">
+                <label className="block text-xs font-medium text-fg-subtle mb-1">날짜</label>
+                <div className="flex items-center justify-between bg-surface-muted rounded-xl p-3 border border-transparent">
                   <span className="text-sm font-sans font-medium">{format(parseISO(editingTask.target_date), 'yyyy년 MM월 dd일')}</span>
                   <button 
                     onClick={() => {
@@ -1167,7 +1169,7 @@ function App() {
                       setSelectingDateForTask(editingTask.id);
                       if (!isCreatingTask) setEditingTask(null);
                     }}
-                    className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors shadow-sm text-gray-700"
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line-strong rounded-lg text-sm font-medium hover:bg-surface-hover transition-colors shadow-sm text-fg"
                   >
                     <CalendarIcon size={14} />
                     날짜 변경
@@ -1176,11 +1178,11 @@ function App() {
               </div>
             </div>
 
-            <div className="px-6 pb-6 pt-4 shrink-0 flex justify-between gap-3 border-t border-gray-100">
+            <div className="px-6 pb-6 pt-4 shrink-0 flex justify-between gap-3 border-t border-line">
               {isCreatingTask ? (
                 <button
                   onClick={() => { setEditingTask(null); setIsCreatingTask(false); setIsTimePickerOpen(false); }}
-                  className="px-4 py-3 text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors font-bold flex items-center justify-center"
+                  className="px-4 py-3 text-fg-muted bg-surface-hover hover:bg-surface-hover rounded-xl transition-colors font-bold flex items-center justify-center"
                 >
                   취소
                 </button>
@@ -1231,7 +1233,7 @@ function App() {
                   setEditingTask(null);
                 }}
                 disabled={!editingTask.title.trim()}
-                className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:bg-gray-300"
+                className="flex-1 py-3 bg-ink text-on-ink rounded-xl font-bold hover:opacity-90 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
               >
                 {isCreatingTask ? '만들기' : '저장'}
               </button>
@@ -1272,11 +1274,11 @@ function App() {
 
       {/* Category Manage Modal */}
       {isCategoryModalOpen && (
-        <div className="fixed inset-0 bg-black/20 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-3xl p-5 w-[420px] shadow-xl max-h-[80vh] flex flex-col relative">
+        <div className="fixed inset-0 bg-black/20 dark:bg-black/55 flex items-center justify-center p-4 z-50">
+          <div className="bg-surface rounded-3xl p-5 w-[420px] shadow-xl max-h-[80vh] flex flex-col relative">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">카테고리 관리</h3>
-              <button onClick={() => { setIsCategoryModalOpen(false); setEditingCategoryId(null); setShowEmojiPicker(false); }} className="p-1 hover:bg-gray-100 rounded-full"><X size={20}/></button>
+              <button onClick={() => { setIsCategoryModalOpen(false); setEditingCategoryId(null); setShowEmojiPicker(false); }} className="p-1 hover:bg-surface-hover rounded-full"><X size={20}/></button>
             </div>
             
             <div className="flex-1 overflow-y-auto mb-4 pr-1">
@@ -1292,12 +1294,12 @@ function App() {
                               {...provided.draggableProps}
                               className={clsx(
                                 "flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all",
-                                snapshot.isDragging ? "bg-white shadow-lg border-gray-300" : "bg-gray-50 border-gray-100"
+                                snapshot.isDragging ? "bg-surface shadow-lg border-line-strong" : "bg-surface-muted border-line"
                               )}
                               style={provided.draggableProps.style}
                             >
                               <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                                <div {...provided.dragHandleProps} className="p-0.5 text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing">
+                                <div {...provided.dragHandleProps} className="p-0.5 text-fg-subtle hover:text-fg cursor-grab active:cursor-grabbing">
                                   <GripVertical size={16} />
                                 </div>
                                 {editingCategoryId === c.id ? (
@@ -1305,7 +1307,7 @@ function App() {
                                     <button
                                       type="button"
                                       onClick={() => { setEmojiPickerTarget('edit'); setShowEmojiPicker(open => !open); }}
-                                      className="inline-flex items-center rounded-lg p-1 hover:bg-white"
+                                      className="inline-flex items-center rounded-lg p-1 hover:bg-surface"
                                       aria-label="카테고리 아이콘 변경"
                                     >
                                       <EmojiIcon emoji={editingCategoryIcon} className="h-5 w-6" />
@@ -1314,13 +1316,13 @@ function App() {
                                       autoFocus
                                       value={editingCategoryName}
                                       onChange={event => setEditingCategoryName(event.target.value)}
-                                      className="min-w-0 flex-1 rounded-lg bg-white px-2 py-1 font-medium text-gray-700 outline-none ring-1 ring-gray-200 focus:ring-gray-400"
+                                      className="min-w-0 flex-1 rounded-lg bg-surface px-2 py-1 font-medium text-fg outline-none ring-1 ring-gray-200 focus:ring-gray-400"
                                     />
                                   </>
                                 ) : (
                                   <>
                                     <span className="inline-flex items-center"><EmojiIcon emoji={c.icon} className="h-5 w-6" /></span>
-                                    <span className="font-medium text-gray-700 truncate">{c.name}</span>
+                                    <span className="font-medium text-fg truncate">{c.name}</span>
                                   </>
                                 )}
                               </div>
@@ -1341,14 +1343,14 @@ function App() {
                                       setShowEmojiPicker(false);
                                     }}
                                     aria-label={`${c.name} 저장`}
-                                    className="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
+                                    className="p-1.5 text-fg-subtle hover:text-fg hover:bg-surface rounded-lg transition-colors"
                                   >
                                     <Check size={16}/>
                                   </button>
                                   <button
                                     onClick={() => { setEditingCategoryId(null); setShowEmojiPicker(false); }}
                                     aria-label="카테고리 수정 취소"
-                                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-white rounded-lg transition-colors"
+                                    className="p-1.5 text-fg-subtle hover:text-fg hover:bg-surface rounded-lg transition-colors"
                                   >
                                     <X size={16}/>
                                   </button>
@@ -1364,11 +1366,11 @@ function App() {
                                       setShowEmojiPicker(false);
                                     }}
                                     aria-label={`${c.name} 수정`}
-                                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-white rounded-lg transition-colors"
+                                    className="p-1.5 text-fg-subtle hover:text-fg hover:bg-surface rounded-lg transition-colors"
                                   >
                                     <Pencil size={16}/>
                                   </button>
-                                  <button onClick={() => { if (editingCategoryId === c.id) setEditingCategoryId(null); void handleCategoryDelete(c.id); }} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                  <button onClick={() => { if (editingCategoryId === c.id) setEditingCategoryId(null); void handleCategoryDelete(c.id); }} className="p-1.5 text-fg-subtle hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors">
                                     <Trash2 size={16}/>
                                   </button>
                                 </div>
@@ -1384,11 +1386,11 @@ function App() {
               </DragDropContext>
               
               {categories.length === 0 && (
-                <div className="text-center text-gray-400 py-8 text-sm">등록된 카테고리가 없습니다</div>
+                <div className="text-center text-fg-subtle py-8 text-sm">등록된 카테고리가 없습니다</div>
               )}
             </div>
 
-            <div className="pt-4 border-t border-gray-100">
+            <div className="pt-4 border-t border-line">
               <form onSubmit={async (e) => {
                 e.preventDefault();
                 const form = e.currentTarget;
@@ -1406,29 +1408,29 @@ function App() {
                   <button 
                     type="button"
                     onClick={() => { setEmojiPickerTarget('new'); setShowEmojiPicker(!showEmojiPicker); }}
-                    className="w-12 h-12 flex items-center justify-center bg-gray-50 hover:bg-gray-100 rounded-xl text-2xl transition-colors border border-gray-200 shrink-0"
+                    className="w-12 h-12 flex items-center justify-center bg-surface-muted hover:bg-surface-hover rounded-xl text-2xl transition-colors border border-line-strong shrink-0"
                   >
                     <EmojiIcon emoji={newCategoryEmoji} className="h-6 w-8" />
                   </button>
-                  <input name="name" type="text" placeholder="새 카테고리 이름" className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 outline-none focus:border-gray-400 transition-colors font-sans" />
-                  <button type="submit" className="w-12 h-12 flex items-center justify-center bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors shrink-0"><Plus size={20}/></button>
+                  <input name="name" type="text" placeholder="새 카테고리 이름" className="flex-1 bg-surface-muted border border-line-strong rounded-xl px-4 outline-none focus:border-fg-subtle transition-colors font-sans" />
+                  <button type="submit" className="w-12 h-12 flex items-center justify-center bg-ink text-on-ink rounded-xl hover:opacity-90 transition-colors shrink-0"><Plus size={20}/></button>
                 </div>
                 
                 {showEmojiPicker && (
-                  <div className="absolute bottom-16 left-1/2 z-[60] flex h-[430px] w-[680px] -translate-x-1/2 flex-col rounded-2xl border border-gray-200 bg-white p-5 shadow-2xl">
+                  <div className="absolute bottom-16 left-1/2 z-[60] flex h-[430px] w-[680px] -translate-x-1/2 flex-col rounded-2xl border border-line-strong bg-surface p-5 shadow-2xl">
                     <div className="mb-3 flex items-center justify-between">
-                      <span className="text-base font-medium text-gray-700">아이콘 선택</span>
-                      <button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="아이콘 선택 닫기" className="p-1 text-gray-400 hover:text-gray-700"><X size={16}/></button>
+                      <span className="text-base font-medium text-fg">아이콘 선택</span>
+                      <button type="button" onClick={() => setShowEmojiPicker(false)} aria-label="아이콘 선택 닫기" className="p-1 text-fg-subtle hover:text-fg"><X size={16}/></button>
                     </div>
                     <div className="mb-4 grid grid-cols-5 gap-1.5">
                       {emojiCategories.map(category => (
-                        <button key={category.id} type="button" onClick={() => setSelectedEmojiCategory(category.id)} className={clsx("flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition-colors", selectedEmojiSet.id === category.id ? "bg-primary/30 text-gray-800" : "text-gray-500 hover:bg-gray-100")}><EmojiIcon emoji={category.icon} className="h-4 w-5" /> {category.id}</button>
+                        <button key={category.id} type="button" onClick={() => setSelectedEmojiCategory(category.id)} className={clsx("flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition-colors", selectedEmojiSet.id === category.id ? "bg-primary/30 text-fg" : "text-fg-muted hover:bg-surface-hover")}><EmojiIcon emoji={category.icon} className="h-4 w-5" /> {category.id}</button>
                       ))}
                     </div>
                     <div className="h-[252px] flex-none overflow-y-auto pr-1">
                       {(selectedEmojiSet.sections ?? [{ id: selectedEmojiSet.id, label: '', emojis: selectedEmojiSet.emojis }]).map(section => (
                         <div key={section.id} className="mb-3 last:mb-0">
-                          {section.label && <p className="mb-1.5 px-1 text-xs font-medium text-gray-400">{section.label}</p>}
+                          {section.label && <p className="mb-1.5 px-1 text-xs font-medium text-fg-subtle">{section.label}</p>}
                           <div className="grid grid-cols-10 gap-1.5">
                             {section.emojis.map(emoji => {
                               const flagName = flagNameByEmoji[emoji];
