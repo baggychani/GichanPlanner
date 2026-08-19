@@ -66,7 +66,7 @@ export function TaskRow({
           {task.is_important && (
             <Star size={14} strokeWidth={2} fill="currentColor" className={clsx('shrink-0', task.is_completed ? 'text-fg-faint' : 'text-amber-500')} />
           )}
-          <div className={clsx('font-sans text-[15px] font-medium leading-snug truncate', task.is_completed ? 'text-fg-subtle line-through decoration-fg-muted decoration-1' : 'text-textPrimary')}>
+          <div className={clsx('font-sans text-[15px] font-normal leading-snug truncate', task.is_completed ? 'text-fg-subtle line-through decoration-fg-muted decoration-1' : 'text-textPrimary')}>
             {task.title}
           </div>
         </div>

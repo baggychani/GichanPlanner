@@ -2,7 +2,7 @@ import {
   format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   isSameMonth, isSameDay, isToday,
 } from 'date-fns';
-import { AlertCircle, ChevronLeft, ChevronRight, Plus, Repeat2, Settings, Target, ListTodo } from 'lucide-react';
+import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Plus, Repeat2, Settings, Target, ListTodo, UserRound } from 'lucide-react';
 import clsx from 'clsx';
 import type { Deadline, Goal } from '../lib/db';
 import { EMPTY_DAY_COUNTS, isDayCleared, type DayTaskCounts } from '../lib/taskCounts';
@@ -28,6 +28,7 @@ type CalendarBoardProps = {
   onCreateTask: () => void;
   onCreateDeadline: () => void;
   onOpenCategories: () => void;
+  onOpenProfile: () => void;
   onCancelSelection: () => void;
   onCellClick: (day: Date) => void;
   onSelectWeek: (weekStart: Date) => void;
@@ -52,6 +53,7 @@ export function CalendarBoard({
   onCreateTask,
   onCreateDeadline,
   onOpenCategories,
+  onOpenProfile,
   onCancelSelection,
   onCellClick,
   onSelectWeek,
@@ -91,7 +93,7 @@ export function CalendarBoard({
           key={day.toString()}
           onClick={() => onCellClick(cloneDay)}
           className={clsx(
-            'min-h-[110px] p-2 border-line transition-all cursor-pointer relative group',
+            'min-h-[110px] p-2 border-line transition-all cursor-pointer relative group max-[1200px]:min-h-[88px]',
             isSelecting ? 'hover:bg-primary/20' : 'hover:brightness-95',
             isWeekend && !isSelecting ? (i === 6 ? 'bg-red-50/30 dark:bg-red-950/25' : 'bg-blue-50/30 dark:bg-blue-950/25') : 'bg-surface',
             !isSameMonth(day, monthStart) ? 'opacity-40' : '',
@@ -144,7 +146,7 @@ export function CalendarBoard({
       <div className="relative grid grid-cols-7" key={cloneWeekStart.toString()}>
         <div
           className={clsx(
-            'absolute -left-16 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border shadow-sm flex items-center justify-center cursor-pointer transition-all z-10',
+            'absolute -left-16 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border shadow-sm flex items-center justify-center cursor-pointer transition-all z-10 max-[900px]:hidden',
             isSelectedWeek ? 'bg-primary border-primary text-on-primary scale-110' : 'bg-surface border-line-strong text-fg-subtle hover:text-primary hover:bg-surface-muted hover:scale-110',
           )}
           onClick={() => onSelectWeek(cloneWeekStart)}
@@ -164,12 +166,16 @@ export function CalendarBoard({
   }
 
   return (
-    <div className="w-[760px] shrink-0 relative">
+    <div className="w-[760px] shrink-0 relative max-[1560px]:w-[45vw] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:pl-0">
       <div className="flex justify-between items-center mb-6 pl-4 relative">
         <div className="flex items-center gap-4">
-          <h1 className="text-3xl font-bold">{format(currentDate, 'yyyy. MM')}</h1>
-          <button onClick={onGoToToday} className="px-4 py-1.5 bg-surface border border-line-strong rounded-full text-sm font-medium hover:bg-surface-muted shadow-sm transition-colors">
-            오늘
+          <h1 className="text-3xl font-bold leading-tight">
+            <span className="max-[600px]:hidden">{format(currentDate, 'yyyy.')}</span>
+            <span className="hidden max-[600px]:inline">{format(currentDate, 'yy.')}</span>
+            <span className="ml-2 max-[600px]:ml-0 max-[600px]:block">{format(currentDate, 'MM')}</span>
+          </h1>
+          <button onClick={onGoToToday} aria-label="오늘" title="오늘" className="shrink-0 px-4 py-1.5 bg-surface border border-line-strong rounded-full text-sm font-medium hover:bg-surface-muted shadow-sm transition-colors max-[900px]:grid max-[900px]:h-10 max-[900px]:w-10 max-[900px]:place-items-center max-[900px]:p-0">
+            <span className="max-[900px]:hidden">오늘</span><CalendarDays size={18} className="hidden max-[900px]:block" />
           </button>
         </div>
 
@@ -181,6 +187,9 @@ export function CalendarBoard({
         )}
 
         <div className="flex items-center gap-3">
+          <button onClick={() => onSelectWeek(startOfWeek(selectedDate, { weekStartsOn: 1 }))} aria-label="주간 목표" title="주간 목표" className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
+            <Target size={22} />
+          </button>
           {/* 바깥 클릭으로 닫히지 않음. 메뉴를 연 채 달력을 보는 흐름을 유지하기 위한 의도. */}
           <div className="relative">
             <button
@@ -210,7 +219,10 @@ export function CalendarBoard({
           <button onClick={onOpenCategories} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted" title="카테고리 관리">
             <Settings size={22} />
           </button>
-          <ThemeToggle />
+          <ThemeToggle className="max-[560px]:hidden" />
+          <button onClick={onOpenProfile} aria-label="프로필 및 계정" className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted" title="프로필 및 계정">
+            <UserRound size={21} />
+          </button>
           <div className="w-px h-6 bg-line-strong mx-1" />
           <button onClick={onPrevMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
             <ChevronLeft size={24} />

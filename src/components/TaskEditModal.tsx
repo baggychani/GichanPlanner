@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Image as ImageIcon, Star, Trash2, Upload, X } from 'lucide-react';
 import clsx from 'clsx';
 import type { Domain, Task } from '../lib/db';
-import { formatScheduledTime } from '../lib/datetime';
+import { formatScheduledTime, parseDay } from '../lib/datetime';
 import { Overlay } from './Overlay';
 
 type TaskEditModalProps = {
@@ -44,9 +44,9 @@ export function TaskEditModal({
 
   return (
     <Overlay>
-      <div className="bg-surface rounded-3xl w-[420px] shadow-xl flex flex-col max-h-[90vh]">
+      <div className="bg-surface rounded-3xl w-[420px] max-w-full shadow-xl flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-6 pb-4 shrink-0">
-          <h3 className="text-lg font-bold">{isCreating ? '할 일 만들기' : '할 일 상세'}</h3>
+          <h3 className="text-[17px] font-bold">{isCreating ? '할 일 만들기' : '할 일 상세'}</h3>
           <button onClick={onClose} className="p-1 hover:bg-surface-hover rounded-full"><X size={20} /></button>
         </div>
 
@@ -59,7 +59,7 @@ export function TaskEditModal({
               value={task.title}
               onChange={event => onChange({ ...task, title: event.target.value })}
               placeholder="할 일을 적어주세요"
-              className="w-full bg-surface-muted rounded-xl p-3 outline-none font-sans text-lg font-medium border border-transparent focus:border-line-strong"
+              className="w-full bg-surface-muted rounded-xl px-3 py-2.5 outline-none font-sans text-[15px] font-medium leading-5 border border-transparent focus:border-line-strong"
             />
           </div>
           <div>
@@ -154,7 +154,7 @@ export function TaskEditModal({
           <div>
             <label className="block text-xs font-medium text-fg-subtle mb-1">날짜</label>
             <div className="flex items-center justify-between bg-surface-muted rounded-xl p-3 border border-transparent">
-              <span className="text-sm font-sans font-medium">{format(parseISO(task.target_date), 'yyyy년 MM월 dd일')}</span>
+              <span className="text-sm font-sans font-medium">{format(parseDay(task.target_date), 'yyyy년 MM월 dd일')}</span>
               <button
                 onClick={onPickDate}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line-strong rounded-lg text-sm font-medium hover:bg-surface-hover transition-colors shadow-sm text-fg"

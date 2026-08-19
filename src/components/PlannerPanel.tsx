@@ -1,9 +1,10 @@
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { ArrowRight, CalendarDays, CircleX, Copy, MoreHorizontal, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import type { Deadline } from '../lib/db';
+import { parseDay } from '../lib/datetime';
 
 type DeadlineNotice = { deadline: Deadline; remainingDays: number };
 
@@ -39,7 +40,7 @@ export function PlannerPanel({
   onOpenDeadline,
 }: PlannerPanelProps) {
   return (
-    <div className="w-[650px] bg-surface p-8 flex flex-col h-[calc(100vh-3rem)] sticky top-6 rounded-3xl shadow-sm border border-line overflow-hidden">
+    <div className="w-[650px] bg-surface p-8 flex flex-col h-[calc(100vh-3rem)] sticky top-6 rounded-3xl shadow-sm border border-line overflow-hidden max-[1200px]:w-[calc(55vw-3rem)] max-[1200px]:p-6 max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:h-[min(720px,calc(100vh-2rem))] max-[900px]:static">
       <div className="flex items-center justify-between mb-6 shrink-0">
         <h2 className="text-2xl font-bold">
           {viewMode === 'DAILY'
@@ -94,7 +95,7 @@ export function PlannerPanel({
                   <p className={clsx('truncate text-sm', isDueToday ? 'font-bold text-red-700 dark:text-red-200' : 'font-medium text-fg')}>{deadline.title}</p>
                   {deadline.memo && <p className={clsx('mt-1 line-clamp-2 text-xs', isDueToday ? 'font-medium text-red-500' : 'text-fg-muted')}>{deadline.memo}</p>}
                 </div>
-                <span className={clsx('ml-auto shrink-0 text-xs', isDueToday ? 'font-bold text-red-600' : 'text-red-500', deadline.memo ? 'mt-0.5' : '')}>{format(parseISO(deadline.due_date), 'M/d')}</span>
+                <span className={clsx('ml-auto shrink-0 text-xs', isDueToday ? 'font-bold text-red-600' : 'text-red-500', deadline.memo ? 'mt-0.5' : '')}>{format(parseDay(deadline.due_date), 'M/d')}</span>
               </div>
             );
           })}

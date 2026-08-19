@@ -1,0 +1,13 @@
+import { createClient } from '@supabase/supabase-js';
+
+const url = import.meta.env.VITE_SUPABASE_URL;
+const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+// A local-only planner must still start when a contributor has not configured Supabase.
+export const supabase = url && anonKey
+  ? createClient(url, anonKey, {
+      auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true },
+    })
+  : null;
+
+export const isSupabaseConfigured = supabase !== null;

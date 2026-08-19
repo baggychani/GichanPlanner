@@ -3,7 +3,7 @@ import { addDays, addMonths, differenceInCalendarDays, format, parseISO, subMont
 import { ko } from 'date-fns/locale';
 import type { DropResult } from '@hello-pangea/dnd';
 import { db, type Deadline, type Task } from './lib/db';
-import { deadlineOnDate, isoFromTimeParts, timePartsFromDate, type Meridiem } from './lib/datetime';
+import { deadlineOnDate, isoFromTimeParts, parseDay, timePartsFromDate, type Meridiem } from './lib/datetime';
 import {
   applyTaskReorder,
   copyAllTasksToDate,
@@ -24,10 +24,14 @@ import { PlannerPanel } from './components/PlannerPanel';
 import { TaskEditModal } from './components/TaskEditModal';
 import { TimePickerModal } from './components/TimePickerModal';
 import { WeeklyPanel } from './components/WeeklyPanel';
+import { ProfileModal } from './components/ProfileModal';
+import { useObservable } from 'dexie-react-hooks';
 
 // Typography principle: small text is readable at normal weight. Reserve bold for page titles and primary actions only.
 // 빠른 만들기·일별 메뉴는 바깥을 눌러도 닫히지 않게 둔다. 달력 클릭과 메뉴 조작이 겹치지 않게 하려는 의도다.
 function App() {
+  const cloudUser = useObservable(db.cloud.currentUser);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [viewMode, setViewMode] = useState<'DAILY' | 'WEEKLY'>('DAILY');
@@ -72,7 +76,7 @@ function App() {
   const selectedDateIncompleteCount = tasks.filter(task => task.target_date === selectedDateString && !task.is_completed).length;
   const deadlineNotices = useMemo(() =>
     deadlines
-      .map(deadline => ({ deadline, remainingDays: differenceInCalendarDays(parseISO(deadline.due_date), selectedDate) }))
+      .map(deadline => ({ deadline, remainingDays: differenceInCalendarDays(parseDay(deadline.due_date), selectedDate) }))
       .filter(({ deadline, remainingDays }) => deadline.reminder_days !== null && remainingDays >= 0 && remainingDays <= deadline.reminder_days)
       .sort((a, b) => a.remainingDays - b.remainingDays),
     [deadlines, selectedDate],
@@ -256,7 +260,7 @@ function App() {
   };
 
   return (
-    <div className="min-h-screen flex justify-center p-6 gap-10 bg-bgPrimary pl-24">
+    <div className="min-h-screen flex justify-center p-6 gap-10 bg-bgPrimary pl-24 max-[1560px]:pl-6 max-[1560px]:gap-6 max-[1200px]:gap-3 max-[1200px]:p-3 max-[900px]:flex-col max-[900px]:items-center max-[900px]:gap-5 max-[900px]:p-4">
       <CalendarBoard
         currentDate={currentDate}
         selectedDate={selectedDate}
@@ -286,6 +290,7 @@ function App() {
           setIsQuickCreateMenuOpen(false);
         }}
         onOpenCategories={() => setIsCategoryModalOpen(true)}
+        onOpenProfile={() => setIsProfileOpen(true)}
         onCancelSelection={() => {
           setSelectingDateForTask(null);
           setSelectingDateForDeadline(null);
@@ -440,6 +445,7 @@ function App() {
       {isCategoryModalOpen && (
         <CategoryModal categories={categories} onClose={() => setIsCategoryModalOpen(false)} />
       )}
+      {isProfileOpen && <ProfileModal user={cloudUser} onClose={() => setIsProfileOpen(false)} />}
     </div>
   );
 }

@@ -70,6 +70,16 @@ body {
   background-color: color-mix(in srgb, var(--color-primary) 30%, transparent);
 }
 
+/* 마우스 클릭 뒤 남는 브라우저 기본 외곽선은 제거하되, 키보드 탐색에는 분명한 포커스를 남긴다. */
+:where(button, [role="button"]):focus:not(:focus-visible) {
+  outline: none;
+}
+
+:where(button, [role="button"]):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
+}
+
 @keyframes task-drop-feedback {
   0% { box-shadow: 0 0 0 0 rgb(255 217 81 / 0.9); }
   55% { box-shadow: 0 0 0 7px rgb(255 217 81 / 0); }
@@ -78,6 +88,50 @@ body {
 
 .task-drop-feedback {
   animation: task-drop-feedback 420ms ease-out;
+}
+
+@keyframes clear-shimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+.clear-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 22px;
+  padding: 0 11px 0 9px;
+  border-radius: 999px;
+  background: var(--color-primary);
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 55%, #fff),
+    0 0 10px color-mix(in srgb, var(--color-primary) 50%, transparent);
+}
+
+.clear-mark-text {
+  display: block;
+  font-size: 10px;
+  font-weight: 800;
+  font-style: italic;
+  letter-spacing: 0.16em;
+  line-height: 1;
+  transform: translateY(-1px);
+  background-image: linear-gradient(110deg, #3f2e0a 0%, #1a1408 36%, #8a6410 50%, #2a1c08 68%, #3f2e0a 100%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: clear-shimmer 3.2s ease-in-out infinite;
+}
+
+.dark .clear-mark {
+  box-shadow:
+    0 0 0 1px color-mix(in srgb, var(--color-primary) 40%, #000),
+    0 0 12px color-mix(in srgb, var(--color-primary) 35%, transparent);
+}
+
+.dark .clear-mark-text {
+  background-image: linear-gradient(110deg, #2a1c08 0%, #0c0a06 36%, #c9a227 50%, #1a1408 68%, #2a1c08 100%);
 }
 
 /* 스크롤바는 카드 오른쪽 패딩에 얹혀 본문 폭을 줄이지 않는다. */
