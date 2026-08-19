@@ -1,0 +1,190 @@
+import { useState } from 'react';
+import { format, parseISO } from 'date-fns';
+import { Calendar as CalendarIcon, Image as ImageIcon, Star, Trash2, Upload, X } from 'lucide-react';
+import clsx from 'clsx';
+import type { Domain, Task } from '../lib/db';
+import { formatScheduledTime } from '../lib/datetime';
+import { Overlay } from './Overlay';
+
+type TaskEditModalProps = {
+  task: Task;
+  isCreating: boolean;
+  categories: Domain[];
+  onChange: (task: Task) => void;
+  onClose: () => void;
+  onPickDate: () => void;
+  onOpenTimePicker: () => void;
+  onDelete: () => void;
+  onSave: () => void;
+};
+
+export function TaskEditModal({
+  task,
+  isCreating,
+  categories,
+  onChange,
+  onClose,
+  onPickDate,
+  onOpenTimePicker,
+  onDelete,
+  onSave,
+}: TaskEditModalProps) {
+  const [isFileHover, setIsFileHover] = useState(false);
+
+  const handleImageUpload = (file: File | null) => {
+    if (!file || !file.type.startsWith('image/')) return;
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const image_data = event.target?.result;
+      if (typeof image_data !== 'string') return;
+      onChange({ ...task, image_data });
+    };
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <Overlay>
+      <div className="bg-surface rounded-3xl w-[420px] shadow-xl flex flex-col max-h-[90vh]">
+        <div className="flex justify-between items-center p-6 pb-4 shrink-0">
+          <h3 className="text-lg font-bold">{isCreating ? '할 일 만들기' : '할 일 상세'}</h3>
+          <button onClick={onClose} className="p-1 hover:bg-surface-hover rounded-full"><X size={20} /></button>
+        </div>
+
+        <div className="overflow-y-auto px-6 pb-6 space-y-4">
+          <div>
+            <label className="block text-xs font-medium text-fg-subtle mb-1">제목</label>
+            <input
+              type="text"
+              autoFocus={isCreating}
+              value={task.title}
+              onChange={event => onChange({ ...task, title: event.target.value })}
+              placeholder="할 일을 적어주세요"
+              className="w-full bg-surface-muted rounded-xl p-3 outline-none font-sans text-lg font-medium border border-transparent focus:border-line-strong"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-subtle mb-1">카테고리</label>
+            <div className="flex gap-2">
+              <select
+                value={task.domain_id ?? ''}
+                onChange={event => onChange({ ...task, domain_id: event.target.value || null })}
+                className="min-w-0 flex-1 bg-surface-muted rounded-xl p-3 outline-none font-sans text-sm border border-transparent focus:border-line-strong"
+              >
+                <option value="">미분류</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => onChange({ ...task, is_important: !task.is_important })}
+                aria-pressed={task.is_important}
+                aria-label="중요 할 일"
+                className={clsx(
+                  'shrink-0 flex items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition-colors',
+                  task.is_important ? 'bg-primary text-on-primary' : 'bg-surface-muted text-fg-muted hover:bg-surface-hover',
+                )}
+              >
+                <Star size={16} fill={task.is_important ? 'currentColor' : 'none'} />
+                중요
+              </button>
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-subtle mb-1">메모</label>
+            <textarea
+              value={task.memo || ''}
+              onChange={event => onChange({ ...task, memo: event.target.value })}
+              placeholder="추가적인 메모를 적어보세요"
+              className="w-full bg-surface-muted rounded-xl p-3 outline-none h-24 resize-none border border-transparent focus:border-line-strong text-sm font-sans"
+            />
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-fg-subtle mb-1">이미지 첨부</label>
+            {task.image_data ? (
+              <div className="w-full bg-surface-muted rounded-xl border border-line-strong overflow-hidden">
+                <img src={task.image_data} alt="첨부" className="w-full object-contain max-h-[300px] bg-surface-hover" />
+                <div className="p-2 flex justify-end gap-2 bg-surface border-t border-line-strong">
+                  <label className="px-3 py-1.5 bg-surface-hover rounded-lg text-sm font-medium cursor-pointer transition-colors text-fg flex items-center gap-1.5">
+                    <Upload size={14} />
+                    변경
+                    <input type="file" accept="image/*" className="hidden" onChange={(event) => handleImageUpload(event.target.files?.[0] ?? null)} />
+                  </label>
+                  <button
+                    onClick={() => onChange({ ...task, image_data: null })}
+                    className="px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/70 rounded-lg text-sm font-medium text-red-500 transition-colors flex items-center gap-1.5"
+                  >
+                    <Trash2 size={14} />
+                    삭제
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className={clsx(
+                  'w-full bg-surface-muted rounded-xl border-2 border-dashed border-line-strong h-24 flex flex-col items-center justify-center relative transition-colors cursor-pointer',
+                  isFileHover ? 'bg-surface-hover' : 'hover:bg-surface-hover',
+                )}
+                onDragOver={(event) => { event.preventDefault(); setIsFileHover(true); }}
+                onDragLeave={(event) => { event.preventDefault(); setIsFileHover(false); }}
+                onDrop={(event) => {
+                  event.preventDefault();
+                  setIsFileHover(false);
+                  handleImageUpload(event.dataTransfer.files[0] ?? null);
+                }}
+              >
+                <ImageIcon size={24} className="text-fg-subtle mb-2" />
+                <span className="text-xs text-fg-muted font-sans font-medium">클릭하거나 이미지를 드래그 앤 드롭</span>
+                <input type="file" accept="image/*" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(event) => handleImageUpload(event.target.files?.[0] ?? null)} />
+              </div>
+            )}
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-fg-subtle mb-1">시간</label>
+            <div className="flex items-center justify-between bg-surface-muted rounded-xl p-3 border border-transparent">
+              <span className="text-sm font-sans text-fg-muted">{formatScheduledTime(task.scheduled_time) ?? '시간 없음'}</span>
+              <button onClick={onOpenTimePicker} className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line-strong rounded-lg text-sm font-medium hover:bg-surface-hover transition-colors shadow-sm text-fg">
+                <CalendarIcon size={14} /> 시간 설정
+              </button>
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-xs font-medium text-fg-subtle mb-1">날짜</label>
+            <div className="flex items-center justify-between bg-surface-muted rounded-xl p-3 border border-transparent">
+              <span className="text-sm font-sans font-medium">{format(parseISO(task.target_date), 'yyyy년 MM월 dd일')}</span>
+              <button
+                onClick={onPickDate}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-surface border border-line-strong rounded-lg text-sm font-medium hover:bg-surface-hover transition-colors shadow-sm text-fg"
+              >
+                <CalendarIcon size={14} />
+                날짜 변경
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <div className="px-6 pb-6 pt-4 shrink-0 flex justify-between gap-3 border-t border-line">
+          {isCreating ? (
+            <button onClick={onClose} className="px-4 py-3 text-fg-muted bg-surface-hover hover:bg-line-strong rounded-xl transition-colors font-bold flex items-center justify-center">
+              취소
+            </button>
+          ) : (
+            <button onClick={onDelete} className="px-4 py-3 text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/70 rounded-xl transition-colors font-bold flex items-center justify-center">
+              삭제
+            </button>
+          )}
+          <button
+            onClick={onSave}
+            disabled={!task.title.trim()}
+            className="flex-1 py-3 bg-ink text-on-ink rounded-xl font-bold hover:opacity-90 transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            {isCreating ? '만들기' : '저장'}
+          </button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}

@@ -66,12 +66,12 @@ export function TaskRow({
           {task.is_important && (
             <Star size={14} strokeWidth={2} fill="currentColor" className={clsx('shrink-0', task.is_completed ? 'text-fg-faint' : 'text-amber-500')} />
           )}
-          <div className={clsx('font-sans text-base font-medium leading-snug truncate', task.is_completed ? 'text-fg-subtle line-through decoration-fg-muted decoration-2' : 'text-textPrimary')}>
+          <div className={clsx('font-sans text-[15px] font-medium leading-snug truncate', task.is_completed ? 'text-fg-subtle line-through decoration-fg-muted decoration-1' : 'text-textPrimary')}>
             {task.title}
           </div>
         </div>
         {scheduledLabel && (
-          <div className={clsx('mt-0.5 flex items-center gap-1 text-sm', task.is_completed ? 'text-fg-subtle' : 'text-fg-muted')}>
+          <div className={clsx('mt-0.5 flex items-center gap-1 text-[13px]', task.is_completed ? 'text-fg-subtle' : 'text-fg-muted')}>
             <Clock size={13} strokeWidth={2} className="shrink-0" />
             <span>{scheduledLabel}</span>
           </div>
