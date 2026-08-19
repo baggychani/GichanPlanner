@@ -101,6 +101,8 @@ export interface Profile {
   avatar: Blob | null;
   legacy_dexie_user_id: string | null;
   email: string | null;
+  birthday_month: number | null;
+  birthday_day: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -178,6 +180,21 @@ db.version(10).stores({
 }).upgrade(async (transaction) => {
   await transaction.table('deadlines').toCollection().modify((deadline: Deadline) => {
     if (deadline.due_time === undefined) deadline.due_time = null;
+  });
+});
+
+db.version(11).stores({
+  tasks: 'id, target_date, is_completed, is_important, deleted_at, domain_id, order',
+  schedules: 'id, target_date, start_time, deleted_at',
+  routines: 'id, start_date, deleted_at',
+  domains: 'id, deleted_at, order',
+  goals: 'id, time_frame, start_date, deleted_at',
+  deadlines: 'id, due_date, deleted_at',
+  profiles: 'id',
+}).upgrade(async (transaction) => {
+  await transaction.table('profiles').toCollection().modify((profile: Profile) => {
+    if (profile.birthday_month === undefined) profile.birthday_month = null;
+    if (profile.birthday_day === undefined) profile.birthday_day = null;
   });
 });
 

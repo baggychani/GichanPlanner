@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Camera, ChevronLeft, LogOut, UserRound, X } from 'lucide-react';
+import { Camera, ChevronLeft, LogOut, UserRound, X, Calendar as CalendarIcon } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { UserLogin } from 'dexie-cloud-addon';
 import clsx from 'clsx';
@@ -9,6 +9,7 @@ import { db } from '../lib/db';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
 import { AuthPanel } from './AuthScreen';
+import { BirthdayPickerModal } from './BirthdayPickerModal';
 import { authErrorMessage, authInputClass, PasswordField } from './authUi';
 
 export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; onClose: () => void }) {
@@ -17,6 +18,11 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
   const profile = useLiveQuery(() => db.profiles.get('#profile'));
   const [view, setView] = useState<'profile' | 'password'>('profile');
   const [nickname, setNickname] = useState('');
+  const [birthdayMonth, setBirthdayMonth] = useState<number | null>(null);
+  const [birthdayDay, setBirthdayDay] = useState<number | null>(null);
+  const [isBirthdayPickerOpen, setIsBirthdayPickerOpen] = useState(false);
+  const [pickerMonth, setPickerMonth] = useState(1);
+  const [pickerDay, setPickerDay] = useState(1);
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
@@ -44,7 +50,9 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
   useEffect(() => {
     if (profile?.nickname) setNickname(profile.nickname);
     else setNickname(fallbackName);
-  }, [profile?.nickname, fallbackName]);
+    setBirthdayMonth(profile?.birthday_month ?? null);
+    setBirthdayDay(profile?.birthday_day ?? null);
+  }, [profile?.nickname, profile?.birthday_month, profile?.birthday_day, fallbackName]);
 
   useEffect(() => {
     if (!profile?.avatar) { setAvatarUrl(null); return; }
@@ -62,6 +70,8 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
       avatar: existing?.avatar ?? null,
       legacy_dexie_user_id: user?.userId ?? existing?.legacy_dexie_user_id ?? null,
       email: accountEmail || existing?.email || null,
+      birthday_month: existing?.birthday_month ?? null,
+      birthday_day: existing?.birthday_day ?? null,
       created_at: existing?.created_at ?? now,
       updated_at: now,
     }));
@@ -76,6 +86,8 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
       avatar,
       legacy_dexie_user_id: user?.userId ?? profile?.legacy_dexie_user_id ?? null,
       email: accountEmail || profile?.email || null,
+      birthday_month: birthdayMonth,
+      birthday_day: birthdayDay,
       created_at: profile?.created_at ?? now,
       updated_at: now,
     });
@@ -124,6 +136,10 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
         if (view === 'password') {
           setView('profile');
           setError(null);
+          return;
+        }
+        if (isBirthdayPickerOpen) {
+          setIsBirthdayPickerOpen(false);
           return;
         }
         onClose();
@@ -190,6 +206,25 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
               <span className="text-[13px] font-medium text-fg-muted">닉네임</span>
               <input value={nickname} onChange={event => setNickname(event.target.value)} maxLength={40} className={clsx(authInputClass, 'mt-1.5')} />
             </label>
+            <div className="mt-4">
+              <span className="text-[13px] font-medium text-fg-muted">생일</span>
+              <div className="mt-1.5 flex items-center justify-between rounded-xl border border-line-strong bg-surface-muted px-3 py-2.5">
+                <span className="text-[15px] text-fg-muted">
+                  {birthdayMonth && birthdayDay ? `${birthdayMonth}월 ${birthdayDay}일` : '생일 없음'}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPickerMonth(birthdayMonth ?? 1);
+                    setPickerDay(birthdayDay ?? 1);
+                    setIsBirthdayPickerOpen(true);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover"
+                >
+                  <CalendarIcon size={14} /> 생일 설정
+                </button>
+              </div>
+            </div>
             <button
               onClick={() => { void saveProfile().then(() => setToast('프로필을 저장했습니다.')); }}
               disabled={!nickname.trim()}
@@ -247,6 +282,25 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
           onSave={image => {
             setCroppingFile(null);
             void saveProfile(image).then(() => setToast('프로필 사진을 저장했습니다.'));
+          }}
+        />
+      )}
+      {isBirthdayPickerOpen && (
+        <BirthdayPickerModal
+          month={pickerMonth}
+          day={pickerDay}
+          onMonthChange={setPickerMonth}
+          onDayChange={setPickerDay}
+          onClose={() => setIsBirthdayPickerOpen(false)}
+          onClear={() => {
+            setBirthdayMonth(null);
+            setBirthdayDay(null);
+            setIsBirthdayPickerOpen(false);
+          }}
+          onConfirm={() => {
+            setBirthdayMonth(pickerMonth);
+            setBirthdayDay(pickerDay);
+            setIsBirthdayPickerOpen(false);
           }}
         />
       )}
