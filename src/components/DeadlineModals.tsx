@@ -1,8 +1,9 @@
-import { format, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AlertCircle, Calendar as CalendarIcon, X } from 'lucide-react';
 import clsx from 'clsx';
 import { db, type Deadline } from '../lib/db';
+import { parseDay } from '../lib/datetime';
 import { Overlay } from './Overlay';
 
 const REMINDER_DAYS = [null, 1, 3, 7, 14, 30] as const;
@@ -77,7 +78,7 @@ export function DeadlineCreateModal({
           <div>
             <label className="mb-1 block text-xs font-medium text-fg-subtle">데드라인 날짜</label>
             <div className="flex items-center justify-between rounded-xl bg-surface-muted p-3">
-              <span className="text-sm text-fg">{format(parseISO(dueDate), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
+              <span className="text-sm text-fg">{format(parseDay(dueDate), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
               <button onClick={onPickDate} className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover"><CalendarIcon size={14} /> 날짜 선택</button>
             </div>
           </div>
@@ -126,7 +127,7 @@ export function DeadlineEditModal({
           <div>
             <label className="mb-1 block text-xs font-medium text-fg-subtle">데드라인 날짜</label>
             <div className="flex items-center justify-between rounded-xl bg-surface-muted p-3">
-              <span className="text-sm text-fg">{format(parseISO(deadline.due_date), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
+              <span className="text-sm text-fg">{format(parseDay(deadline.due_date), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
               <button onClick={onPickDate} className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover"><CalendarIcon size={14} /> 날짜 변경</button>
             </div>
           </div>

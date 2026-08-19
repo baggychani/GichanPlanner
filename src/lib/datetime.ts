@@ -1,11 +1,21 @@
-import { parseISO } from 'date-fns';
+import { parse, parseISO } from 'date-fns';
 
 export type Meridiem = 'AM' | 'PM';
 
+const DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+
+export function parseDay(ymd: string): Date {
+  return parse(ymd, 'yyyy-MM-dd', new Date());
+}
+
+export function parseDateValue(value: string): Date {
+  return DAY_PATTERN.test(value) ? parseDay(value) : parseISO(value);
+}
+
 export function deadlineOnDate(value: string | null, targetDate: string): string | null {
   if (!value) return null;
-  const original = parseISO(value);
-  const next = new Date(`${targetDate}T00:00:00`);
+  const original = parseDateValue(value);
+  const next = parseDay(targetDate);
   next.setHours(original.getHours(), original.getMinutes(), 0, 0);
   return next.toISOString();
 }
@@ -31,7 +41,7 @@ export function timePartsFromDate(date: Date): { meridiem: Meridiem; hour: numbe
 }
 
 export function isoFromTimeParts(targetDate: string, meridiem: Meridiem, hour: number, minute: number): string {
-  const date = new Date(`${targetDate}T00:00:00`);
+  const date = parseDay(targetDate);
   const hours = (hour % 12) + (meridiem === 'PM' ? 12 : 0);
   date.setHours(hours, minute, 0, 0);
   return date.toISOString();

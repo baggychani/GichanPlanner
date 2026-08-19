@@ -1,4 +1,6 @@
-import emojiKoreanSource from 'emoji-picker-react/src/data/emojis-ko.json';
+import emojiKoreanSource from '../data/emojis-ko.json';
+
+// 한국어 이모지 이름은 패키지 내부 경로가 아니라 여기 JSON을 쓴다.
 
 type EmojiRecord = { u: string; n?: string[] };
 type EmojiSource = { emojis: Record<string, EmojiRecord[]> };
