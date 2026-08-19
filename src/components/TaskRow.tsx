@@ -1,5 +1,5 @@
 import clsx from 'clsx';
-import { Clock } from 'lucide-react';
+import { Clock, Star } from 'lucide-react';
 import type { DraggableProvided, DraggableStateSnapshot } from '@hello-pangea/dnd';
 import type { Task } from '../lib/db';
 import { formatScheduledTime } from '../lib/datetime';
@@ -62,8 +62,13 @@ export function TaskRow({
       </button>
 
       <div className="flex-1 min-w-0" onClick={onOpen}>
-        <div className={clsx('font-sans text-base font-medium leading-snug truncate', task.is_completed ? 'text-gray-400 line-through decoration-gray-500 decoration-2' : 'text-textPrimary')}>
-          {task.title}
+        <div className="flex items-center gap-1.5 min-w-0">
+          {task.is_important && (
+            <Star size={14} strokeWidth={2} fill="currentColor" className={clsx('shrink-0', task.is_completed ? 'text-gray-300' : 'text-amber-500')} />
+          )}
+          <div className={clsx('font-sans text-base font-medium leading-snug truncate', task.is_completed ? 'text-gray-400 line-through decoration-gray-500 decoration-2' : 'text-textPrimary')}>
+            {task.title}
+          </div>
         </div>
         {scheduledLabel && (
           <div className={clsx('mt-0.5 flex items-center gap-1 text-sm', task.is_completed ? 'text-gray-400' : 'text-gray-500')}>

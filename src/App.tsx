@@ -4,7 +4,7 @@ import {
   isSameMonth, isSameDay, addDays, isToday, parseISO, differenceInCalendarDays
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, AlertCircle, Settings, Target, X, Trash2, Calendar as CalendarIcon, GripVertical, Image as ImageIcon, Upload, Pencil, Check, Repeat2, MoreHorizontal, Copy, ArrowRight, CalendarDays, CircleX, ListTodo } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, AlertCircle, Settings, Target, X, Trash2, Calendar as CalendarIcon, GripVertical, Image as ImageIcon, Upload, Pencil, Check, Repeat2, MoreHorizontal, Copy, ArrowRight, CalendarDays, CircleX, ListTodo, Star } from 'lucide-react';
 import clsx from 'clsx';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Deadline, type Task } from './lib/db';
@@ -116,13 +116,16 @@ function App() {
   const selectedDateIncompleteCount = tasks.filter(task => task.target_date === selectedDateString && !task.is_completed).length;
 
   const calendarActiveTaskCountByDate = useLiveQuery(async () => {
-    const countByDate: Record<string, number> = {};
+    const countByDate: Record<string, { active: number; important: number }> = {};
     const [storedTasks, storedCategories] = await Promise.all([db.tasks.toArray(), db.domains.toArray()]);
     const visibleDomainIds = new Set(storedCategories.filter(category => category.deleted_at === null).map(category => category.id));
     for (const task of storedTasks) {
       const isVisible = task.domain_id === null || visibleDomainIds.has(task.domain_id);
       if (task.deleted_at === null && !task.is_completed && isVisible) {
-        countByDate[task.target_date] = (countByDate[task.target_date] ?? 0) + 1;
+        const counts = countByDate[task.target_date] ?? { active: 0, important: 0 };
+        if (task.is_important) counts.important += 1;
+        else counts.active += 1;
+        countByDate[task.target_date] = counts;
       }
     }
     return countByDate;
@@ -447,7 +450,7 @@ function App() {
         const cloneDay = day;
         const dateStr = format(day, 'yyyy-MM-dd');
         
-        const activeTaskCount = calendarActiveTaskCountByDate[dateStr] ?? 0;
+        const dayCounts = calendarActiveTaskCountByDate[dateStr] ?? { active: 0, important: 0 };
         const dayDeadlines = deadlines.filter(deadline => deadline.due_date === dateStr);
         const hasDeadline = dayDeadlines.length > 0;
         
@@ -482,10 +485,15 @@ function App() {
               {hasDeadline && <AlertCircle size={18} strokeWidth={2.5} className="text-red-500 drop-shadow-sm" aria-label={`${dayDeadlines.length}개의 데드라인`} />}
             </div>
 
-            <div className="mt-2 flex flex-col items-center gap-1">
-              {activeTaskCount > 0 && (
+            <div className="mt-2 flex items-center justify-center gap-1">
+              {dayCounts.active > 0 && (
                 <div className="min-w-7 px-2 py-1 rounded-full text-sm font-bold w-max bg-gray-100 text-gray-700 text-center">
-                  {activeTaskCount}
+                  {dayCounts.active}
+                </div>
+              )}
+              {dayCounts.important > 0 && (
+                <div className="min-w-7 px-2 py-1 rounded-full text-sm font-bold w-max bg-primary text-textPrimary text-center">
+                  {dayCounts.important}
                 </div>
               )}
             </div>
@@ -713,8 +721,8 @@ function App() {
           {(provided, snapshot) => (
             <div 
               className={clsx(
-                "p-2 rounded-2xl transition-[background-color,box-shadow,margin] duration-200 ease-out",
-                categoryTasks.length === 0 && !isAdding ? "mb-1" : "space-y-2 mb-5",
+                "space-y-2 p-2 rounded-2xl transition-[background-color,box-shadow,margin] duration-200 ease-out",
+                categoryTasks.length === 0 && !isAdding ? "mb-3" : "mb-5",
                 snapshot.isDraggingOver ? "bg-primary/10 ring-1 ring-primary/40 shadow-inner" : ""
               )}
             >
@@ -795,7 +803,7 @@ function App() {
                 )}
                 
                 {!isAdding && categoryTasks.length === 0 && !snapshot.isDraggingOver && (
-                  <div className="pl-9 py-0.5 text-sm text-gray-300 font-sans">할 일이 없습니다</div>
+                  <div className="pl-9 py-2 text-sm text-gray-300 font-sans">할 일이 없습니다</div>
                 )}
               </div>
             </div>
@@ -923,16 +931,19 @@ function App() {
         {viewMode === 'DAILY' && deadlineNotices.length > 0 && (
           <section className="shrink-0 mt-4 max-h-[40%] overflow-y-auto border-t border-red-100 pt-4 space-y-2" aria-label="데드라인 알림">
             <p className="px-1 text-xs font-medium text-red-500">데드라인 알림</p>
-            {deadlineNotices.map(({ deadline, remainingDays }) => (
-              <div key={deadline.id} role="button" tabIndex={0} onClick={() => setEditingDeadline(deadline)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setEditingDeadline(deadline); }} className={clsx("group flex cursor-pointer gap-3 rounded-2xl border border-red-200 bg-red-50/60 px-4 py-3 shadow-sm transition-colors hover:bg-red-50", deadline.memo ? "items-start" : "items-center")}>
-                <span className={clsx("shrink-0 rounded-full bg-red-500 px-2 py-1 text-xs font-medium text-white", deadline.memo ? "mt-0.5" : "")}>D-{remainingDays}</span>
+            {deadlineNotices.map(({ deadline, remainingDays }) => {
+              const isDueToday = remainingDays === 0;
+              return (
+              <div key={deadline.id} role="button" tabIndex={0} onClick={() => setEditingDeadline(deadline)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setEditingDeadline(deadline); }} className={clsx("group flex cursor-pointer gap-3 rounded-2xl border px-4 py-3 shadow-sm transition-colors", isDueToday ? "border-red-500 bg-red-100 hover:bg-red-200/80" : "border-red-200 bg-red-50/60 hover:bg-red-50", deadline.memo ? "items-start" : "items-center")}>
+                <span className={clsx("shrink-0 rounded-full px-2 py-1 text-xs text-white", isDueToday ? "bg-red-600 font-bold" : "bg-red-500 font-medium", deadline.memo ? "mt-0.5" : "")}>{isDueToday ? 'D-DAY' : `D-${remainingDays}`}</span>
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-800">{deadline.title}</p>
-                  {deadline.memo && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{deadline.memo}</p>}
+                  <p className={clsx("truncate text-sm", isDueToday ? "font-bold text-red-700" : "font-medium text-gray-800")}>{deadline.title}</p>
+                  {deadline.memo && <p className={clsx("mt-1 line-clamp-2 text-xs", isDueToday ? "font-medium text-red-500" : "text-gray-500")}>{deadline.memo}</p>}
                 </div>
-                <span className={clsx("ml-auto shrink-0 text-xs text-red-500", deadline.memo ? "mt-0.5" : "")}>{format(parseISO(deadline.due_date), 'M/d')}</span>
+                <span className={clsx("ml-auto shrink-0 text-xs", isDueToday ? "font-bold text-red-600" : "text-red-500", deadline.memo ? "mt-0.5" : "")}>{format(parseISO(deadline.due_date), 'M/d')}</span>
               </div>
-            ))}
+              );
+            })}
           </section>
         )}
       </div>
@@ -1058,16 +1069,31 @@ function App() {
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">카테고리</label>
-                <select
-                  value={editingTask.domain_id ?? ''}
-                  onChange={event => setEditingTask({ ...editingTask, domain_id: event.target.value || null })}
-                  className="w-full bg-gray-50 rounded-xl p-3 outline-none font-sans text-sm border border-transparent focus:border-gray-200"
-                >
-                  <option value="">미분류</option>
-                  {categories.map(category => (
-                    <option key={category.id} value={category.id}>{category.name}</option>
-                  ))}
-                </select>
+                <div className="flex gap-2">
+                  <select
+                    value={editingTask.domain_id ?? ''}
+                    onChange={event => setEditingTask({ ...editingTask, domain_id: event.target.value || null })}
+                    className="min-w-0 flex-1 bg-gray-50 rounded-xl p-3 outline-none font-sans text-sm border border-transparent focus:border-gray-200"
+                  >
+                    <option value="">미분류</option>
+                    {categories.map(category => (
+                      <option key={category.id} value={category.id}>{category.name}</option>
+                    ))}
+                  </select>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTask({ ...editingTask, is_important: !editingTask.is_important })}
+                    aria-pressed={editingTask.is_important}
+                    aria-label="중요 할 일"
+                    className={clsx(
+                      "shrink-0 flex items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition-colors",
+                      editingTask.is_important ? "bg-primary text-textPrimary" : "bg-gray-50 text-gray-500 hover:bg-gray-100"
+                    )}
+                  >
+                    <Star size={16} fill={editingTask.is_important ? 'currentColor' : 'none'} />
+                    중요
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">메모</label>
