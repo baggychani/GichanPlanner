@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Check, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
@@ -28,27 +28,22 @@ export function CategoryModal({
     [selectedEmojiCategory],
   );
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      if (showEmojiPicker) setShowEmojiPicker(false);
-      else if (editingCategoryId) setEditingCategoryId(null);
-      else onClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
-  }, [showEmojiPicker, editingCategoryId, onClose]);
-
   return (
     <>
-      <Overlay>
-        <div className="bg-surface rounded-3xl p-5 w-[420px] shadow-xl max-h-[80vh] flex flex-col relative">
+      <Overlay
+        onEscape={() => {
+          if (showEmojiPicker) setShowEmojiPicker(false);
+          else if (editingCategoryId) setEditingCategoryId(null);
+          else onClose();
+        }}
+      >
+        <div className="bg-surface rounded-3xl p-5 w-[420px] h-[min(680px,85vh)] shadow-xl flex flex-col relative">
           <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-bold">카테고리 관리</h3>
             <button onClick={onClose} className="p-1 hover:bg-surface-hover rounded-full"><X size={20} /></button>
           </div>
 
-          <div className="flex-1 overflow-y-auto mb-4 pr-1">
+          <div className="mb-4 min-h-0 flex-1 overflow-y-scroll [scrollbar-gutter:stable]">
             <DragDropContext onDragEnd={(result) => { void reorderCategories(categories, result); }}>
               <Droppable droppableId="categories">
                 {(provided) => (

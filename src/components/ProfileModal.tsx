@@ -1,43 +1,71 @@
 import { useEffect, useState } from 'react';
-import { Camera, Globe2, LogOut, Mail, UserRound, X } from 'lucide-react';
+import { Camera, ChevronLeft, LogOut, UserRound, X } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { UserLogin } from 'dexie-cloud-addon';
+import clsx from 'clsx';
 import { AvatarCropDialog } from './AvatarCropDialog';
 import { Overlay } from './Overlay';
-import { db, isDexieCloudConfigured } from '../lib/db';
-import { downloadPortablePlannerExport } from '../lib/portablePlannerExport';
+import { db } from '../lib/db';
+import { useAuth } from '../hooks/useAuth';
+import { supabase } from '../lib/supabase';
+import { AuthPanel } from './AuthScreen';
+import { authErrorMessage, authInputClass, PasswordField } from './authUi';
 
 export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; onClose: () => void }) {
+  const { session, isLoading } = useAuth();
+  const [openedLoggedIn, setOpenedLoggedIn] = useState<boolean | null>(null);
   const profile = useLiveQuery(() => db.profiles.get('#profile'));
+  const [view, setView] = useState<'profile' | 'password'>('profile');
   const [nickname, setNickname] = useState('');
-  const [email, setEmail] = useState('');
-  const [notice, setNotice] = useState<string | null>(null);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [newPasswordConfirm, setNewPasswordConfirm] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [croppingFile, setCroppingFile] = useState<File | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
-  const isLoggedIn = Boolean(user?.isLoggedIn);
-  const fallbackName = user?.name || user?.email?.split('@')[0] || '사용자';
 
-  useEffect(() => { if (profile?.nickname) setNickname(profile.nickname); else if (isLoggedIn) setNickname(fallbackName); }, [profile?.nickname, isLoggedIn, fallbackName]);
+  const supabaseUser = session?.user ?? null;
+  const accountEmail = supabaseUser?.email || profile?.email || '';
+  const fallbackName = accountEmail.split('@')[0] || '사용자';
+
+  useEffect(() => {
+    if (isLoading || openedLoggedIn !== null) return;
+    setOpenedLoggedIn(Boolean(session));
+  }, [isLoading, openedLoggedIn, session]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = window.setTimeout(() => setToast(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
+
+  useEffect(() => {
+    if (profile?.nickname) setNickname(profile.nickname);
+    else setNickname(fallbackName);
+  }, [profile?.nickname, fallbackName]);
+
   useEffect(() => {
     if (!profile?.avatar) { setAvatarUrl(null); return; }
-    const url = URL.createObjectURL(profile.avatar); setAvatarUrl(url);
+    const url = URL.createObjectURL(profile.avatar);
+    setAvatarUrl(url);
     return () => URL.revokeObjectURL(url);
   }, [profile?.avatar]);
 
   useEffect(() => {
-    if (!isLoggedIn || !user?.userId) return;
+    if (!openedLoggedIn) return;
     const now = new Date().toISOString();
     void db.profiles.get('#profile').then(existing => db.profiles.put({
       id: '#profile',
       nickname: existing?.nickname || fallbackName,
       avatar: existing?.avatar ?? null,
-      legacy_dexie_user_id: user.userId ?? null,
-      email: user.email ?? null,
+      legacy_dexie_user_id: user?.userId ?? existing?.legacy_dexie_user_id ?? null,
+      email: accountEmail || existing?.email || null,
       created_at: existing?.created_at ?? now,
       updated_at: now,
     }));
-  }, [fallbackName, isLoggedIn, user?.email, user?.userId]);
+  }, [accountEmail, fallbackName, openedLoggedIn, user?.userId]);
 
   const saveProfile = async (avatar = profile?.avatar ?? null) => {
     if (!nickname.trim()) return;
@@ -47,37 +75,171 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
       nickname: nickname.trim(),
       avatar,
       legacy_dexie_user_id: user?.userId ?? profile?.legacy_dexie_user_id ?? null,
-      email: user?.email ?? profile?.email ?? null,
+      email: accountEmail || profile?.email || null,
       created_at: profile?.created_at ?? now,
       updated_at: now,
     });
   };
-  const loginWithEmail = async (event: React.FormEvent) => {
-    event.preventDefault(); if (!email.trim()) return;
-    setIsSubmitting(true); setNotice(null);
-    try { await db.cloud.login({ email: email.trim(), grant_type: 'otp' }); setNotice('이메일로 전송된 일회용 코드를 확인하세요.'); }
-    catch (error) { setNotice(error instanceof Error ? error.message : '로그인을 시작하지 못했습니다.'); }
-    finally { setIsSubmitting(false); }
-  };
-  const loginWithGoogle = async () => {
-    setIsSubmitting(true); setNotice(null);
-    try { await db.cloud.login({ provider: 'google' }); }
-    catch (error) { setNotice(error instanceof Error ? error.message : 'Google 로그인을 시작하지 못했습니다.'); }
-    finally { setIsSubmitting(false); }
+
+  const submitPasswordChange = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!supabase) return;
+
+    setIsSubmitting(true);
+    setError(null);
+    try {
+      const { error: verifyError } = await supabase.auth.signInWithPassword({
+        email: accountEmail,
+        password: currentPassword,
+      });
+      if (verifyError) throw new Error('현재 비밀번호가 올바르지 않습니다.');
+      if (newPassword.length < 6) throw new Error('비밀번호는 6자 이상이어야 합니다.');
+      if (newPassword !== newPasswordConfirm) throw new Error('비밀번호 확인이 일치하지 않습니다.');
+      const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
+      if (updateError) throw updateError;
+      setCurrentPassword('');
+      setNewPassword('');
+      setNewPasswordConfirm('');
+      setView('profile');
+      setToast('비밀번호를 변경했습니다.');
+    } catch (caught) {
+      setError(authErrorMessage(caught));
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  return <Overlay zClassName="z-[70]">
-    <section aria-label="프로필 및 계정" className="w-full max-w-md rounded-3xl border border-line bg-surface p-6 shadow-2xl">
-      <div className="mb-6 flex items-center justify-between"><h2 className="text-xl font-bold">프로필 및 계정</h2><button onClick={onClose} aria-label="프로필 닫기" className="rounded-full p-2 text-fg-muted hover:bg-surface-hover"><X size={20} /></button></div>
-      {!isDexieCloudConfigured ? <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">Dexie Cloud DB URL이 아직 없습니다. <code>.env.local</code>에 <code>VITE_DEXIE_CLOUD_URL</code>을 넣으면 이메일 코드와 Google 로그인을 사용할 수 있습니다.</div> : isLoggedIn ? <div className="space-y-5">
-        <div className="flex items-center gap-4"><label className="relative grid h-16 w-16 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700"><>{avatarUrl ? <img src={avatarUrl} alt="프로필 사진" className="h-full w-full object-cover" /> : <UserRound size={30} />}</><span className="absolute inset-x-0 bottom-0 grid h-6 place-items-center bg-black/40 text-white"><Camera size={13} /></span><input aria-label="프로필 사진 변경" type="file" accept="image/*" className="sr-only" onChange={event => { const file = event.target.files?.[0]; if (!file) return; if (file.size > 10 * 1024 * 1024) { setNotice('원본 사진은 10MB 이하만 선택할 수 있습니다.'); return; } setCroppingFile(file); event.currentTarget.value = ''; }} /></label><div className="min-w-0"><p className="truncate font-semibold">{profile?.nickname || fallbackName}</p><p className="truncate text-sm text-fg-muted">{user?.email || user?.userId}</p></div></div>
-        <label className="block text-sm font-medium">닉네임<input value={nickname} onChange={event => setNickname(event.target.value)} maxLength={40} className="mt-1.5 w-full rounded-xl border border-line bg-surface-muted px-3 py-2.5 outline-none focus:border-indigo-500" /></label>
-        {notice && <p role="status" className="rounded-xl bg-surface-muted p-3 text-sm text-fg-muted">{notice}</p>}
-        <button onClick={() => { void saveProfile().then(() => setNotice('프로필을 저장했습니다.')); }} disabled={!nickname.trim()} className="w-full rounded-xl bg-ink py-3 font-semibold text-on-ink disabled:opacity-40">프로필 저장</button>
-        <button onClick={() => { void downloadPortablePlannerExport().then(() => setNotice('사진을 포함한 이식용 백업을 내려받았습니다.')).catch(() => setNotice('백업을 만들지 못했습니다.')); }} className="w-full rounded-xl border border-line py-3 text-sm font-medium text-fg-muted hover:bg-surface-muted">내 데이터 백업 다운로드</button>
-        <button onClick={() => { void db.cloud.logout(); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-line py-3 text-sm font-medium text-fg-muted hover:bg-surface-muted"><LogOut size={16} />이 기기에서 로그아웃</button>
-      </div> : <form onSubmit={event => { void loginWithEmail(event); }} className="space-y-4"><p className="text-sm leading-6 text-fg-muted">비밀번호를 저장하지 않는 이메일 일회용 코드 로그인입니다. Google 로그인도 사용할 수 있습니다.</p><label className="block text-sm font-medium">이메일<input value={email} onChange={event => setEmail(event.target.value)} type="email" autoComplete="email" required className="mt-1.5 w-full rounded-xl border border-line bg-surface-muted px-3 py-2.5 outline-none focus:border-indigo-500" /></label>{notice && <p role="status" className="rounded-xl bg-surface-muted p-3 text-sm text-fg-muted">{notice}</p>}<button disabled={isSubmitting} className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-3 font-semibold text-on-ink disabled:opacity-40"><Mail size={17} />이메일 코드 받기</button><button type="button" disabled={isSubmitting} onClick={() => { void loginWithGoogle(); }} className="flex w-full items-center justify-center gap-2 rounded-xl border border-line py-3 font-medium hover:bg-surface-muted disabled:opacity-40"><Globe2 size={17} />Google로 계속하기</button></form>}
-    </section>
-    {croppingFile && <AvatarCropDialog file={croppingFile} onClose={() => setCroppingFile(null)} onSave={image => { setCroppingFile(null); void saveProfile(image).then(() => setNotice('프로필 사진을 저장했습니다.')); }} />}
-  </Overlay>;
+  const logout = async () => {
+    if (supabase) await supabase.auth.signOut();
+    if (user?.isLoggedIn) await db.cloud.logout();
+    onClose();
+  };
+
+  const title = view === 'password' ? '비밀번호 변경' : '프로필';
+
+  return (
+    <Overlay zClassName="z-[70]" onEscape={onClose}>
+      <section aria-label="프로필 및 계정" className="w-full max-w-[400px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+        {openedLoggedIn === null && (
+          <div className="flex justify-end">
+            <button onClick={onClose} aria-label="닫기" className="-mr-2 rounded-full p-2 text-fg-muted hover:bg-surface-hover"><X size={20} /></button>
+          </div>
+        )}
+        {openedLoggedIn === false && (
+          <>
+            <div className="mb-2 flex justify-end">
+              <button onClick={onClose} aria-label="닫기" className="-mr-2 rounded-full p-2 text-fg-muted hover:bg-surface-hover"><X size={20} /></button>
+            </div>
+            <AuthPanel onSuccess={onClose} />
+          </>
+        )}
+        {openedLoggedIn === true && (
+          <>
+        <div className="mb-6 flex items-center gap-1">
+          {view === 'password' && (
+            <button
+              type="button"
+              onClick={() => { setView('profile'); setError(null); }}
+              aria-label="프로필로 돌아가기"
+              className="-ml-2 rounded-full p-2 text-fg hover:bg-surface-hover"
+            >
+              <ChevronLeft size={20} />
+            </button>
+          )}
+          <h2 className="flex-1 text-xl font-bold tracking-tight">{title}</h2>
+          <button onClick={onClose} aria-label="닫기" className="rounded-full p-2 text-fg-muted hover:bg-surface-hover"><X size={20} /></button>
+        </div>
+
+        {view === 'profile' && (
+          <div>
+            <div className="flex items-center gap-4">
+              <label className="relative grid h-16 w-16 shrink-0 cursor-pointer place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                {avatarUrl ? <img src={avatarUrl} alt="프로필 사진" className="h-full w-full object-cover" /> : <UserRound size={30} />}
+                <span className="absolute inset-x-0 bottom-0 grid h-6 place-items-center bg-black/40 text-white"><Camera size={13} /></span>
+                <input
+                  aria-label="프로필 사진 변경"
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  onChange={event => {
+                    const file = event.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 10 * 1024 * 1024) { setToast('원본 사진은 10MB 이하만 선택할 수 있습니다.'); return; }
+                    setCroppingFile(file);
+                    event.currentTarget.value = '';
+                  }}
+                />
+              </label>
+              <div className="min-w-0">
+                <p className="truncate text-[17px] font-semibold">{profile?.nickname || fallbackName}</p>
+                <p className="truncate text-sm text-fg-muted">{accountEmail}</p>
+              </div>
+            </div>
+
+            <label className="mt-6 block">
+              <span className="text-[13px] font-medium text-fg-muted">닉네임</span>
+              <input value={nickname} onChange={event => setNickname(event.target.value)} maxLength={40} className={clsx(authInputClass, 'mt-1.5')} />
+            </label>
+            <button
+              onClick={() => { void saveProfile().then(() => setToast('프로필을 저장했습니다.')); }}
+              disabled={!nickname.trim()}
+              className="mt-4 w-full rounded-xl bg-ink py-3 font-semibold text-on-ink disabled:opacity-40"
+            >
+              저장
+            </button>
+
+            <div className="mt-6 border-t border-line pt-2">
+              <button
+                type="button"
+                onClick={() => { setView('password'); setError(null); }}
+                className="flex w-full items-center justify-between rounded-xl px-1 py-3 text-[15px] font-medium text-fg hover:bg-surface-muted"
+              >
+                비밀번호 변경
+                <ChevronLeft size={18} className="rotate-180 text-fg-subtle" />
+              </button>
+              <button
+                type="button"
+                onClick={() => { void logout(); }}
+                className="mt-1 flex w-full items-center gap-2 rounded-xl px-1 py-3 text-[15px] font-medium text-fg hover:bg-surface-muted"
+              >
+                <LogOut size={16} strokeWidth={1.75} />
+                로그아웃
+              </button>
+            </div>
+          </div>
+        )}
+
+        {view === 'password' && (
+          <form noValidate onSubmit={event => { void submitPasswordChange(event); }} className="space-y-4">
+            <PasswordField label="현재 비밀번호" value={currentPassword} onChange={setCurrentPassword} autoComplete="current-password" />
+            <PasswordField label="새 비밀번호" value={newPassword} onChange={setNewPassword} autoComplete="new-password" />
+            <PasswordField label="새 비밀번호 확인" value={newPasswordConfirm} onChange={setNewPasswordConfirm} autoComplete="new-password" />
+            {error && <p role="alert" className="text-sm text-red-600 dark:text-red-400">{error}</p>}
+            <button disabled={isSubmitting} className="w-full rounded-xl bg-ink py-3 font-semibold text-on-ink disabled:opacity-40">
+              {isSubmitting ? '변경 중…' : '비밀번호 변경'}
+            </button>
+          </form>
+        )}
+          </>
+        )}
+      </section>
+
+      {toast && (
+        <p role="status" className="pointer-events-none absolute bottom-8 left-1/2 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-on-ink shadow-lg">
+          {toast}
+        </p>
+      )}
+
+      {croppingFile && (
+        <AvatarCropDialog
+          file={croppingFile}
+          onClose={() => setCroppingFile(null)}
+          onSave={image => {
+            setCroppingFile(null);
+            void saveProfile(image).then(() => setToast('프로필 사진을 저장했습니다.'));
+          }}
+        />
+      )}
+    </Overlay>
+  );
 }

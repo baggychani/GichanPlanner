@@ -67,7 +67,7 @@ export function AvatarCropDialog({ file, onClose, onSave }: {
   };
 
   return (
-    <Overlay zClassName="z-[80]">
+    <Overlay zClassName="z-[80]" onEscape={onClose}>
       <section aria-label="프로필 사진 조절" className="w-full max-w-md rounded-3xl border border-line bg-surface p-6 shadow-2xl">
         <div className="mb-5 flex items-center justify-between"><div><h2 className="text-xl font-bold">프로필 사진 조절</h2><p className="mt-1 text-sm text-fg-muted">사진을 드래그하고 확대해서 원 안에 맞추세요.</p></div><button onClick={onClose} aria-label="사진 조절 닫기" className="rounded-full p-2 hover:bg-surface-hover"><X size={20} /></button></div>
         <div

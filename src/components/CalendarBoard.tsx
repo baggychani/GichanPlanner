@@ -216,7 +216,7 @@ export function CalendarBoard({
               </button>
             </div>
           </div>
-          <button onClick={onOpenCategories} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted" title="카테고리 관리">
+          <button onClick={onOpenCategories} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted" title="설정" aria-label="설정">
             <Settings size={22} />
           </button>
           <ThemeToggle className="max-[560px]:hidden" />

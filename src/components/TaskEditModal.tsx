@@ -47,7 +47,7 @@ export function TaskEditModal({
   };
 
   return (
-    <Overlay>
+    <Overlay onEscape={onClose}>
       <div className="bg-surface rounded-3xl w-[420px] max-w-full shadow-xl flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-6 pb-4 shrink-0">
           <h3 className="text-[17px] font-bold">{isCreating ? '할 일 만들기' : '할 일 상세'}</h3>

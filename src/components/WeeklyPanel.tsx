@@ -11,6 +11,7 @@ type WeeklyPanelProps = {
   editingGoalTitle: string;
   onEditingGoalIdChange: (id: string | null) => void;
   onEditingGoalTitleChange: (title: string) => void;
+  onCreate?: () => boolean;
 };
 
 export function WeeklyPanel({
@@ -20,6 +21,7 @@ export function WeeklyPanel({
   editingGoalTitle,
   onEditingGoalIdChange,
   onEditingGoalTitleChange,
+  onCreate,
 }: WeeklyPanelProps) {
   const weekGoals = goals.filter(goal => goal.time_frame === 'WEEK' && goal.start_date === format(weekStart, 'yyyy-MM-dd'));
   const completedGoalCount = weekGoals.filter(goal => goal.is_completed).length;
@@ -29,6 +31,7 @@ export function WeeklyPanel({
       <form
         onSubmit={async (event) => {
           event.preventDefault();
+          if (onCreate && !onCreate()) return;
           const form = event.currentTarget;
           const title = (new FormData(form).get('title') as string).trim();
           if (!title) return;

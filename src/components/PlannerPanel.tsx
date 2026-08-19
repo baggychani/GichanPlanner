@@ -40,8 +40,8 @@ export function PlannerPanel({
   onOpenDeadline,
 }: PlannerPanelProps) {
   return (
-    <div className="w-[650px] bg-surface p-8 flex flex-col h-[calc(100vh-3rem)] sticky top-6 rounded-3xl shadow-sm border border-line overflow-hidden max-[1200px]:w-[calc(55vw-3rem)] max-[1200px]:p-6 max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:h-[min(720px,calc(100vh-2rem))] max-[900px]:static">
-      <div className="flex items-center justify-between mb-6 shrink-0">
+    <div className="w-[650px] bg-surface flex flex-col h-[calc(100vh-3rem)] sticky top-6 rounded-3xl shadow-sm border border-line overflow-hidden max-[1200px]:w-[calc(55vw-3rem)] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:h-[min(720px,calc(100vh-2rem))] max-[900px]:static">
+      <div className="flex items-center justify-between mb-6 shrink-0 px-8 pt-8 max-[1200px]:px-6 max-[1200px]:pt-6">
         <h2 className="text-2xl font-bold">
           {viewMode === 'DAILY'
             ? format(selectedDate, 'M월 d일 (E)', { locale: ko })
@@ -68,10 +68,13 @@ export function PlannerPanel({
         )}
       </div>
       <div className="panel-scroll flex-1 min-h-0">
-        {children}
+        <div className={clsx('px-8 max-[1200px]:px-6', viewMode === 'DAILY' && deadlineNotices.length > 0 ? 'pb-2' : 'pb-8 max-[1200px]:pb-6')}>
+          {children}
+        </div>
       </div>
       {viewMode === 'DAILY' && deadlineNotices.length > 0 && (
-        <section className="panel-scroll shrink-0 mt-4 max-h-[40%] border-t border-red-100 dark:border-red-900 pt-4 space-y-2" aria-label="데드라인 알림">
+        <section className="panel-scroll shrink-0 max-h-[40%] border-t border-red-100 dark:border-red-900" aria-label="데드라인 알림">
+          <div className="space-y-2 px-8 pt-4 pb-8 max-[1200px]:px-6 max-[1200px]:pb-6">
           <p className="px-1 text-xs font-medium text-red-500">데드라인 알림</p>
           {deadlineNotices.map(({ deadline, remainingDays }) => {
             const isDueToday = remainingDays === 0;
@@ -99,6 +102,7 @@ export function PlannerPanel({
               </div>
             );
           })}
+          </div>
         </section>
       )}
     </div>

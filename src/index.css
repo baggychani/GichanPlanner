@@ -139,12 +139,11 @@ body {
   background-image: linear-gradient(110deg, #2a1c08 0%, #0c0a06 36%, #c9a227 50%, #1a1408 68%, #2a1c08 100%);
 }
 
-/* 스크롤바는 카드 오른쪽 패딩에 얹혀 본문 폭을 줄이지 않는다. */
+/* 스크롤바는 카드 오른쪽 끝에 고정하고, 본문 폭은 스크롤 유무와 상관없이 같게 둔다. */
 .panel-scroll {
   overflow-y: auto;
   overflow-x: hidden;
-  margin-right: -20px;
-  padding-right: 20px;
+  scrollbar-gutter: stable;
   scrollbar-width: thin;
   scrollbar-color: color-mix(in srgb, var(--color-fg) 28%, transparent) transparent;
 }

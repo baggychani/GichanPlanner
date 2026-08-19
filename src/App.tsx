@@ -25,13 +25,18 @@ import { TaskEditModal } from './components/TaskEditModal';
 import { TimePickerModal } from './components/TimePickerModal';
 import { WeeklyPanel } from './components/WeeklyPanel';
 import { ProfileModal } from './components/ProfileModal';
+import { Overlay, hasEscapeOverlay } from './components/Overlay';
+import { RecoveryPasswordDialog } from './components/AuthScreen';
+import { AuthProvider, useAuth } from './hooks/useAuth';
 import { useObservable } from 'dexie-react-hooks';
 import { migrateLegacyTaskImages } from './lib/imageAttachment';
 
 // Typography principle: small text is readable at normal weight. Reserve bold for page titles and primary actions only.
 // 빠른 만들기·일별 메뉴는 바깥을 눌러도 닫히지 않게 둔다. 달력 클릭과 메뉴 조작이 겹치지 않게 하려는 의도다.
-function App() {
+function PlannerApp() {
   const cloudUser = useObservable(db.cloud.currentUser);
+  const { session, isPasswordRecovery, clearPasswordRecovery } = useAuth();
+  const isLoggedIn = Boolean(session);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -71,7 +76,12 @@ function App() {
   const dropFeedbackTimer = useRef<number | null>(null);
   const optimisticClearTimer = useRef<number | null>(null);
 
-  const { tasks, categories, goals, deadlines, calendarTaskCountByDate } = usePlannerData(optimisticTasks);
+  const planner = usePlannerData(optimisticTasks);
+  const tasks = isLoggedIn ? planner.tasks : [];
+  const categories = isLoggedIn ? planner.categories : [];
+  const goals = isLoggedIn ? planner.goals : [];
+  const deadlines = isLoggedIn ? planner.deadlines : [];
+  const calendarTaskCountByDate = isLoggedIn ? planner.calendarTaskCountByDate : {};
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const selectedDateLabel = format(selectedDate, 'yyyy-MM-dd EEEE', { locale: ko });
   const selectedDateIncompleteCount = tasks.filter(task => task.target_date === selectedDateString && !task.is_completed).length;
@@ -95,23 +105,20 @@ function App() {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
       if (viewingImage) setViewingImage(null);
-      else if (isCategoryModalOpen) return;
+      else if (isTimePickerOpen) setIsTimePickerOpen(false);
+      else if (hasEscapeOverlay()) return;
       else if (isQuickCreateMenuOpen) setIsQuickCreateMenuOpen(false);
-      else if (isDeadlineModalOpen) setIsDeadlineModalOpen(false);
       else if (isSelectingDeadlineDate) { setIsSelectingDeadlineDate(false); setIsDeadlineModalOpen(true); }
       else if (isDailyMenuOpen) setIsDailyMenuOpen(false);
-      else if (isTimePickerOpen) setIsTimePickerOpen(false);
       else if (confirmDailyAction) setConfirmDailyAction(null);
       else if (isNoIncompleteNoticeOpen) setIsNoIncompleteNoticeOpen(false);
-      else if (editingDeadline) setEditingDeadline(null);
       else if (selectingDateForDeadline) setSelectingDateForDeadline(null);
       else if (selectingDateForTask) setSelectingDateForTask(null);
-      else if (editingTask) { setEditingTask(null); setIsCreatingTask(false); setIsTimePickerOpen(false); }
       else if (dateSelectionMode) setDateSelectionMode(null);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewingImage, isCategoryModalOpen, isQuickCreateMenuOpen, isDeadlineModalOpen, isSelectingDeadlineDate, isDailyMenuOpen, isTimePickerOpen, confirmDailyAction, isNoIncompleteNoticeOpen, editingDeadline, editingTask, selectingDateForDeadline, selectingDateForTask, dateSelectionMode]);
+  }, [viewingImage, isQuickCreateMenuOpen, isSelectingDeadlineDate, isDailyMenuOpen, isTimePickerOpen, confirmDailyAction, isNoIncompleteNoticeOpen, selectingDateForDeadline, selectingDateForTask, dateSelectionMode]);
 
   useEffect(() => () => {
     if (dropFeedbackTimer.current !== null) window.clearTimeout(dropFeedbackTimer.current);
@@ -119,6 +126,18 @@ function App() {
   }, []);
 
   useEffect(() => { void migrateLegacyTaskImages(); }, []);
+
+  useEffect(() => {
+    if (isLoggedIn) return;
+    setIsQuickCreateMenuOpen(false);
+    setIsDailyMenuOpen(false);
+    setIsCategoryModalOpen(false);
+    setIsDeadlineModalOpen(false);
+    setEditingTask(null);
+    setIsCreatingTask(false);
+    setEditingDeadline(null);
+    setConfirmDailyAction(null);
+  }, [isLoggedIn]);
 
   const closeTaskEditor = () => {
     setEditingTask(null);
@@ -262,6 +281,14 @@ function App() {
     setViewMode('DAILY');
   };
 
+  const requireLogin = () => {
+    if (isLoggedIn) return true;
+    setIsQuickCreateMenuOpen(false);
+    setIsDailyMenuOpen(false);
+    setIsProfileOpen(true);
+    return false;
+  };
+
   return (
     <div className="min-h-screen flex justify-center p-6 gap-10 bg-bgPrimary pl-24 max-[1560px]:pl-6 max-[1560px]:gap-6 max-[1200px]:gap-3 max-[1200px]:p-3 max-[900px]:flex-col max-[900px]:items-center max-[900px]:gap-5 max-[900px]:p-4">
       <CalendarBoard
@@ -281,18 +308,26 @@ function App() {
         }}
         onPrevMonth={() => setCurrentDate(subMonths(currentDate, 1))}
         onNextMonth={() => setCurrentDate(addMonths(currentDate, 1))}
-        onToggleQuickCreate={() => setIsQuickCreateMenuOpen(open => !open)}
+        onToggleQuickCreate={() => {
+          if (!requireLogin()) return;
+          setIsQuickCreateMenuOpen(open => !open);
+        }}
         onCreateTask={() => {
+          if (!requireLogin()) return;
           setIsCreatingTask(true);
           setEditingTask(createBlankTask(format(selectedDate, 'yyyy-MM-dd')));
           setIsQuickCreateMenuOpen(false);
         }}
         onCreateDeadline={() => {
+          if (!requireLogin()) return;
           setDeadlineDueDate(format(selectedDate, 'yyyy-MM-dd'));
           setIsDeadlineModalOpen(true);
           setIsQuickCreateMenuOpen(false);
         }}
-        onOpenCategories={() => setIsCategoryModalOpen(true)}
+        onOpenCategories={() => {
+          if (!requireLogin()) return;
+          setIsCategoryModalOpen(true);
+        }}
         onOpenProfile={() => setIsProfileOpen(true)}
         onCancelSelection={() => {
           setSelectingDateForTask(null);
@@ -316,25 +351,42 @@ function App() {
         weeklyGoalWeekStart={weeklyGoalWeekStart}
         isDailyMenuOpen={isDailyMenuOpen}
         deadlineNotices={deadlineNotices}
-        onToggleDailyMenu={() => setIsDailyMenuOpen(open => !open)}
+        onToggleDailyMenu={() => {
+          if (!requireLogin()) return;
+          setIsDailyMenuOpen(open => !open);
+        }}
         onMoveIncompleteTomorrow={() => {
+          if (!requireLogin()) return;
           if (selectedDateIncompleteCount === 0) setIsNoIncompleteNoticeOpen(true);
           else void moveIncompleteTasksToDate(selectedDateString, format(addDays(selectedDate, 1), 'yyyy-MM-dd'));
           setIsDailyMenuOpen(false);
         }}
         onMoveIncompletePickDate={() => {
+          if (!requireLogin()) return;
           if (selectedDateIncompleteCount === 0) setIsNoIncompleteNoticeOpen(true);
           else setDateSelectionMode('MOVE_INCOMPLETE');
           setIsDailyMenuOpen(false);
         }}
         onDeleteIncomplete={() => {
+          if (!requireLogin()) return;
           if (selectedDateIncompleteCount === 0) setIsNoIncompleteNoticeOpen(true);
           else setConfirmDailyAction('DELETE_INCOMPLETE');
           setIsDailyMenuOpen(false);
         }}
-        onCopyAll={() => { setDateSelectionMode('COPY_ALL'); setIsDailyMenuOpen(false); }}
-        onDeleteAll={() => { setConfirmDailyAction('DELETE_ALL'); setIsDailyMenuOpen(false); }}
-        onOpenDeadline={setEditingDeadline}
+        onCopyAll={() => {
+          if (!requireLogin()) return;
+          setDateSelectionMode('COPY_ALL');
+          setIsDailyMenuOpen(false);
+        }}
+        onDeleteAll={() => {
+          if (!requireLogin()) return;
+          setConfirmDailyAction('DELETE_ALL');
+          setIsDailyMenuOpen(false);
+        }}
+        onOpenDeadline={(deadline) => {
+          if (!requireLogin()) return;
+          setEditingDeadline(deadline);
+        }}
       >
         {viewMode === 'DAILY' ? (
           <DailyPanel
@@ -347,10 +399,20 @@ function App() {
             justDroppedTaskId={justDroppedTaskId}
             onDragStart={setDraggedTaskId}
             onDragEnd={(result) => { void handleTaskDragEnd(result); }}
-            onQuickAddCategory={(categoryKey) => { setQuickAddCategoryId(categoryKey); setQuickAddTitle(''); }}
+            onQuickAddCategory={(categoryKey) => {
+              if (!requireLogin()) return;
+              setQuickAddCategoryId(categoryKey);
+              setQuickAddTitle('');
+            }}
             onQuickAddTitleChange={setQuickAddTitle}
-            onQuickAddSubmit={(categoryId) => { void saveQuickAdd(categoryId); }}
-            onQuickAddBlur={(categoryId) => { void saveQuickAdd(categoryId, true); }}
+            onQuickAddSubmit={(categoryId) => {
+              if (!requireLogin()) return;
+              void saveQuickAdd(categoryId);
+            }}
+            onQuickAddBlur={(categoryId) => {
+              if (!requireLogin()) return;
+              void saveQuickAdd(categoryId, true);
+            }}
             onOpenTask={(task) => { setIsCreatingTask(false); setEditingTask(task); }}
             onViewImage={setViewingImage}
           />
@@ -362,6 +424,7 @@ function App() {
             editingGoalTitle={editingGoalTitle}
             onEditingGoalIdChange={setEditingGoalId}
             onEditingGoalTitleChange={setEditingGoalTitle}
+            onCreate={requireLogin}
           />
         ) : null}
       </PlannerPanel>
@@ -449,7 +512,22 @@ function App() {
         <CategoryModal categories={categories} onClose={() => setIsCategoryModalOpen(false)} />
       )}
       {isProfileOpen && <ProfileModal user={cloudUser} onClose={() => setIsProfileOpen(false)} />}
+      {isPasswordRecovery && (
+        <Overlay zClassName="z-[80]" onEscape={clearPasswordRecovery}>
+          <section className="w-full max-w-[400px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">
+            <RecoveryPasswordDialog onDone={clearPasswordRecovery} />
+          </section>
+        </Overlay>
+      )}
     </div>
+  );
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <PlannerApp />
+    </AuthProvider>
   );
 }
 

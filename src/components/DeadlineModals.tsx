@@ -60,7 +60,7 @@ export function DeadlineCreateModal({
   onSave,
 }: DeadlineCreateModalProps) {
   return (
-    <Overlay>
+    <Overlay onEscape={onClose}>
       <div className="flex max-h-[90vh] w-[440px] flex-col rounded-3xl bg-surface shadow-xl">
         <div className="flex shrink-0 items-center justify-between p-6 pb-4">
           <div className="flex items-center gap-2 text-red-500"><AlertCircle size={20} /><h3 className="text-lg font-medium text-fg">데드라인 만들기</h3></div>
@@ -109,7 +109,7 @@ export function DeadlineEditModal({
   onClose: () => void;
 }) {
   return (
-    <Overlay>
+    <Overlay onEscape={onClose}>
       <div className="flex max-h-[90vh] w-[440px] flex-col rounded-3xl bg-surface shadow-xl">
         <div className="flex shrink-0 items-center justify-between p-6 pb-4">
           <div className="flex items-center gap-2 text-red-500"><AlertCircle size={20} /><h3 className="text-lg font-medium text-fg">데드라인 상세</h3></div>

@@ -8,7 +8,7 @@ import { useObjectUrl } from '../hooks/useObjectUrl';
 // 이전 카드형 할 일 UI. 지금은 텍스트 행을 쓰지만 레거시 스타일은 남겨 둔다.
 const useLegacyTaskCards = false;
 const legacyTaskCardClass = 'flex gap-3 p-3 rounded-2xl border bg-surface border-transparent shadow-sm hover:border-line-strong hover:shadow';
-const textTaskRowClass = 'flex gap-3 px-3 py-2.5 rounded-xl bg-transparent';
+const textTaskRowClass = 'flex gap-3 px-3 py-1.5 rounded-xl bg-transparent';
 
 type TaskRowProps = {
   task: Task;

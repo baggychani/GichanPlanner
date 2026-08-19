@@ -60,7 +60,7 @@ export function DailyPanel({
           <div
             className={clsx(
               'space-y-2 p-2 rounded-2xl transition-[background-color,box-shadow,margin] duration-200 ease-out',
-              categoryTasks.length === 0 && !isAdding ? 'mb-3' : 'mb-5',
+              categoryTasks.length === 0 && !isAdding ? 'mb-2' : 'mb-5',
               snapshot.isDraggingOver ? 'bg-primary/10 ring-1 ring-primary/40 shadow-inner' : '',
             )}
           >
@@ -87,7 +87,7 @@ export function DailyPanel({
             <div
               ref={provided.innerRef}
               {...provided.droppableProps}
-              className="space-y-2 pl-1 min-h-[10px]"
+              className="space-y-0.5 pl-1 min-h-[10px]"
             >
               {categoryTasks.map((task, index) => (
                 <Draggable key={task.id} draggableId={task.id} index={index}>
@@ -142,7 +142,7 @@ export function DailyPanel({
               )}
 
               {!isAdding && categoryTasks.length === 0 && !snapshot.isDraggingOver && (
-                <div className="pl-9 py-2 text-sm text-fg-faint font-sans">할 일이 없습니다</div>
+                <div className="pl-9 pt-2 pb-1 text-sm text-fg-faint font-sans">오늘은 등록된 할 일이 없습니다</div>
               )}
             </div>
           </div>
