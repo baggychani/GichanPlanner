@@ -3,6 +3,7 @@
 
 @theme {
   --font-sans: "Pretendard", sans-serif;
+  /* 할 일 제목용 레거시 글꼴. 현재 행 스타일에서는 쓰지 않지만 삭제하지 말 것. */
   --font-task: "GriunXHangeul_DAHL-Rg", sans-serif;
 
   --color-primary: #FFD951;

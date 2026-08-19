@@ -4,14 +4,20 @@ import {
   isSameMonth, isSameDay, addDays, isToday, parseISO, differenceInCalendarDays
 } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, Plus, AlertCircle, Settings, Target, X, Trash2, Calendar as CalendarIcon, GripVertical, Image as ImageIcon, Upload, Pencil, Check, Repeat2, MoreHorizontal, Copy, ArrowRight, CalendarDays, CircleX } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Plus, AlertCircle, Settings, Target, X, Trash2, Calendar as CalendarIcon, GripVertical, Image as ImageIcon, Upload, Pencil, Check, Repeat2, MoreHorizontal, Copy, ArrowRight, CalendarDays, CircleX, ListTodo } from 'lucide-react';
 import clsx from 'clsx';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Deadline, type Task } from './lib/db';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import { emojiAssetCode, emojiCategories, flagNameByEmoji, getFlagCode } from './lib/emojis';
+import { emojiCategories, flagNameByEmoji } from './lib/emojis';
+import { deadlineOnDate, formatScheduledTime, isoFromTimeParts, timePartsFromDate, type Meridiem } from './lib/datetime';
+import { EmojiIcon } from './components/EmojiIcon';
+import { TaskRow } from './components/TaskRow';
+import { TimePickerModal } from './components/TimePickerModal';
+import { ConfirmDailyDeleteDialog, ImageViewer, NoIncompleteNoticeDialog } from './components/DailyDialogs';
 
 // Typography principle: small text is readable at normal weight. Reserve bold for page titles and primary actions only.
+// 빠른 만들기·일별 메뉴는 바깥을 눌러도 닫히지 않게 둔다. 달력 클릭과 메뉴 조작이 겹치지 않게 하려는 의도다.
 function App() {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -23,8 +29,13 @@ function App() {
 
   // Modals state
   const [editingTask, setEditingTask] = useState<Task | null>(null);
+  const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
+  const [editingCategoryName, setEditingCategoryName] = useState('');
+  const [editingCategoryIcon, setEditingCategoryIcon] = useState('📁');
+  const [emojiPickerTarget, setEmojiPickerTarget] = useState<'new' | 'edit'>('new');
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [flagTooltip, setFlagTooltip] = useState<{ label: string; x: number; y: number } | null>(null);
   const [newCategoryEmoji, setNewCategoryEmoji] = useState('📁');
@@ -49,7 +60,7 @@ function App() {
   const [confirmDailyAction, setConfirmDailyAction] = useState<'DELETE_INCOMPLETE' | 'DELETE_ALL' | null>(null);
   const [isNoIncompleteNoticeOpen, setIsNoIncompleteNoticeOpen] = useState(false);
   const [isTimePickerOpen, setIsTimePickerOpen] = useState(false);
-  const [timeMeridiem, setTimeMeridiem] = useState<'AM' | 'PM'>('AM');
+  const [timeMeridiem, setTimeMeridiem] = useState<Meridiem>('AM');
   const [timeHour, setTimeHour] = useState(9);
   const [timeMinute, setTimeMinute] = useState(0);
 
@@ -74,17 +85,18 @@ function App() {
         else if (isTimePickerOpen) setIsTimePickerOpen(false);
         else if (confirmDailyAction) setConfirmDailyAction(null);
         else if (isNoIncompleteNoticeOpen) setIsNoIncompleteNoticeOpen(false);
+        else if (isCategoryModalOpen && editingCategoryId) setEditingCategoryId(null);
         else if (isCategoryModalOpen) setIsCategoryModalOpen(false);
         else if (editingDeadline) setEditingDeadline(null);
-        else if (editingTask) setEditingTask(null);
         else if (selectingDateForDeadline) setSelectingDateForDeadline(null);
         else if (selectingDateForTask) setSelectingDateForTask(null);
+        else if (editingTask) { setEditingTask(null); setIsCreatingTask(false); setIsTimePickerOpen(false); }
         else if (dateSelectionMode) setDateSelectionMode(null);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [viewingImage, showEmojiPicker, isQuickCreateMenuOpen, isDeadlineModalOpen, isSelectingDeadlineDate, isDailyMenuOpen, isTimePickerOpen, confirmDailyAction, isNoIncompleteNoticeOpen, isCategoryModalOpen, editingDeadline, editingTask, selectingDateForDeadline, selectingDateForTask, dateSelectionMode]);
+  }, [viewingImage, showEmojiPicker, isQuickCreateMenuOpen, isDeadlineModalOpen, isSelectingDeadlineDate, isDailyMenuOpen, isTimePickerOpen, confirmDailyAction, isNoIncompleteNoticeOpen, isCategoryModalOpen, editingCategoryId, editingDeadline, editingTask, selectingDateForDeadline, selectingDateForTask, dateSelectionMode]);
 
   useEffect(() => () => {
     if (dropFeedbackTimer.current !== null) window.clearTimeout(dropFeedbackTimer.current);
@@ -121,28 +133,13 @@ function App() {
   const goals = useLiveQuery(() => db.goals.filter(g => g.deleted_at === null).toArray()) || [];
   const deadlines = useLiveQuery(() => db.deadlines.filter(deadline => deadline.deleted_at === null).toArray()) || [];
   const selectedEmojiSet = useMemo(() => emojiCategories.find(category => category.id === selectedEmojiCategory) ?? emojiCategories[0], [selectedEmojiCategory]);
-  const renderEmoji = (emoji: string, imageClassName = 'h-4 w-5') => {
-    const flagCode = getFlagCode(emoji);
-    const imageSource = flagCode
-      ? `https://flagcdn.com/w80/${flagCode}.png`
-      : `https://cdn.jsdelivr.net/gh/jdecked/twemoji@latest/assets/svg/${emojiAssetCode(emoji)}.svg`;
-    return (
-      <span className={`inline-flex items-center justify-center ${imageClassName}`}>
-        <img
-          src={imageSource}
-          alt=""
-          loading="lazy"
-          className="h-full w-full object-contain"
-          onError={(event) => {
-            event.currentTarget.classList.add('hidden');
-            event.currentTarget.nextElementSibling?.classList.remove('hidden');
-          }}
-        />
-        <span className="hidden text-inherit leading-none">{emoji}</span>
-      </span>
-    );
-  };
-  const renderCategoryIcon = (icon: string, imageClassName = 'h-4 w-5') => renderEmoji(icon, imageClassName);
+  const deadlineNotices = useMemo(() =>
+    deadlines
+      .map(deadline => ({ deadline, remainingDays: differenceInCalendarDays(parseISO(deadline.due_date), selectedDate) }))
+      .filter(({ deadline, remainingDays }) => deadline.reminder_days !== null && remainingDays >= 0 && remainingDays <= deadline.reminder_days)
+      .sort((a, b) => a.remainingDays - b.remainingDays),
+    [deadlines, selectedDate]
+  );
 
   useEffect(() => {
     if (categoryQuery === undefined || hasRepairedOrphanedTasks.current) return;
@@ -170,14 +167,6 @@ function App() {
     setCurrentDate(new Date());
     setSelectedDate(new Date());
     setViewMode('DAILY');
-  };
-
-  const deadlineOnDate = (deadline: string | null, targetDate: string) => {
-    if (!deadline) return null;
-    const original = parseISO(deadline);
-    const next = new Date(`${targetDate}T00:00:00`);
-    next.setHours(original.getHours(), original.getMinutes(), 0, 0);
-    return next.toISOString();
   };
 
   const moveIncompleteTasksToDate = async (destinationDate: string) => {
@@ -293,41 +282,53 @@ function App() {
       await copyAllTasksToDate(destinationDate);
       setDateSelectionMode(null);
     } else if (selectingDateForTask) {
-      await db.transaction('rw', db.tasks, async () => {
-        const task = await db.tasks.get(selectingDateForTask);
-        if (!task || task.deleted_at !== null || task.target_date === destinationDate) return;
-
-        const [sourceTasks, destinationTasks] = await Promise.all([
-          db.tasks.where('target_date').equals(task.target_date).toArray(),
-          db.tasks.where('target_date').equals(destinationDate).toArray(),
-        ]);
-        const remainingSourceTasks = sourceTasks
-          .filter(candidate => candidate.deleted_at === null && candidate.domain_id === task.domain_id && candidate.id !== task.id)
-          .sort((a, b) => a.order - b.order || a.created_at.localeCompare(b.created_at));
-        const destinationOrder = destinationTasks.filter(candidate =>
-          candidate.deleted_at === null && candidate.domain_id === task.domain_id
-        ).length;
-        const now = new Date().toISOString();
-
-        await db.tasks.bulkPut([
-          ...remainingSourceTasks.map((candidate, order) => ({
-            ...candidate,
-            order,
-            updated_at: candidate.order === order ? candidate.updated_at : now,
-            version: candidate.order === order ? candidate.version : candidate.version + 1,
-          })),
-          {
-            ...task,
+      if (isCreatingTask && editingTask && editingTask.id === selectingDateForTask) {
+        if (editingTask.target_date !== destinationDate) {
+          setEditingTask({
+            ...editingTask,
             target_date: destinationDate,
-            deadline: deadlineOnDate(task.deadline, destinationDate),
-            scheduled_time: deadlineOnDate(task.scheduled_time, destinationDate),
-            order: destinationOrder,
-            updated_at: now,
-            version: task.version + 1,
-          },
-        ]);
-      });
-      setSelectingDateForTask(null);
+            deadline: deadlineOnDate(editingTask.deadline, destinationDate),
+            scheduled_time: deadlineOnDate(editingTask.scheduled_time, destinationDate),
+          });
+        }
+        setSelectingDateForTask(null);
+      } else {
+        await db.transaction('rw', db.tasks, async () => {
+          const task = await db.tasks.get(selectingDateForTask);
+          if (!task || task.deleted_at !== null || task.target_date === destinationDate) return;
+
+          const [sourceTasks, destinationTasks] = await Promise.all([
+            db.tasks.where('target_date').equals(task.target_date).toArray(),
+            db.tasks.where('target_date').equals(destinationDate).toArray(),
+          ]);
+          const remainingSourceTasks = sourceTasks
+            .filter(candidate => candidate.deleted_at === null && candidate.domain_id === task.domain_id && candidate.id !== task.id)
+            .sort((a, b) => a.order - b.order || a.created_at.localeCompare(b.created_at));
+          const destinationOrder = destinationTasks.filter(candidate =>
+            candidate.deleted_at === null && candidate.domain_id === task.domain_id
+          ).length;
+          const now = new Date().toISOString();
+
+          await db.tasks.bulkPut([
+            ...remainingSourceTasks.map((candidate, order) => ({
+              ...candidate,
+              order,
+              updated_at: candidate.order === order ? candidate.updated_at : now,
+              version: candidate.order === order ? candidate.version : candidate.version + 1,
+            })),
+            {
+              ...task,
+              target_date: destinationDate,
+              deadline: deadlineOnDate(task.deadline, destinationDate),
+              scheduled_time: deadlineOnDate(task.scheduled_time, destinationDate),
+              order: destinationOrder,
+              updated_at: now,
+              version: task.version + 1,
+            },
+          ]);
+        });
+        setSelectingDateForTask(null);
+      }
     }
     setSelectedDate(day);
     setViewMode('DAILY');
@@ -350,6 +351,7 @@ function App() {
       )}
 
       <div className="flex items-center gap-3">
+        {/* 바깥 클릭으로 닫히지 않음. 메뉴를 연 채 달력을 보는 흐름을 유지하기 위한 의도. */}
         <div className="relative">
           <button
             onClick={() => setIsQuickCreateMenuOpen(open => !open)}
@@ -361,9 +363,34 @@ function App() {
             <Plus size={24} />
           </button>
           <div className={clsx(
-            "absolute top-12 right-0 w-44 overflow-hidden rounded-2xl border border-gray-100 bg-white p-1.5 shadow-xl origin-top-right transition-all duration-200 z-40",
+            "absolute top-12 right-0 w-48 overflow-hidden rounded-2xl border border-gray-100 bg-white p-1.5 shadow-xl origin-top-right transition-all duration-200 z-40",
             isQuickCreateMenuOpen ? "scale-100 opacity-100 translate-y-0" : "pointer-events-none scale-95 opacity-0 -translate-y-1"
           )}>
+            <button onClick={() => {
+              const now = new Date().toISOString();
+              setIsCreatingTask(true);
+              setEditingTask({
+                id: crypto.randomUUID(),
+                version: 1,
+                created_at: now,
+                updated_at: now,
+                deleted_at: null,
+                title: '',
+                memo: '',
+                target_date: format(selectedDate, 'yyyy-MM-dd'),
+                deadline: null,
+                scheduled_time: null,
+                domain_id: null,
+                goal_id: null,
+                is_important: false,
+                is_completed: false,
+                order: 0,
+                image_data: null,
+              });
+              setIsQuickCreateMenuOpen(false);
+            }} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-600 hover:bg-gray-50 hover:text-gray-900 transition-colors">
+              <ListTodo size={16} /> 할 일 만들기
+            </button>
             <button onClick={() => { setDeadlineDueDate(format(selectedDate, 'yyyy-MM-dd')); setIsDeadlineModalOpen(true); setIsQuickCreateMenuOpen(false); }} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-gray-600 hover:bg-red-50 hover:text-red-600 transition-colors">
               <AlertCircle size={16} /> 데드라인 만들기
             </button>
@@ -659,33 +686,22 @@ function App() {
   const openTimePicker = () => {
     if (!editingTask) return;
     const date = editingTask.scheduled_time ? parseISO(editingTask.scheduled_time) : new Date(`${editingTask.target_date}T09:00:00`);
-    const roundedMinutes = Math.round(date.getMinutes() / 5) * 5;
-    const hours = (date.getHours() + (roundedMinutes === 60 ? 1 : 0)) % 24;
-    setTimeMeridiem(hours >= 12 ? 'PM' : 'AM');
-    setTimeHour(hours % 12 || 12);
-    setTimeMinute(roundedMinutes === 60 ? 0 : roundedMinutes);
+    const parts = timePartsFromDate(date);
+    setTimeMeridiem(parts.meridiem);
+    setTimeHour(parts.hour);
+    setTimeMinute(parts.minute);
     setIsTimePickerOpen(true);
   };
 
   const applySelectedTime = () => {
     if (!editingTask) return;
-    const date = new Date(`${editingTask.target_date}T00:00:00`);
-    const hours = (timeHour % 12) + (timeMeridiem === 'PM' ? 12 : 0);
-    date.setHours(hours, timeMinute, 0, 0);
-    setEditingTask({ ...editingTask, scheduled_time: date.toISOString() });
+    setEditingTask({ ...editingTask, scheduled_time: isoFromTimeParts(editingTask.target_date, timeMeridiem, timeHour, timeMinute) });
     setIsTimePickerOpen(false);
   };
 
   const renderDailyPanel = () => {
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
     const dayTasks = tasks.filter((t: Task) => t.target_date === dateStr);
-    const deadlineNotices = deadlines
-      .map(deadline => ({ deadline, remainingDays: differenceInCalendarDays(parseISO(deadline.due_date), selectedDate) }))
-      .filter(({ deadline, remainingDays }) => deadline.reminder_days !== null && remainingDays >= 0 && remainingDays <= deadline.reminder_days)
-      .sort((a, b) => a.remainingDays - b.remainingDays);
-    const useLegacyTaskCards = false;
-    const legacyTaskCardClass = 'flex gap-3 p-3 rounded-2xl border bg-white border-transparent shadow-sm hover:border-gray-200 hover:shadow';
-    const textTaskRowClass = 'flex gap-3 px-3 py-2.5 rounded-xl bg-transparent';
     
     const renderCategorySection = (categoryId: string | null, name: string, icon: string) => {
       const categoryTasks = dayTasks.filter(t => t.domain_id === categoryId);
@@ -697,14 +713,15 @@ function App() {
           {(provided, snapshot) => (
             <div 
               className={clsx(
-                "space-y-2 mb-6 p-2 rounded-2xl transition-[background-color,box-shadow] duration-200 ease-out",
+                "p-2 rounded-2xl transition-[background-color,box-shadow,margin] duration-200 ease-out",
+                categoryTasks.length === 0 && !isAdding ? "mb-1" : "space-y-2 mb-5",
                 snapshot.isDraggingOver ? "bg-primary/10 ring-1 ring-primary/40 shadow-inner" : ""
               )}
             >
               <div className="flex items-center justify-between group">
                 <div className="flex items-center gap-2">
                   <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-gray-50 border border-gray-100">
-                    <span className="text-sm inline-flex items-center">{renderCategoryIcon(icon)}</span>
+                    <span className="text-sm inline-flex items-center"><EmojiIcon emoji={icon} /></span>
                     <span className="text-sm font-medium text-gray-600">{name}</span>
                   </div>
                   {activeCategoryTasksCount > 0 && (
@@ -734,57 +751,18 @@ function App() {
                 {categoryTasks.map((task, index) => (
                   <Draggable key={task.id} draggableId={task.id} index={index}>
                     {(provided, snapshot) => (
-                      <div 
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        {...provided.dragHandleProps}
-                        className={clsx(
-                          "group will-change-transform transition-[box-shadow,border-color,background-color,opacity] duration-200 ease-out",
-                          useLegacyTaskCards ? legacyTaskCardClass : textTaskRowClass,
-                          !task.memo ? "items-center" : "items-start",
-                          snapshot.isDragging ? "bg-white shadow-xl border border-primary opacity-95" : "hover:bg-gray-50",
-                          justDroppedTaskId === task.id ? "task-drop-feedback" : "",
-                          draggedTaskId === task.id ? "cursor-grabbing" : ""
-                        )}
-                        style={provided.draggableProps.style}
-                      >
-                        <button 
-                          onClick={async (e) => {
-                            e.stopPropagation();
-                            await db.tasks.update(task.id, { is_completed: !task.is_completed, updated_at: new Date().toISOString(), version: task.version + 1 });
-                          }}
-                          aria-label={task.is_completed ? `${task.title} 완료 취소` : `${task.title} 완료`}
-                          className={clsx("shrink-0 z-10 transition-transform", !task.memo ? "" : "mt-0.5")}
-                        >
-                          <div className={clsx("w-5 h-5 rounded-full border-2 flex items-center justify-center transition-colors", task.is_completed ? "bg-primary border-primary" : "border-gray-300 group-hover:border-primary")}>
-                            {task.is_completed && <div className="w-2.5 h-2.5 bg-white rounded-full" />}
-                          </div>
-                        </button>
-                        
-                        <div 
-                          className="flex-1 min-w-0"
-                          onClick={() => setEditingTask(task)}
-                        >
-                          <div className={clsx("font-sans text-base font-medium leading-snug truncate", task.is_completed ? "text-gray-400 line-through decoration-gray-500 decoration-2" : "text-textPrimary")}>
-                            {task.title}
-                          </div>
-                          {task.memo && (
-                            <div className="text-sm text-gray-500 mt-2 whitespace-pre-wrap">{task.memo}</div>
-                          )}
-                        </div>
-
-                        {task.image_data && (
-                          <div 
-                            className="w-12 h-12 rounded-lg shrink-0 overflow-hidden cursor-pointer border border-gray-200 shadow-sm hover:opacity-90"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setViewingImage(task.image_data || null);
-                            }}
-                          >
-                            <img src={task.image_data} alt="첨부" className="w-full h-full object-cover" />
-                          </div>
-                        )}
-                      </div>
+                      <TaskRow
+                        task={task}
+                        provided={provided}
+                        snapshot={snapshot}
+                        isDropped={justDroppedTaskId === task.id}
+                        isGrabbing={draggedTaskId === task.id}
+                        onToggleComplete={() => {
+                          void db.tasks.update(task.id, { is_completed: !task.is_completed, updated_at: new Date().toISOString(), version: task.version + 1 });
+                        }}
+                        onOpen={() => { setIsCreatingTask(false); setEditingTask(task); }}
+                        onViewImage={(src) => setViewingImage(src)}
+                      />
                     )}
                   </Draggable>
                 ))}
@@ -817,7 +795,7 @@ function App() {
                 )}
                 
                 {!isAdding && categoryTasks.length === 0 && !snapshot.isDraggingOver && (
-                  <div className="pl-9 py-2 text-sm text-gray-300 font-sans">할 일이 없습니다</div>
+                  <div className="pl-9 py-0.5 text-sm text-gray-300 font-sans">할 일이 없습니다</div>
                 )}
               </div>
             </div>
@@ -827,26 +805,11 @@ function App() {
     };
 
     return (
-      <div className="flex-1 overflow-y-auto pr-2 pb-10">
+      <div className="pr-1">
         <DragDropContext onDragStart={(start) => setDraggedTaskId(start.draggableId)} onDragEnd={handleTaskDragEnd}>
           {categories.map(c => renderCategorySection(c.id, c.name, c.icon))}
           {renderCategorySection(null, '미분류', '📥')}
         </DragDropContext>
-        {deadlineNotices.length > 0 && (
-          <section className="mt-5 space-y-2 border-t border-red-100 pt-5" aria-label="데드라인 알림">
-            <p className="px-1 text-xs font-medium text-red-500">데드라인 알림</p>
-            {deadlineNotices.map(({ deadline, remainingDays }) => (
-              <div key={deadline.id} role="button" tabIndex={0} onClick={() => setEditingDeadline(deadline)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setEditingDeadline(deadline); }} className={clsx("group flex cursor-pointer gap-3 rounded-2xl border border-red-200 bg-red-50/60 px-4 py-3 shadow-sm transition-colors hover:bg-red-50", deadline.memo ? "items-start" : "items-center")}>
-                <span className={clsx("shrink-0 rounded-full bg-red-500 px-2 py-1 text-xs font-medium text-white", deadline.memo ? "mt-0.5" : "")}>D-{remainingDays}</span>
-                <div className="min-w-0">
-                  <p className="truncate text-sm font-medium text-gray-800">{deadline.title}</p>
-                  {deadline.memo && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{deadline.memo}</p>}
-                </div>
-                <span className={clsx("ml-auto shrink-0 text-xs text-red-500", deadline.memo ? "mt-0.5" : "")}>{format(parseISO(deadline.due_date), 'M/d')}</span>
-              </div>
-            ))}
-          </section>
-        )}
       </div>
     );
   };
@@ -857,7 +820,7 @@ function App() {
     const completedGoalCount = weekGoals.filter(goal => goal.is_completed).length;
 
     return (
-      <div className="flex-1 overflow-y-auto pr-2 pb-10 flex flex-col gap-6">
+      <div className="pr-1 pb-2 flex flex-col gap-6">
         <form onSubmit={async (e) => {
           e.preventDefault();
           const form = e.currentTarget;
@@ -928,7 +891,7 @@ function App() {
   const renderPanel = () => {
     return (
       <div className="w-[500px] bg-white p-8 flex flex-col h-[calc(100vh-3rem)] sticky top-6 rounded-3xl shadow-sm border border-gray-100">
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-6 shrink-0">
           <h2 className="text-2xl font-bold">
             {viewMode === 'DAILY' 
               ? format(selectedDate, 'M월 d일 (E)', { locale: ko })
@@ -936,6 +899,7 @@ function App() {
           </h2>
           {viewMode === 'DAILY' && (
             <div className="relative">
+              {/* 바깥 클릭으로 닫히지 않음. 메뉴를 연 채 날짜를 확인하는 흐름을 유지하기 위한 의도. */}
               <button onClick={() => setIsDailyMenuOpen(open => !open)} aria-label="일별 할 일 메뉴" aria-expanded={isDailyMenuOpen} className="p-2 rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-colors">
                 <MoreHorizontal size={22}/>
               </button>
@@ -953,7 +917,24 @@ function App() {
             </div>
           )}
         </div>
-        {viewMode === 'DAILY' ? renderDailyPanel() : renderWeeklyPanel()}
+        <div className="flex-1 min-h-0 overflow-y-auto pr-1">
+          {viewMode === 'DAILY' ? renderDailyPanel() : renderWeeklyPanel()}
+        </div>
+        {viewMode === 'DAILY' && deadlineNotices.length > 0 && (
+          <section className="shrink-0 mt-4 max-h-[40%] overflow-y-auto border-t border-red-100 pt-4 space-y-2" aria-label="데드라인 알림">
+            <p className="px-1 text-xs font-medium text-red-500">데드라인 알림</p>
+            {deadlineNotices.map(({ deadline, remainingDays }) => (
+              <div key={deadline.id} role="button" tabIndex={0} onClick={() => setEditingDeadline(deadline)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') setEditingDeadline(deadline); }} className={clsx("group flex cursor-pointer gap-3 rounded-2xl border border-red-200 bg-red-50/60 px-4 py-3 shadow-sm transition-colors hover:bg-red-50", deadline.memo ? "items-start" : "items-center")}>
+                <span className={clsx("shrink-0 rounded-full bg-red-500 px-2 py-1 text-xs font-medium text-white", deadline.memo ? "mt-0.5" : "")}>D-{remainingDays}</span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium text-gray-800">{deadline.title}</p>
+                  {deadline.memo && <p className="mt-1 line-clamp-2 text-xs text-gray-500">{deadline.memo}</p>}
+                </div>
+                <span className={clsx("ml-auto shrink-0 text-xs text-red-500", deadline.memo ? "mt-0.5" : "")}>{format(parseISO(deadline.due_date), 'M/d')}</span>
+              </div>
+            ))}
+          </section>
+        )}
       </div>
     );
   };
@@ -1055,12 +1036,12 @@ function App() {
       )}
 
       {/* Task Edit Modal */}
-      {editingTask && (
+      {editingTask && !selectingDateForTask && (
         <div className="fixed inset-0 bg-black/20 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-3xl w-[420px] shadow-xl flex flex-col max-h-[90vh]">
             <div className="flex justify-between items-center p-6 pb-4 shrink-0">
-              <h3 className="text-lg font-bold">할 일 상세</h3>
-              <button onClick={() => { setEditingTask(null); setIsTimePickerOpen(false); }} className="p-1 hover:bg-gray-100 rounded-full"><X size={20}/></button>
+              <h3 className="text-lg font-bold">{isCreatingTask ? '할 일 만들기' : '할 일 상세'}</h3>
+              <button onClick={() => { setEditingTask(null); setIsCreatingTask(false); setIsTimePickerOpen(false); }} className="p-1 hover:bg-gray-100 rounded-full"><X size={20}/></button>
             </div>
             
             <div className="overflow-y-auto px-6 pb-6 space-y-4">
@@ -1068,10 +1049,25 @@ function App() {
                 <label className="block text-xs font-medium text-gray-400 mb-1">제목</label>
                 <input 
                   type="text" 
+                  autoFocus={isCreatingTask}
                   value={editingTask.title}
                   onChange={e => setEditingTask({...editingTask, title: e.target.value})}
+                  placeholder="할 일을 적어주세요"
                   className="w-full bg-gray-50 rounded-xl p-3 outline-none font-sans text-lg font-medium border border-transparent focus:border-gray-200"
                 />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-400 mb-1">카테고리</label>
+                <select
+                  value={editingTask.domain_id ?? ''}
+                  onChange={event => setEditingTask({ ...editingTask, domain_id: event.target.value || null })}
+                  className="w-full bg-gray-50 rounded-xl p-3 outline-none font-sans text-sm border border-transparent focus:border-gray-200"
+                >
+                  <option value="">미분류</option>
+                  {categories.map(category => (
+                    <option key={category.id} value={category.id}>{category.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">메모</label>
@@ -1128,7 +1124,7 @@ function App() {
               <div>
                 <label className="block text-xs font-medium text-gray-400 mb-1">시간</label>
                 <div className="flex items-center justify-between bg-gray-50 rounded-xl p-3 border border-transparent">
-                  <span className="text-sm font-sans text-gray-600">{editingTask.scheduled_time ? format(parseISO(editingTask.scheduled_time), 'a h:mm', { locale: ko }) : '시간 없음'}</span>
+                  <span className="text-sm font-sans text-gray-600">{formatScheduledTime(editingTask.scheduled_time) ?? '시간 없음'}</span>
                   <button onClick={openTimePicker} className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors shadow-sm text-gray-700">
                     <CalendarIcon size={14} /> 시간 설정
                   </button>
@@ -1141,8 +1137,9 @@ function App() {
                   <span className="text-sm font-sans font-medium">{format(parseISO(editingTask.target_date), 'yyyy년 MM월 dd일')}</span>
                   <button 
                     onClick={() => {
+                      setIsTimePickerOpen(false);
                       setSelectingDateForTask(editingTask.id);
-                      setEditingTask(null);
+                      if (!isCreatingTask) setEditingTask(null);
                     }}
                     className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-gray-200 rounded-lg text-sm font-medium hover:bg-gray-100 transition-colors shadow-sm text-gray-700"
                   >
@@ -1154,29 +1151,55 @@ function App() {
             </div>
 
             <div className="px-6 pb-6 pt-4 shrink-0 flex justify-between gap-3 border-t border-gray-100">
-              <button 
-                onClick={async () => {
-                  const now = new Date().toISOString();
-                  await db.tasks.update(editingTask.id, {
-                    deleted_at: now,
-                    updated_at: now,
-                    version: editingTask.version + 1,
-                  });
-                  setEditingTask(null);
-                }}
-                className="px-4 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors font-bold flex items-center justify-center"
-              >
-                삭제
-              </button>
+              {isCreatingTask ? (
+                <button
+                  onClick={() => { setEditingTask(null); setIsCreatingTask(false); setIsTimePickerOpen(false); }}
+                  className="px-4 py-3 text-gray-500 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors font-bold flex items-center justify-center"
+                >
+                  취소
+                </button>
+              ) : (
+                <button 
+                  onClick={async () => {
+                    const now = new Date().toISOString();
+                    await db.tasks.update(editingTask.id, {
+                      deleted_at: now,
+                      updated_at: now,
+                      version: editingTask.version + 1,
+                    });
+                    setEditingTask(null);
+                  }}
+                  className="px-4 py-3 text-red-500 bg-red-50 hover:bg-red-100 rounded-xl transition-colors font-bold flex items-center justify-center"
+                >
+                  삭제
+                </button>
+              )}
               <button 
                 onClick={async () => {
                   if (!editingTask.title.trim()) return;
+                  const now = new Date().toISOString();
+                  if (isCreatingTask) {
+                    const categoryTasks = tasks.filter(task => task.target_date === editingTask.target_date && task.domain_id === editingTask.domain_id);
+                    const nextOrder = categoryTasks.reduce((maximum, task) => Math.max(maximum, task.order), -1) + 1;
+                    await db.tasks.add({
+                      ...editingTask,
+                      title: editingTask.title.trim(),
+                      memo: editingTask.memo.trim(),
+                      order: nextOrder,
+                      created_at: now,
+                      updated_at: now,
+                      version: 1,
+                    });
+                    setIsCreatingTask(false);
+                    setEditingTask(null);
+                    return;
+                  }
                   const { id, ...changes } = editingTask;
                   await db.tasks.update(id, {
                     ...changes,
                     title: editingTask.title.trim(),
                     memo: editingTask.memo.trim(),
-                    updated_at: new Date().toISOString(),
+                    updated_at: now,
                     version: editingTask.version + 1,
                   });
                   setEditingTask(null);
@@ -1184,91 +1207,41 @@ function App() {
                 disabled={!editingTask.title.trim()}
                 className="flex-1 py-3 bg-gray-900 text-white rounded-xl font-bold hover:bg-gray-800 transition-colors disabled:cursor-not-allowed disabled:bg-gray-300"
               >
-                저장
+                {isCreatingTask ? '만들기' : '저장'}
               </button>
             </div>
           </div>
         </div>
       )}
 
-      {isTimePickerOpen && editingTask && (
-        <div className="fixed inset-0 z-[60] flex items-end justify-center bg-black/30 p-4 sm:items-center">
-          <div className="w-full max-w-[460px] rounded-3xl bg-white p-6 shadow-2xl">
-            <div className="mx-auto mb-5 h-1 w-10 rounded-full bg-gray-200" />
-            <h3 className="mb-5 text-center text-base font-medium text-gray-800">시간 설정</h3>
-            <div className="mb-5 grid grid-cols-2 gap-2 rounded-2xl bg-gray-100 p-1">
-              {(['AM', 'PM'] as const).map(meridiem => (
-                <button key={meridiem} onClick={() => setTimeMeridiem(meridiem)} className={clsx("rounded-xl py-2.5 text-sm font-medium transition-colors", timeMeridiem === meridiem ? "bg-white text-gray-800 shadow-sm" : "text-gray-400")}>
-                  {meridiem === 'AM' ? '오전' : '오후'}
-                </button>
-              ))}
-            </div>
-            <p className="mb-2 text-sm font-medium text-gray-500">시</p>
-            <div className="mb-5 grid grid-cols-6 gap-2">
-              {Array.from({ length: 12 }, (_, index) => index + 1).map(hour => (
-                <button key={hour} onClick={() => setTimeHour(hour)} className={clsx("aspect-square rounded-full text-sm font-medium transition-colors", timeHour === hour ? "bg-primary text-gray-800" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>{hour}</button>
-              ))}
-            </div>
-            <p className="mb-2 text-sm font-medium text-gray-500">분</p>
-            <div className="mb-6 grid grid-cols-6 gap-2">
-              {Array.from({ length: 12 }, (_, index) => index * 5).map(minute => (
-                <button key={minute} onClick={() => setTimeMinute(minute)} className={clsx("aspect-square rounded-full text-sm font-medium transition-colors", timeMinute === minute ? "bg-primary text-gray-800" : "bg-gray-100 text-gray-600 hover:bg-gray-200")}>{String(minute).padStart(2, '0')}</button>
-              ))}
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button onClick={() => { setEditingTask({ ...editingTask, scheduled_time: null }); setIsTimePickerOpen(false); }} className="rounded-xl bg-gray-100 py-3 text-sm font-medium text-red-500 hover:bg-red-50">시간 해제</button>
-              <button onClick={applySelectedTime} className="rounded-xl bg-gray-900 py-3 text-sm font-medium text-white hover:bg-gray-800">완료</button>
-            </div>
-          </div>
-        </div>
+      {isTimePickerOpen && editingTask && !selectingDateForTask && (
+        <TimePickerModal
+          meridiem={timeMeridiem}
+          hour={timeHour}
+          minute={timeMinute}
+          onMeridiemChange={setTimeMeridiem}
+          onHourChange={setTimeHour}
+          onMinuteChange={setTimeMinute}
+          onClear={() => { setEditingTask({ ...editingTask, scheduled_time: null }); setIsTimePickerOpen(false); }}
+          onConfirm={applySelectedTime}
+        />
       )}
 
       {confirmDailyAction && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 p-4">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-medium text-gray-800">할 일을 삭제할까요?</h3>
-            {confirmDailyAction === 'DELETE_ALL' ? (
-              <p className="mb-6 text-sm text-gray-500">모든 할 일 <strong className="font-bold text-gray-700">({selectedDateLabel})</strong>을 삭제합니다.</p>
-            ) : (
-              <p className="mb-6 text-sm text-gray-500">미완료 할 일 <strong className="font-bold text-gray-700">({selectedDateLabel})</strong>만 삭제합니다.</p>
-            )}
-            <div className="flex justify-end gap-2">
-              <button onClick={() => setConfirmDailyAction(null)} className="rounded-xl px-4 py-2.5 text-sm font-medium text-gray-500 hover:bg-gray-100">취소</button>
-              <button onClick={async () => { await deleteDayTasks(confirmDailyAction === 'DELETE_INCOMPLETE'); setConfirmDailyAction(null); }} className="rounded-xl bg-red-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-red-600">삭제</button>
-            </div>
-          </div>
-        </div>
+        <ConfirmDailyDeleteDialog
+          mode={confirmDailyAction}
+          dateLabel={selectedDateLabel}
+          onCancel={() => setConfirmDailyAction(null)}
+          onConfirm={() => { void deleteDayTasks(confirmDailyAction === 'DELETE_INCOMPLETE').then(() => setConfirmDailyAction(null)); }}
+        />
       )}
 
       {isNoIncompleteNoticeOpen && (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 p-4">
-          <div className="w-full max-w-sm rounded-3xl bg-white p-6 shadow-xl">
-            <h3 className="mb-2 text-lg font-medium text-gray-800">미완료 할 일이 없습니다</h3>
-            <p className="mb-6 text-sm text-gray-500"><strong className="font-bold text-gray-700">{selectedDateLabel}</strong>에는 이동하거나 삭제할 미완료 할 일이 없습니다.</p>
-            <div className="flex justify-end"><button onClick={() => setIsNoIncompleteNoticeOpen(false)} className="rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-gray-800">확인</button></div>
-          </div>
-        </div>
+        <NoIncompleteNoticeDialog dateLabel={selectedDateLabel} onClose={() => setIsNoIncompleteNoticeOpen(false)} />
       )}
 
-      {/* Full Screen Image Viewer */}
       {viewingImage && (
-        <div 
-          className="fixed inset-0 bg-black/80 z-[100] flex items-center justify-center p-8 cursor-zoom-out"
-          onClick={() => setViewingImage(null)}
-        >
-          <img 
-            src={viewingImage} 
-            alt="크게 보기" 
-            className="max-w-full max-h-full object-contain rounded-xl shadow-2xl"
-            onClick={(e) => e.stopPropagation()} 
-          />
-          <button 
-            className="absolute top-6 right-6 p-2 bg-white/10 hover:bg-white/20 rounded-full text-white transition-colors"
-            onClick={() => setViewingImage(null)}
-          >
-            <X size={24} />
-          </button>
-        </div>
+        <ImageViewer src={viewingImage} onClose={() => setViewingImage(null)} />
       )}
 
       {/* Category Manage Modal */}
@@ -1277,7 +1250,7 @@ function App() {
           <div className="bg-white rounded-3xl p-5 w-[420px] shadow-xl max-h-[80vh] flex flex-col relative">
             <div className="flex justify-between items-center mb-4">
               <h3 className="text-lg font-bold">카테고리 관리</h3>
-              <button onClick={() => setIsCategoryModalOpen(false)} className="p-1 hover:bg-gray-100 rounded-full"><X size={20}/></button>
+              <button onClick={() => { setIsCategoryModalOpen(false); setEditingCategoryId(null); setShowEmojiPicker(false); }} className="p-1 hover:bg-gray-100 rounded-full"><X size={20}/></button>
             </div>
             
             <div className="flex-1 overflow-y-auto mb-4 pr-1">
@@ -1297,16 +1270,83 @@ function App() {
                               )}
                               style={provided.draggableProps.style}
                             >
-                              <div className="flex items-center gap-2.5">
+                              <div className="flex items-center gap-2.5 min-w-0 flex-1">
                                 <div {...provided.dragHandleProps} className="p-0.5 text-gray-400 hover:text-gray-700 cursor-grab active:cursor-grabbing">
                                   <GripVertical size={16} />
                                 </div>
-                                <span className="inline-flex items-center">{renderCategoryIcon(c.icon, 'h-5 w-6')}</span>
-                                <span className="font-medium text-gray-700">{c.name}</span>
+                                {editingCategoryId === c.id ? (
+                                  <>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setEmojiPickerTarget('edit'); setShowEmojiPicker(open => !open); }}
+                                      className="inline-flex items-center rounded-lg p-1 hover:bg-white"
+                                      aria-label="카테고리 아이콘 변경"
+                                    >
+                                      <EmojiIcon emoji={editingCategoryIcon} className="h-5 w-6" />
+                                    </button>
+                                    <input
+                                      autoFocus
+                                      value={editingCategoryName}
+                                      onChange={event => setEditingCategoryName(event.target.value)}
+                                      className="min-w-0 flex-1 rounded-lg bg-white px-2 py-1 font-medium text-gray-700 outline-none ring-1 ring-gray-200 focus:ring-gray-400"
+                                    />
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="inline-flex items-center"><EmojiIcon emoji={c.icon} className="h-5 w-6" /></span>
+                                    <span className="font-medium text-gray-700 truncate">{c.name}</span>
+                                  </>
+                                )}
                               </div>
-                              <button onClick={() => handleCategoryDelete(c.id)} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
-                                <Trash2 size={16}/>
-                              </button>
+                              {editingCategoryId === c.id ? (
+                                <div className="flex items-center gap-0.5 shrink-0">
+                                  <button
+                                    onClick={async () => {
+                                      if (!editingCategoryName.trim()) return;
+                                      const now = new Date().toISOString();
+                                      await db.domains.put({
+                                        ...c,
+                                        name: editingCategoryName.trim(),
+                                        icon: editingCategoryIcon,
+                                        updated_at: now,
+                                        version: c.version + 1,
+                                      });
+                                      setEditingCategoryId(null);
+                                      setShowEmojiPicker(false);
+                                    }}
+                                    aria-label={`${c.name} 저장`}
+                                    className="p-1.5 text-gray-400 hover:text-gray-800 hover:bg-white rounded-lg transition-colors"
+                                  >
+                                    <Check size={16}/>
+                                  </button>
+                                  <button
+                                    onClick={() => { setEditingCategoryId(null); setShowEmojiPicker(false); }}
+                                    aria-label="카테고리 수정 취소"
+                                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-white rounded-lg transition-colors"
+                                  >
+                                    <X size={16}/>
+                                  </button>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-0.5 shrink-0">
+                                  <button
+                                    onClick={() => {
+                                      setEditingCategoryId(c.id);
+                                      setEditingCategoryName(c.name);
+                                      setEditingCategoryIcon(c.icon);
+                                      setEmojiPickerTarget('edit');
+                                      setShowEmojiPicker(false);
+                                    }}
+                                    aria-label={`${c.name} 수정`}
+                                    className="p-1.5 text-gray-400 hover:text-gray-700 hover:bg-white rounded-lg transition-colors"
+                                  >
+                                    <Pencil size={16}/>
+                                  </button>
+                                  <button onClick={() => { if (editingCategoryId === c.id) setEditingCategoryId(null); void handleCategoryDelete(c.id); }} className="p-1.5 text-gray-400 hover:text-red-500 hover:bg-red-50 rounded-lg transition-colors">
+                                    <Trash2 size={16}/>
+                                  </button>
+                                </div>
+                              )}
                             </div>
                           )}
                         </Draggable>
@@ -1339,10 +1379,10 @@ function App() {
                 <div className="flex gap-2">
                   <button 
                     type="button"
-                    onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    onClick={() => { setEmojiPickerTarget('new'); setShowEmojiPicker(!showEmojiPicker); }}
                     className="w-12 h-12 flex items-center justify-center bg-gray-50 hover:bg-gray-100 rounded-xl text-2xl transition-colors border border-gray-200 shrink-0"
                   >
-                    {renderCategoryIcon(newCategoryEmoji, 'h-6 w-8')}
+                    <EmojiIcon emoji={newCategoryEmoji} className="h-6 w-8" />
                   </button>
                   <input name="name" type="text" placeholder="새 카테고리 이름" className="flex-1 bg-gray-50 border border-gray-200 rounded-xl px-4 outline-none focus:border-gray-400 transition-colors font-sans" />
                   <button type="submit" className="w-12 h-12 flex items-center justify-center bg-gray-900 text-white rounded-xl hover:bg-gray-800 transition-colors shrink-0"><Plus size={20}/></button>
@@ -1356,7 +1396,7 @@ function App() {
                     </div>
                     <div className="mb-4 grid grid-cols-5 gap-1.5">
                       {emojiCategories.map(category => (
-                        <button key={category.id} type="button" onClick={() => setSelectedEmojiCategory(category.id)} className={clsx("flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition-colors", selectedEmojiSet.id === category.id ? "bg-primary/30 text-gray-800" : "text-gray-500 hover:bg-gray-100")}>{renderEmoji(category.icon, 'h-4 w-5')} {category.id}</button>
+                        <button key={category.id} type="button" onClick={() => setSelectedEmojiCategory(category.id)} className={clsx("flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-sm font-medium transition-colors", selectedEmojiSet.id === category.id ? "bg-primary/30 text-gray-800" : "text-gray-500 hover:bg-gray-100")}><EmojiIcon emoji={category.icon} className="h-4 w-5" /> {category.id}</button>
                       ))}
                     </div>
                     <div className="h-[252px] flex-none overflow-y-auto pr-1">
@@ -1367,8 +1407,8 @@ function App() {
                             {section.emojis.map(emoji => {
                               const flagName = flagNameByEmoji[emoji];
                               return (
-                                <button key={emoji} type="button" onClick={() => { setNewCategoryEmoji(emoji); setShowEmojiPicker(false); setFlagTooltip(null); }} onMouseEnter={(event) => { if (flagName) { const rect = event.currentTarget.getBoundingClientRect(); setFlagTooltip({ label: flagName, x: rect.left + rect.width / 2, y: rect.top - 8 }); } }} onMouseLeave={() => setFlagTooltip(null)} onFocus={(event) => { if (flagName) { const rect = event.currentTarget.getBoundingClientRect(); setFlagTooltip({ label: flagName, x: rect.left + rect.width / 2, y: rect.top - 8 }); } }} onBlur={() => setFlagTooltip(null)} aria-label={`${emoji} 선택`} className="group relative flex aspect-square items-center justify-center rounded-xl text-2xl hover:bg-primary/20 focus:bg-primary/20">
-                                  {renderEmoji(emoji, 'h-7 w-7')}
+                                <button key={emoji} type="button" onClick={() => { if (emojiPickerTarget === 'edit') setEditingCategoryIcon(emoji); else setNewCategoryEmoji(emoji); setShowEmojiPicker(false); setFlagTooltip(null); }} onMouseEnter={(event) => { if (flagName) { const rect = event.currentTarget.getBoundingClientRect(); setFlagTooltip({ label: flagName, x: rect.left + rect.width / 2, y: rect.top - 8 }); } }} onMouseLeave={() => setFlagTooltip(null)} onFocus={(event) => { if (flagName) { const rect = event.currentTarget.getBoundingClientRect(); setFlagTooltip({ label: flagName, x: rect.left + rect.width / 2, y: rect.top - 8 }); } }} onBlur={() => setFlagTooltip(null)} aria-label={`${emoji} 선택`} className="group relative flex aspect-square items-center justify-center rounded-xl text-2xl hover:bg-primary/20 focus:bg-primary/20">
+                                  <EmojiIcon emoji={emoji} className="h-7 w-7" />
                                 </button>
                               );
                             })}
