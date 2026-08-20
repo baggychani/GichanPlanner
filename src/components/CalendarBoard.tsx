@@ -285,12 +285,13 @@ export function CalendarBoard({
             <Settings size={22} />
           </button>
           <ThemeToggle className="max-[560px]:hidden" />
+          <div className="relative">
           <button
             onClick={onOpenProfile}
             aria-label={isLoggedIn ? '프로필 및 계정' : '로그인'}
             title={isLoggedIn ? '프로필 및 계정' : '로그인'}
             className={clsx(
-              'rounded-full transition-colors hover:bg-surface-hover',
+              'relative rounded-full transition-colors hover:bg-surface-hover',
               isLoggedIn ? 'p-0.5' : 'p-2 text-fg-muted',
             )}
           >
@@ -301,7 +302,16 @@ export function CalendarBoard({
             ) : (
               <UserRound size={21} />
             )}
+            {!isLoggedIn && (
+              <span className="absolute left-1/2 top-full z-40 mt-2.5 -translate-x-1/2">
+                <span className="absolute -top-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-l border-t border-line bg-surface" />
+                <span className="relative block whitespace-nowrap rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-medium text-fg shadow-sm">
+                  로그인해주세요
+                </span>
+              </span>
+            )}
           </button>
+          </div>
           <div className="w-px h-6 bg-line-strong mx-1" />
           <button onClick={onPrevMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
             <ChevronLeft size={24} />
