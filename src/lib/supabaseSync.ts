@@ -16,7 +16,6 @@ import { supabase } from './supabase';
 const OWNER_KEY = 'gichanplan-sync-owner';
 
 let applyingRemote = false;
-let syncInFlight = false;
 let hooksInstalled = false;
 let syncChain: Promise<void> = Promise.resolve();
 let lastError: unknown = null;
@@ -143,7 +142,7 @@ function preserveDomainIfCleared(winner: Task, loser: Task, domains: Domain[]): 
 }
 
 function skipCloudPush() {
-  return applyingRemote || syncInFlight;
+  return applyingRemote;
 }
 
 async function repairTasksInDeletedCategories() {
@@ -170,6 +169,15 @@ function mergeByUpdatedAt<T extends { id: string; updated_at: string; version?: 
     if (!existing || isNewer(row, existing)) merged.set(row.id, row);
   }
   return [...merged.values()];
+}
+
+function keepNewerLocal<T extends { id: string; updated_at: string; version?: number }>(merged: T[], live: T[]) {
+  const byId = new Map(merged.map(row => [row.id, row]));
+  for (const row of live) {
+    const existing = byId.get(row.id);
+    if (!existing || isNewer(row, existing)) byId.set(row.id, row);
+  }
+  return [...byId.values()];
 }
 
 async function pushTask(task: Task, ownerId: string, mode: 'user' | 'bulk') {
@@ -316,12 +324,16 @@ async function pullRemote(ownerId: string, email: string | null) {
   applyingRemote = true;
   try {
     await db.transaction('rw', [...plannerWriteTables()], async () => {
-      if (mergedTasks.length) await db.tasks.bulkPut(mergedTasks);
+      const liveTasks = keepNewerLocal(mergedTasks, await db.tasks.toArray());
+      if (liveTasks.length) await db.tasks.bulkPut(liveTasks);
       for (const spec of simple) {
-        const rows = simpleMerged.get(spec.name) ?? [];
-        if (rows.length) await (spec.table as { bulkPut: (rows: unknown[]) => Promise<unknown> }).bulkPut(rows);
+        const merged = simpleMerged.get(spec.name) ?? [];
+        const live = keepNewerLocal(merged, await spec.table.toArray() as Array<{ id: string; updated_at: string; version?: number }>);
+        if (live.length) await (spec.table as { bulkPut: (rows: unknown[]) => Promise<unknown> }).bulkPut(live);
       }
-      await db.profiles.put(profile.email === email || !email ? profile : { ...profile, email });
+      const liveProfile = await db.profiles.get('#profile');
+      const nextProfile = liveProfile && isNewer(liveProfile, profile) ? liveProfile : profile;
+      await db.profiles.put(nextProfile.email === email || !email ? nextProfile : { ...nextProfile, email });
     });
     await repairTasksInDeletedCategories();
   } finally {
@@ -367,17 +379,12 @@ async function syncNow() {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  syncInFlight = true;
-  try {
-    await prepareLocalAccount(user.id);
-    await pullRemote(user.id, user.email ?? null);
-    await pushAllLocal(user.id);
-    void maybeSavePlannerCloudSnapshot().catch(error => {
-      console.warn('[gichanplanner] 계정 사본을 남기지 못했습니다', error);
-    });
-  } finally {
-    syncInFlight = false;
-  }
+  await prepareLocalAccount(user.id);
+  await pullRemote(user.id, user.email ?? null);
+  await pushAllLocal(user.id);
+  void maybeSavePlannerCloudSnapshot().catch(error => {
+    console.warn('[gichanplanner] 계정 사본을 남기지 못했습니다', error);
+  });
 }
 
 export function syncPlannerWithCloud() {
