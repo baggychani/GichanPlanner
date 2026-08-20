@@ -1,5 +1,15 @@
 import type { Transaction } from 'dexie';
-import { db, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
+import { db, type Domain, type Profile, type Task } from './db';
+import {
+  SIMPLE_SYNC_TABLES,
+  plannerWriteTables,
+  taskFromRemote,
+  taskRow,
+  versionFrom,
+  type PlannerSyncTable,
+  type RemoteStamp,
+  type RemoteTask,
+} from './plannerSyncSchema';
 import { supabase } from './supabase';
 
 const OWNER_KEY = 'gichanplan-sync-owner';
@@ -97,142 +107,10 @@ async function downloadBlob(bucket: 'profile-images' | 'task-images', path: stri
   return data;
 }
 
-async function upsertRows(table: 'tasks' | 'schedules' | 'routines' | 'domains' | 'goals' | 'deadlines' | 'projects', rows: object[]) {
+async function upsertRows(table: PlannerSyncTable, rows: object[]) {
   if (!supabase || rows.length === 0) return;
   const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
   if (error) throw error;
-}
-
-type RemoteStamp = {
-  id: string;
-  revision?: number;
-  created_at: string;
-  updated_at: string;
-  deleted_at: string | null;
-};
-
-function versionFrom(row: RemoteStamp) {
-  return row.revision ?? 1;
-}
-
-function taskRow(task: Task, ownerId: string, imagePath: string | null) {
-  return {
-    id: task.id, owner_id: ownerId, revision: task.version,
-    created_at: task.created_at, updated_at: task.updated_at, deleted_at: task.deleted_at,
-    title: task.title, target_date: task.target_date, deadline: task.deadline, scheduled_time: task.scheduled_time,
-    domain_id: task.domain_id, goal_id: task.goal_id, project_id: task.project_id ?? null, is_important: task.is_important, is_completed: task.is_completed,
-    memo: task.memo, order: task.order, image_path: imagePath,
-  };
-}
-
-function domainRow(domain: Domain, ownerId: string) {
-  return {
-    id: domain.id, owner_id: ownerId, revision: domain.version,
-    created_at: domain.created_at, updated_at: domain.updated_at, deleted_at: domain.deleted_at,
-    name: domain.name, icon: domain.icon, color: domain.color, order: domain.order, is_archived: domain.is_archived,
-  };
-}
-
-function projectRow(project: Project, ownerId: string) {
-  return {
-    id: project.id, owner_id: ownerId, revision: project.version,
-    created_at: project.created_at, updated_at: project.updated_at, deleted_at: project.deleted_at,
-    title: project.title, icon: project.icon, domain_id: project.domain_id, due_date: project.due_date, order: project.order,
-  };
-}
-
-function goalRow(goal: Goal, ownerId: string) {
-  return {
-    id: goal.id, owner_id: ownerId, revision: goal.version,
-    created_at: goal.created_at, updated_at: goal.updated_at, deleted_at: goal.deleted_at,
-    domain_id: goal.domain_id, time_frame: goal.time_frame, start_date: goal.start_date, end_date: goal.end_date,
-    title: goal.title, is_completed: goal.is_completed,
-  };
-}
-
-function deadlineRow(deadline: Deadline, ownerId: string) {
-  return {
-    id: deadline.id, owner_id: ownerId, revision: deadline.version,
-    created_at: deadline.created_at, updated_at: deadline.updated_at, deleted_at: deadline.deleted_at,
-    title: deadline.title, memo: deadline.memo, due_date: deadline.due_date, due_time: deadline.due_time,
-    reminder_days: deadline.reminder_days, project_id: deadline.project_id ?? null,
-  };
-}
-
-function scheduleRow(schedule: Schedule, ownerId: string) {
-  return {
-    id: schedule.id, owner_id: ownerId, revision: schedule.version,
-    created_at: schedule.created_at, updated_at: schedule.updated_at, deleted_at: schedule.deleted_at,
-    title: schedule.title, target_date: schedule.target_date, start_time: schedule.start_time, end_time: schedule.end_time,
-    domain_id: schedule.domain_id,
-  };
-}
-
-function routineRow(routine: Routine, ownerId: string) {
-  return {
-    id: routine.id, owner_id: ownerId, revision: routine.version,
-    created_at: routine.created_at, updated_at: routine.updated_at, deleted_at: routine.deleted_at,
-    title: routine.title, domain_id: routine.domain_id, recurrence_rule: routine.recurrence_rule, start_date: routine.start_date,
-  };
-}
-
-type RemoteTask = RemoteStamp & {
-  title: string; target_date: string; deadline: string | null; scheduled_time: string | null;
-  domain_id: string | null; goal_id: string | null; project_id: string | null; is_important: boolean; is_completed: boolean;
-  memo: string; order: number; image_path: string | null;
-};
-
-function taskFromRemote(row: RemoteTask, imageBlob: Blob | null): Task {
-  return {
-    id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
-    title: row.title, target_date: row.target_date, deadline: row.deadline, scheduled_time: row.scheduled_time,
-    domain_id: row.domain_id, goal_id: row.goal_id, project_id: row.project_id ?? null, is_important: row.is_important, is_completed: row.is_completed,
-    memo: row.memo ?? '', order: row.order ?? 0, image_blob: imageBlob, image_data: null,
-  };
-}
-
-function domainFromRemote(row: RemoteStamp & Domain): Domain {
-  return {
-    id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
-    name: row.name, icon: row.icon, color: row.color, order: row.order, is_archived: row.is_archived,
-  };
-}
-
-function projectFromRemote(row: RemoteStamp & Project): Project {
-  return {
-    id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
-    title: row.title, icon: row.icon, domain_id: row.domain_id ?? null, due_date: row.due_date ?? null, order: row.order ?? 0,
-  };
-}
-
-function goalFromRemote(row: RemoteStamp & Goal): Goal {
-  return {
-    id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
-    domain_id: row.domain_id, time_frame: row.time_frame, start_date: row.start_date, end_date: row.end_date,
-    title: row.title, is_completed: row.is_completed,
-  };
-}
-
-function deadlineFromRemote(row: RemoteStamp & Deadline): Deadline {
-  return {
-    id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
-    title: row.title, memo: row.memo, due_date: row.due_date, due_time: row.due_time ?? null, reminder_days: row.reminder_days,
-    project_id: row.project_id ?? null,
-  };
-}
-
-function scheduleFromRemote(row: RemoteStamp & Schedule): Schedule {
-  return {
-    id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
-    title: row.title, target_date: row.target_date, start_time: row.start_time, end_time: row.end_time, domain_id: row.domain_id,
-  };
-}
-
-function routineFromRemote(row: RemoteStamp & Routine): Routine {
-  return {
-    id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
-    title: row.title, domain_id: row.domain_id, recurrence_rule: row.recurrence_rule, start_date: row.start_date,
-  };
 }
 
 function isNewer(candidate: { updated_at: string; version?: number }, current: { updated_at: string; version?: number }) {
@@ -342,38 +220,40 @@ async function pushProfile(profile: Profile, ownerId: string, mode: 'user' | 'bu
 }
 
 async function pushAllLocal(ownerId: string) {
-  const [tasks, domains, goals, deadlines, schedules, routines, projects, profile] = await Promise.all([
-    db.tasks.toArray(), db.domains.toArray(), db.goals.toArray(), db.deadlines.toArray(),
-    db.schedules.toArray(), db.routines.toArray(), db.projects.toArray(), db.profiles.get('#profile'),
-  ]);
+  const [tasks, profile] = await Promise.all([db.tasks.toArray(), db.profiles.get('#profile')]);
   for (const task of tasks) await pushTask(task, ownerId, 'bulk');
-  await upsertRows('domains', domains.map(domain => domainRow(domain, ownerId)));
-  await upsertRows('goals', goals.map(goal => goalRow(goal, ownerId)));
-  await upsertRows('deadlines', deadlines.map(deadline => deadlineRow(deadline, ownerId)));
-  await upsertRows('schedules', schedules.map(schedule => scheduleRow(schedule, ownerId)));
-  await upsertRows('routines', routines.map(routine => routineRow(routine, ownerId)));
-  await upsertRows('projects', projects.map(project => projectRow(project, ownerId)));
+  for (const spec of SIMPLE_SYNC_TABLES) {
+    const rows = await spec.table.toArray();
+    await upsertRows(spec.name, rows.map(row => spec.toRow(row as never, ownerId)));
+  }
   if (profile) await pushProfile(profile, ownerId, 'bulk');
 }
 
 async function pullRemote(ownerId: string, email: string | null) {
   if (!supabase) return;
   const client = supabase;
-  const [tasksRes, domainsRes, goalsRes, deadlinesRes, schedulesRes, routinesRes, projectsRes, profileRes] = await Promise.all([
+  const simple = SIMPLE_SYNC_TABLES;
+  const results = await Promise.all([
     client.from('tasks').select('*'),
-    client.from('domains').select('*'),
-    client.from('goals').select('*'),
-    client.from('deadlines').select('*'),
-    client.from('schedules').select('*'),
-    client.from('routines').select('*'),
-    client.from('projects').select('*'),
+    ...simple.map(spec => client.from(spec.name).select('*')),
     client.from('profiles').select('*').eq('id', ownerId).maybeSingle(),
   ]);
-  for (const result of [tasksRes, domainsRes, goalsRes, deadlinesRes, schedulesRes, routinesRes, projectsRes, profileRes]) {
+  for (const result of results) {
     if (result.error) throw result.error;
   }
+  const tasksRes = results[0];
+  const simpleResults = results.slice(1, 1 + simple.length);
+  const profileRes = results[results.length - 1];
 
-  const domains = mergeByUpdatedAt(await db.domains.toArray(), ((domainsRes.data ?? []) as Array<RemoteStamp & Domain>).map(domainFromRemote));
+  const simpleMerged = new Map<string, Array<{ id: string; updated_at: string; version?: number }>>();
+  for (let index = 0; index < simple.length; index += 1) {
+    const spec = simple[index];
+    const local = await spec.table.toArray();
+    const remote = (simpleResults[index].data ?? []) as RemoteStamp[];
+    simpleMerged.set(spec.name, mergeByUpdatedAt(local, remote.map(row => spec.fromRemote(row as never))));
+  }
+  const domains = (simpleMerged.get('domains') ?? []) as Domain[];
+
   const localTasks = await db.tasks.toArray();
   const localById = new Map(localTasks.map(task => [task.id, task]));
   const remoteTasks = (tasksRes.data ?? []) as RemoteTask[];
@@ -395,12 +275,6 @@ async function pullRemote(ownerId: string, email: string | null) {
       mergedTasks.push(local);
     }
   }
-
-  const goals = mergeByUpdatedAt(await db.goals.toArray(), ((goalsRes.data ?? []) as Array<RemoteStamp & Goal>).map(goalFromRemote));
-  const deadlines = mergeByUpdatedAt(await db.deadlines.toArray(), ((deadlinesRes.data ?? []) as Array<RemoteStamp & Deadline>).map(deadlineFromRemote));
-  const schedules = mergeByUpdatedAt(await db.schedules.toArray(), ((schedulesRes.data ?? []) as Array<RemoteStamp & Schedule>).map(scheduleFromRemote));
-  const routines = mergeByUpdatedAt(await db.routines.toArray(), ((routinesRes.data ?? []) as Array<RemoteStamp & Routine>).map(routineFromRemote));
-  const projects = mergeByUpdatedAt(await db.projects.toArray(), ((projectsRes.data ?? []) as Array<RemoteStamp & Project>).map(projectFromRemote));
 
   const remoteProfile = profileRes.data as {
     nickname: string;
@@ -440,15 +314,12 @@ async function pullRemote(ownerId: string, email: string | null) {
 
   applyingRemote = true;
   try {
-    await db.transaction('rw', [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.projects, db.profiles], async () => {
-      await Promise.all([db.tasks.clear(), db.domains.clear(), db.goals.clear(), db.deadlines.clear(), db.schedules.clear(), db.routines.clear(), db.projects.clear()]);
+    await db.transaction('rw', [...plannerWriteTables()], async () => {
       if (mergedTasks.length) await db.tasks.bulkPut(mergedTasks);
-      if (domains.length) await db.domains.bulkPut(domains);
-      if (goals.length) await db.goals.bulkPut(goals);
-      if (deadlines.length) await db.deadlines.bulkPut(deadlines);
-      if (schedules.length) await db.schedules.bulkPut(schedules);
-      if (routines.length) await db.routines.bulkPut(routines);
-      if (projects.length) await db.projects.bulkPut(projects);
+      for (const spec of simple) {
+        const rows = simpleMerged.get(spec.name) ?? [];
+        if (rows.length) await (spec.table as { bulkPut: (rows: unknown[]) => Promise<unknown> }).bulkPut(rows);
+      }
       await db.profiles.put(profile.email === email || !email ? profile : { ...profile, email });
     });
     await repairTasksInDeletedCategories();
@@ -460,8 +331,8 @@ async function pullRemote(ownerId: string, email: string | null) {
 async function clearLocalPlanner() {
   applyingRemote = true;
   try {
-    await db.transaction('rw', [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.projects, db.profiles], async () => {
-      await Promise.all([db.tasks.clear(), db.domains.clear(), db.goals.clear(), db.deadlines.clear(), db.schedules.clear(), db.routines.clear(), db.projects.clear(), db.profiles.clear()]);
+    await db.transaction('rw', [...plannerWriteTables()], async () => {
+      await Promise.all([...plannerWriteTables()].map(table => table.clear()));
     });
   } finally {
     applyingRemote = false;
@@ -525,83 +396,23 @@ export function installPlannerSync() {
       if (ownerId && row) await pushTask(row, ownerId, 'user');
     });
   });
-  db.domains.hook('creating', (_key, obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('domains', [domainRow(obj, ownerId)]); });
-  });
-  db.domains.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
-      const row = await db.domains.get(primKey);
-      if (ownerId && row) await upsertRows('domains', [domainRow(row, ownerId)]);
+  for (const spec of SIMPLE_SYNC_TABLES) {
+    spec.table.hook('creating', (_key, obj, trans) => {
+      if (skipCloudPush()) return;
+      whenCommitted(trans, async () => {
+        const ownerId = await currentUserId();
+                if (ownerId) await upsertRows(spec.name, [spec.toRow(obj as never, ownerId)]);
+      });
     });
-  });
-  db.goals.hook('creating', (_key, obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('goals', [goalRow(obj, ownerId)]); });
-  });
-  db.goals.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
-      const row = await db.goals.get(primKey);
-      if (ownerId && row) await upsertRows('goals', [goalRow(row, ownerId)]);
+    spec.table.hook('updating', (_mods, primKey, _obj, trans) => {
+      if (skipCloudPush()) return;
+      whenCommitted(trans, async () => {
+        const ownerId = await currentUserId();
+        const row = await spec.table.get(primKey);
+        if (ownerId && row) await upsertRows(spec.name, [spec.toRow(row as never, ownerId)]);
+      });
     });
-  });
-  db.deadlines.hook('creating', (_key, obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
-      if (!ownerId) return;
-      await upsertRows('deadlines', [deadlineRow(obj, ownerId)]);
-    });
-  });
-  db.deadlines.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
-      const row = await db.deadlines.get(primKey);
-      if (!ownerId || !row) return;
-      await upsertRows('deadlines', [deadlineRow(row, ownerId)]);
-    });
-  });
-  db.schedules.hook('creating', (_key, obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('schedules', [scheduleRow(obj, ownerId)]); });
-  });
-  db.schedules.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
-      const row = await db.schedules.get(primKey);
-      if (ownerId && row) await upsertRows('schedules', [scheduleRow(row, ownerId)]);
-    });
-  });
-  db.routines.hook('creating', (_key, obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('routines', [routineRow(obj, ownerId)]); });
-  });
-  db.routines.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
-      const row = await db.routines.get(primKey);
-      if (ownerId && row) await upsertRows('routines', [routineRow(row, ownerId)]);
-    });
-  });
-  db.projects.hook('creating', (_key, obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('projects', [projectRow(obj, ownerId)]); });
-  });
-  db.projects.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
-      const row = await db.projects.get(primKey);
-      if (ownerId && row) await upsertRows('projects', [projectRow(row, ownerId)]);
-    });
-  });
+  }
   db.profiles.hook('creating', (_key, obj, trans) => {
     if (skipCloudPush()) return;
     whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushProfile(obj, ownerId, 'user'); });
