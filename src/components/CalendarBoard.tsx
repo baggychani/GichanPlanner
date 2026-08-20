@@ -2,7 +2,7 @@ import {
   format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   isSameMonth, isSameDay, isToday, differenceInCalendarDays,
 } from 'date-fns';
-import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Plus, Repeat2, Settings, Target, ListTodo, UserRound } from 'lucide-react';
+import { AlertCircle, CalendarDays, Cake, ChevronLeft, ChevronRight, Flag, Plus, Repeat2, Settings, Target, ListTodo, UserRound } from 'lucide-react';
 import clsx from 'clsx';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Deadline, Goal } from '../lib/db';
@@ -242,7 +242,7 @@ export function CalendarBoard({
               <Plus size={24} />
             </button>
             <div className={clsx(
-              'absolute top-12 right-0 w-48 overflow-hidden rounded-2xl border border-line bg-surface p-1.5 shadow-xl origin-top-right transition-all duration-200 z-40',
+              'absolute top-12 right-0 w-52 overflow-hidden rounded-2xl border border-line bg-surface p-1.5 shadow-xl origin-top-right transition-all duration-200 z-40',
               isQuickCreateOpen ? 'scale-100 opacity-100 translate-y-0' : 'pointer-events-none scale-95 opacity-0 -translate-y-1',
             )}>
               <button onClick={onCreateTask} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-surface-muted hover:text-fg transition-colors">
@@ -250,6 +250,12 @@ export function CalendarBoard({
               </button>
               <button onClick={onCreateDeadline} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 transition-colors">
                 <AlertCircle size={16} /> 데드라인 만들기
+              </button>
+              <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
+                <Cake size={16} /> 기념일 만들기
+              </button>
+              <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
+                <Flag size={16} /> 디데이 만들기
               </button>
               <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
                 <Repeat2 size={16} /> 루틴 만들기

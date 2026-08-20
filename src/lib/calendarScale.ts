@@ -1,8 +1,8 @@
 /** 칸 높이 102px일 때 보이는 치수. 이보다 커져도 키우지 않는다. */
 export const CALENDAR_CELL_DESIGN = {
   height: 102,
-  date: 32,
-  dateFont: 16,
+  date: 34,
+  dateFont: 17,
   bubble: 28,
   bubbleFont: 14,
   bubblePadX: 8,

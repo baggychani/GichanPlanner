@@ -92,8 +92,8 @@ body {
 }
 
 .calendar-metrics {
-  --cal-date: 32px;
-  --cal-date-font: 16px;
+  --cal-date: 34px;
+  --cal-date-font: 17px;
   --cal-bubble: 28px;
   --cal-bubble-font: 14px;
   --cal-bubble-px: 8px;
