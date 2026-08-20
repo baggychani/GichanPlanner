@@ -21,3 +21,8 @@ const BY_DATE: Record<string, readonly string[]> = {
 export function krHolidayNames(ymd: string): readonly string[] | null {
   return BY_DATE[ymd] ?? null;
 }
+
+export function krHolidayLabel(ymd: string): string | null {
+  const names = krHolidayNames(ymd);
+  return names ? names.join(' · ') : null;
+}

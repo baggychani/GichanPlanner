@@ -148,7 +148,6 @@ export function CalendarBoard({
         <div
           key={day.toString()}
           onClick={() => onCellClick(cloneDay)}
-          title={holidayNames?.join(', ')}
           className={clsx(
             'relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-line transition-[filter] duration-150 cursor-pointer group p-[var(--cal-pad)]',
             isSelecting ? 'hover:bg-primary/20' : 'hover:brightness-95',

@@ -5,6 +5,7 @@ import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import type { Deadline, Project } from '../lib/db';
 import { formatScheduledTime, parseDay } from '../lib/datetime';
+import { krHolidayLabel } from '../lib/krHolidays';
 import { EmojiIcon } from './EmojiIcon';
 
 type DeadlineNotice = { deadline: Deadline; remainingDays: number };
@@ -44,16 +45,25 @@ export function PlannerPanel({
   onOpenDeadline,
   onOpenProject,
 }: PlannerPanelProps) {
+  const holidayLabel = viewMode === 'DAILY' ? krHolidayLabel(format(selectedDate, 'yyyy-MM-dd')) : null;
+
   return (
     <div className="flex h-full min-h-0 w-[650px] max-w-[min(650px,46%)] min-w-0 shrink flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:shrink-0">
       <div className="mb-6 flex shrink-0 items-center justify-between px-8 pt-8 max-[1200px]:px-6 max-[1200px]:pt-6">
         <h2 className="flex h-10 min-w-0 items-center gap-3.5 text-2xl font-bold leading-none">
-          <span className="truncate">
-            {viewMode === 'DAILY'
-              ? format(selectedDate, 'M월 d일 (E)', { locale: ko })
-              : weeklyGoalWeekStart
-                ? `${format(weeklyGoalWeekStart, 'M월 d일')} 주간 목표`
-                : '주간 목표'}
+          <span className="flex min-w-0 items-center gap-2">
+            <span className="shrink-0">
+              {viewMode === 'DAILY'
+                ? format(selectedDate, 'M월 d일 (E)', { locale: ko })
+                : weeklyGoalWeekStart
+                  ? `${format(weeklyGoalWeekStart, 'M월 d일')} 주간 목표`
+                  : '주간 목표'}
+            </span>
+            {holidayLabel && (
+              <span className="min-w-0 truncate text-[13px] font-medium leading-none text-red-500">
+                {holidayLabel}
+              </span>
+            )}
           </span>
           {viewMode === 'DAILY' && isToday(selectedDate) && (
             <span className="rounded-full bg-primary px-3 py-1 text-[13px] font-semibold leading-none text-on-primary">오늘</span>
