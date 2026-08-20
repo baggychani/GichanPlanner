@@ -49,9 +49,7 @@ export async function waitForPlannerCloud() {
 
 export async function runPlannerWrite<T>(op: () => Promise<T>): Promise<T> {
   try {
-    const result = await op();
-    await waitForPlannerCloud();
-    return result;
+    return await op();
   } catch (error) {
     notify(error);
     throw error;
