@@ -347,7 +347,7 @@ function PlannerApp() {
   };
 
   return (
-    <div className="flex h-screen w-full overflow-hidden justify-center items-stretch gap-8 px-6 py-7 bg-bgPrimary max-[1200px]:gap-4 max-[1200px]:px-4 max-[1200px]:py-4 max-[900px]:h-auto max-[900px]:min-h-screen max-[900px]:overflow-visible max-[900px]:flex-col max-[900px]:items-center max-[900px]:gap-5 max-[900px]:px-4 max-[900px]:py-5">
+    <div className="flex h-screen w-full overflow-hidden justify-center items-stretch gap-8 px-6 pt-7 pb-10 bg-bgPrimary max-[1200px]:gap-4 max-[1200px]:px-4 max-[1200px]:pt-4 max-[1200px]:pb-6 max-[900px]:h-auto max-[900px]:min-h-screen max-[900px]:overflow-visible max-[900px]:flex-col max-[900px]:items-center max-[900px]:gap-5 max-[900px]:px-4 max-[900px]:pt-5 max-[900px]:pb-8">
       {isLoggedIn && (!accountReady || isSyncing || syncError) && (
         <div className="fixed left-1/2 top-4 z-[90] -translate-x-1/2 rounded-full border border-line bg-surface px-4 py-2 text-sm shadow-lg">
           {syncError ? (

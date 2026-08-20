@@ -42,6 +42,9 @@ type CalendarBoardProps = {
 
 const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일'];
 
+// true 로 두면 달력 위 큰 계정 칸이 다시 보입니다.
+const SHOW_CALENDAR_ACCOUNT_BAR = false;
+
 function CalendarAccountBar({ onOpen }: { onOpen: () => void }) {
   const { session } = useAuth();
   const isLoggedIn = Boolean(session);
@@ -114,6 +117,9 @@ export function CalendarBoard({
   const weekCount = Math.ceil((differenceInCalendarDays(endDate, startDate) + 1) / 7);
   const { rootRef, bodyRef } = useCalendarCellMetrics(weekCount);
   const profile = useLiveQuery(() => db.profiles.get('#profile'));
+  const { session } = useAuth();
+  const isLoggedIn = Boolean(session);
+  const avatarUrl = useObjectUrl(isLoggedIn ? profile?.avatar ?? null : null);
   const birthdayMonth = profile?.birthday_month ?? null;
   const birthdayDay = profile?.birthday_day ?? null;
   const rows = [];
@@ -279,8 +285,22 @@ export function CalendarBoard({
             <Settings size={22} />
           </button>
           <ThemeToggle className="max-[560px]:hidden" />
-          <button onClick={onOpenProfile} aria-label="프로필 및 계정" className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted" title="프로필 및 계정">
-            <UserRound size={21} />
+          <button
+            onClick={onOpenProfile}
+            aria-label={isLoggedIn ? '프로필 및 계정' : '로그인'}
+            title={isLoggedIn ? '프로필 및 계정' : '로그인'}
+            className={clsx(
+              'rounded-full transition-colors hover:bg-surface-hover',
+              isLoggedIn ? 'p-0.5' : 'p-2 text-fg-muted',
+            )}
+          >
+            {isLoggedIn ? (
+              <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserRound size={16} />}
+              </span>
+            ) : (
+              <UserRound size={21} />
+            )}
           </button>
           <div className="w-px h-6 bg-line-strong mx-1" />
           <button onClick={onPrevMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
@@ -292,9 +312,11 @@ export function CalendarBoard({
         </div>
       </div>
 
-      <div className="shrink-0">
-        <CalendarAccountBar onOpen={onOpenProfile} />
-      </div>
+      {SHOW_CALENDAR_ACCOUNT_BAR && (
+        <div className="shrink-0">
+          <CalendarAccountBar onOpen={onOpenProfile} />
+        </div>
+      )}
 
       <div className="relative z-0 flex min-h-0 min-w-0 flex-1 flex-col rounded-3xl border border-line bg-surface shadow-sm max-[900px]:min-h-[min(520px,70vh)]">
         <div className="grid shrink-0 grid-cols-7 rounded-t-3xl border-b border-line bg-surface pt-1.5 pb-1.5">
