@@ -50,19 +50,18 @@ export function PlannerPanel({
   const holidayLabel = viewMode === 'DAILY' ? krHolidayLabel(format(selectedDate, 'yyyy-MM-dd')) : null;
   const profile = useLiveQuery(() => db.profiles.get('#profile'));
   const isBirthday = viewMode === 'DAILY' && isSameBirthday(selectedDate, profile?.birthday_month, profile?.birthday_day);
+  const heading = viewMode === 'DAILY'
+    ? format(selectedDate, 'M월 d일 (E)', { locale: ko })
+    : weeklyGoalWeekStart
+      ? `${format(weeklyGoalWeekStart, 'M월 d일')} 주간 목표`
+      : '주간 목표';
 
   return (
-    <div className="flex h-full min-h-0 w-[650px] max-w-[min(650px,46%)] min-w-0 shrink flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:shrink-0">
+    <div className="flex h-full min-h-0 w-[658px] max-w-[min(658px,46%)] min-w-0 shrink flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:shrink-0">
       <div className="mb-6 flex shrink-0 items-center justify-between px-8 pt-8 max-[1200px]:px-6 max-[1200px]:pt-6">
         <h2 className="flex h-10 min-w-0 items-center gap-3.5 text-2xl font-bold leading-none">
           <span className="flex min-w-0 items-center gap-2">
-            <span className="shrink-0">
-              {viewMode === 'DAILY'
-                ? format(selectedDate, 'M월 d일 (E)', { locale: ko })
-                : weeklyGoalWeekStart
-                  ? `${format(weeklyGoalWeekStart, 'M월 d일')} 주간 목표`
-                  : '주간 목표'}
-            </span>
+            <span className="shrink-0">{heading}</span>
             {holidayLabel && (
               <span className="min-w-0 truncate text-[13px] font-medium leading-none text-red-500">
                 {holidayLabel}

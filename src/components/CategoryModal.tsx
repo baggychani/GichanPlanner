@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Download, FolderKanban, GripVertical, Pencil, Plus, SunMoon, Tags, Trash2, Upload, X } from 'lucide-react';
+import { Check, Download, FolderKanban, GripVertical, Pencil, Plus, SunMoon, Tags, Trash2, Upload, X, type LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { db, type Deadline, type Domain, type Project, type Task } from '../lib/db';
@@ -21,10 +21,42 @@ import {
 import { importPortablePlannerExport } from '../lib/supabasePlannerImport';
 import { authErrorMessage } from './authUi';
 
-type SettingsSection = 'appearance' | 'categories' | 'projects' | 'data';
+export type SettingsSection = 'appearance' | 'categories' | 'projects' | 'data';
+
+const SECTION_TITLE: Record<SettingsSection, string> = {
+  appearance: '보기',
+  categories: '카테고리 관리',
+  projects: '프로젝트 관리',
+  data: '데이터',
+};
 
 // 데이터 받기·넣기는 고급 기능이라 설정 메뉴에서는 숨긴다. 기능 코드는 그대로 둔다.
 const SHOW_DATA_SETTINGS = false;
+
+function SettingsNavButton({
+  active,
+  icon: Icon,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  icon: LucideIcon;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={clsx(
+        'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
+        active ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
+      )}
+    >
+      <Icon size={16} /> {label}
+    </button>
+  );
+}
 
 function snapshotLabel(iso: string) {
   const date = new Date(iso);
@@ -93,13 +125,7 @@ export function CategoryModal({
     return () => { cancelled = true; };
   }, [section, snapshotNonce]);
 
-  const sectionTitle = section === 'appearance'
-    ? '보기'
-    : section === 'categories'
-      ? '카테고리 관리'
-      : section === 'projects'
-        ? '프로젝트 관리'
-        : '데이터';
+  const sectionTitle = SECTION_TITLE[section];
 
   return (
     <>
@@ -113,47 +139,31 @@ export function CategoryModal({
         <div className="relative flex h-[min(680px,85vh)] w-[min(712px,95vw)] overflow-hidden rounded-3xl bg-surface shadow-xl">
           <nav className="flex w-48 shrink-0 flex-col gap-1 border-r border-line bg-surface-muted px-2 py-4">
             <p className="mb-2 px-3 text-xs font-medium text-fg-subtle">설정</p>
-            <button
-              type="button"
+            <SettingsNavButton
+              active={section === 'appearance'}
+              icon={SunMoon}
+              label="보기"
               onClick={() => { setSection('appearance'); setEditingCategoryId(null); }}
-              className={clsx(
-                'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
-                section === 'appearance' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
-              )}
-            >
-              <SunMoon size={16} /> 보기
-            </button>
-            <button
-              type="button"
+            />
+            <SettingsNavButton
+              active={section === 'categories'}
+              icon={Tags}
+              label="카테고리"
               onClick={() => setSection('categories')}
-              className={clsx(
-                'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
-                section === 'categories' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
-              )}
-            >
-              <Tags size={16} /> 카테고리
-            </button>
-            <button
-              type="button"
+            />
+            <SettingsNavButton
+              active={section === 'projects'}
+              icon={FolderKanban}
+              label="프로젝트"
               onClick={() => { setSection('projects'); setEditingCategoryId(null); }}
-              className={clsx(
-                'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
-                section === 'projects' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
-              )}
-            >
-              <FolderKanban size={16} /> 프로젝트
-            </button>
+            />
             {SHOW_DATA_SETTINGS && (
-              <button
-                type="button"
+              <SettingsNavButton
+                active={section === 'data'}
+                icon={Download}
+                label="데이터"
                 onClick={() => { setSection('data'); setEditingCategoryId(null); }}
-                className={clsx(
-                  'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
-                  section === 'data' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
-                )}
-              >
-                <Download size={16} /> 데이터
-              </button>
+              />
             )}
           </nav>
           <div className="flex min-w-0 flex-1 flex-col p-5">
@@ -290,7 +300,7 @@ export function CategoryModal({
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
-                <div className="mb-4 min-h-0 flex-1 overflow-y-scroll [scrollbar-gutter:stable]">
+                <div className="settings-scroll mb-4">
                   <DragDropContext onDragEnd={(result) => { void reorderCategories(categories, result); }}>
                     <Droppable droppableId="categories">
                       {(provided) => (

@@ -207,18 +207,18 @@ export function CalendarBoard({
       <div className="relative grid min-h-0 min-w-0 flex-1 grid-cols-7" key={cloneWeekStart.toString()}>
         <div
           className={clsx(
-            'absolute -left-16 top-1/2 -translate-y-1/2 z-10 flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-transform duration-200 max-[900px]:hidden',
+            'absolute -left-[var(--cal-week-gutter)] top-1/2 z-10 flex h-9 w-9 -translate-y-1/2 cursor-pointer items-center justify-center rounded-full border shadow-sm transition-transform duration-200 max-[900px]:hidden',
             isSelectedWeek ? 'bg-primary border-primary text-on-primary scale-110' : 'bg-surface border-line-strong text-fg-subtle hover:text-primary hover:bg-surface-muted hover:scale-110',
           )}
           onClick={() => onSelectWeek(cloneWeekStart)}
           title="주간 목표"
         >
           <Target size={18} />
-            {weeklyGoalCount > 0 && (
-              <span className="absolute -right-2 -top-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full border border-surface bg-surface-hover text-[10px] font-medium leading-none text-fg-muted">
-                <span className="translate-y-px">{weeklyGoalCount}</span>
-              </span>
-            )}
+          {weeklyGoalCount > 0 && (
+            <span className="absolute -right-2 -top-2 min-w-[18px] h-[18px] px-1 inline-flex items-center justify-center rounded-full border border-surface bg-surface-hover text-[10px] font-medium leading-none text-fg-muted">
+              <span className="translate-y-px">{weeklyGoalCount}</span>
+            </span>
+          )}
         </div>
         {days}
       </div>,
@@ -227,7 +227,7 @@ export function CalendarBoard({
   }
 
   return (
-    <div ref={rootRef} className="calendar-metrics relative flex h-full min-h-0 min-w-0 w-full max-w-[calc(760px+4rem)] flex-1 flex-col pl-16 max-[900px]:h-auto max-[900px]:max-w-[760px] max-[900px]:flex-none max-[900px]:pl-0">
+    <div ref={rootRef} className="calendar-metrics relative flex h-full min-h-0 min-w-0 w-full max-w-[calc(760px+var(--cal-week-gutter))] flex-1 flex-col pl-[var(--cal-week-gutter)] max-[900px]:h-auto max-[900px]:max-w-[760px] max-[900px]:flex-none max-[900px]:pl-0">
       <div className="relative mb-4 flex min-w-0 shrink-0 items-center justify-between pl-4">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold leading-tight">

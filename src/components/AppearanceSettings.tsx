@@ -6,14 +6,14 @@ import type { ThemePreference } from '../lib/theme';
 const OPTIONS: { value: ThemePreference; label: string; icon: typeof Sun }[] = [
   { value: 'light', label: '라이트 모드', icon: Sun },
   { value: 'dark', label: '다크 모드', icon: Moon },
-  { value: 'system', label: '시스템 설정 따르기', icon: Monitor },
+  { value: 'system', label: '시스템 설정', icon: Monitor },
 ];
 
 export function AppearanceSettings() {
   const [preference, setPreference] = useThemePreference();
 
   return (
-    <div className="min-h-0 flex-1">
+    <div className="settings-scroll">
       <section>
         <h4 className="px-1 text-xs font-medium text-fg-subtle">테마</h4>
         <div role="radiogroup" aria-label="테마" className="mt-2 grid grid-cols-3 gap-1 rounded-2xl bg-surface-muted p-1">

@@ -16,7 +16,7 @@ import {
 } from './lib/taskOps';
 import { usePlannerData } from './hooks/usePlannerData';
 import { CalendarBoard, type CalendarSelectionKind } from './components/CalendarBoard';
-import { CategoryModal } from './components/CategoryModal';
+import { CategoryModal, type SettingsSection } from './components/CategoryModal';
 import { ConfirmDailyDeleteDialog, ImageViewer, NoIncompleteNoticeDialog } from './components/DailyDialogs';
 import { DailyPanel } from './components/DailyPanel';
 import { DeadlineCreateModal, DeadlineEditModal } from './components/DeadlineModals';
@@ -50,7 +50,7 @@ function PlannerApp() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<'appearance' | 'categories' | 'projects' | 'data'>('categories');
+  const [settingsSection, setSettingsSection] = useState<SettingsSection>('categories');
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [taskFromSettings, setTaskFromSettings] = useState(false);
   const [isQuickCreateMenuOpen, setIsQuickCreateMenuOpen] = useState(false);

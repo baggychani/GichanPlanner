@@ -100,6 +100,14 @@ body {
   --cal-pad: 6px;
   --cal-gap: 6px;
   --cal-icon: 18px;
+  --cal-week-gutter: 3.5rem;
+}
+
+.settings-scroll {
+  min-height: 0;
+  flex: 1 1 0%;
+  overflow-y: scroll;
+  scrollbar-gutter: stable;
 }
 
 .calendar-deadline-icon {

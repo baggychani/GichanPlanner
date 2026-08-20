@@ -65,7 +65,7 @@ export function ProjectSettingsPanel({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="mb-4 min-h-0 flex-1 overflow-y-scroll [scrollbar-gutter:stable]">
+      <div className="settings-scroll mb-4">
         <div className="space-y-2">
           {projects.map(project => {
             const projectTasks = tasksByProject.get(project.id) ?? [];
