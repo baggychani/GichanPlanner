@@ -29,12 +29,14 @@ import { Overlay, hasEscapeOverlay } from './components/Overlay';
 import { RecoveryPasswordDialog } from './components/AuthScreen';
 import { AuthProvider, useAuth } from './hooks/useAuth';
 import { migrateLegacyTaskImages } from './lib/imageAttachment';
+import { runPlannerWrite } from './lib/supabaseSync';
 
 // Typography principle: small text is readable at normal weight. Reserve bold for page titles and primary actions only.
 // 빠른 만들기·일별 메뉴는 바깥을 눌러도 닫히지 않게 둔다. 달력 클릭과 메뉴 조작이 겹치지 않게 하려는 의도다.
 function PlannerApp() {
-  const { session, isPasswordRecovery, clearPasswordRecovery, isSyncing, syncError, retrySync } = useAuth();
+  const { session, isPasswordRecovery, clearPasswordRecovery, isSyncing, syncError, retrySync, accountReady } = useAuth();
   const isLoggedIn = Boolean(session);
+  const showPlanner = isLoggedIn && accountReady;
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
@@ -77,11 +79,11 @@ function PlannerApp() {
   const optimisticClearTimer = useRef<number | null>(null);
 
   const planner = usePlannerData(optimisticTasks);
-  const tasks = isLoggedIn ? planner.tasks : [];
-  const categories = isLoggedIn ? planner.categories : [];
-  const goals = isLoggedIn ? planner.goals : [];
-  const deadlines = isLoggedIn ? planner.deadlines : [];
-  const calendarTaskCountByDate = isLoggedIn ? planner.calendarTaskCountByDate : {};
+  const tasks = showPlanner ? planner.tasks : [];
+  const categories = showPlanner ? planner.categories : [];
+  const goals = showPlanner ? planner.goals : [];
+  const deadlines = showPlanner ? planner.deadlines : [];
+  const calendarTaskCountByDate = showPlanner ? planner.calendarTaskCountByDate : {};
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const selectedDateLabel = format(selectedDate, 'yyyy-MM-dd EEEE', { locale: ko });
   const selectedDateIncompleteCount = tasks.filter(task => task.target_date === selectedDateString && !task.is_completed).length;
@@ -170,12 +172,12 @@ function PlannerApp() {
       return;
     }
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    await db.tasks.add({
+    await runPlannerWrite(() => db.tasks.add({
       ...createBlankTask(dateStr),
       title: quickAddTitle.trim(),
       domain_id: categoryId,
       order: nextOrderFor(tasks, dateStr, categoryId),
-    });
+    }));
     setQuickAddTitle('');
     if (closeAfterSave) setQuickAddCategoryId(null);
   };
@@ -206,7 +208,7 @@ function PlannerApp() {
   const saveDeadline = async () => {
     if (!deadlineTitle.trim()) return;
     const now = new Date().toISOString();
-    await db.deadlines.add({
+    await runPlannerWrite(() => db.deadlines.add({
       id: crypto.randomUUID(),
       version: 1,
       created_at: now,
@@ -217,9 +219,10 @@ function PlannerApp() {
       due_date: deadlineDueDate,
       due_time: deadlineDueTime,
       reminder_days: deadlineReminderDays,
-    });
+    }));
     setDeadlineTitle('');
     setDeadlineMemo('');
+    setDeadlineDueDate(format(selectedDate, 'yyyy-MM-dd'));
     setDeadlineDueTime(null);
     setDeadlineReminderDays(null);
     setIsDeadlineModalOpen(false);
@@ -230,7 +233,7 @@ function PlannerApp() {
     if (!editingTask?.title.trim()) return;
     const now = new Date().toISOString();
     if (isCreatingTask) {
-      await db.tasks.add({
+      await runPlannerWrite(() => db.tasks.add({
         ...editingTask,
         title: editingTask.title.trim(),
         memo: editingTask.memo.trim(),
@@ -238,18 +241,18 @@ function PlannerApp() {
         created_at: now,
         updated_at: now,
         version: 1,
-      });
+      }));
       closeTaskEditor();
       return;
     }
     const { id, ...changes } = editingTask;
-    await db.tasks.update(id, {
+    await runPlannerWrite(() => db.tasks.update(id, {
       ...changes,
       title: editingTask.title.trim(),
       memo: editingTask.memo.trim(),
       updated_at: now,
       version: editingTask.version + 1,
-    });
+    }));
     setEditingTask(null);
   };
 
@@ -261,17 +264,12 @@ function PlannerApp() {
       setIsSelectingDeadlineDate(false);
       setIsDeadlineModalOpen(true);
     } else if (selectingDateForDeadline) {
-      const deadline = await db.deadlines.get(selectingDateForDeadline);
-      if (deadline && deadline.deleted_at === null) {
-        const updatedDeadline = {
-          ...deadline,
+      if (editingDeadline && editingDeadline.id === selectingDateForDeadline) {
+        setEditingDeadline({
+          ...editingDeadline,
           due_date: destinationDate,
-          due_time: deadlineOnDate(deadline.due_time, destinationDate),
-          updated_at: new Date().toISOString(),
-          version: deadline.version + 1,
-        };
-        await db.deadlines.put(updatedDeadline);
-        setEditingDeadline(updatedDeadline);
+          due_time: deadlineOnDate(editingDeadline.due_time, destinationDate),
+        });
       }
       setSelectingDateForDeadline(null);
     } else if (dateSelectionMode === 'MOVE_INCOMPLETE') {
@@ -281,7 +279,7 @@ function PlannerApp() {
       await copyAllTasksToDate(selectedDateString, destinationDate);
       setDateSelectionMode(null);
     } else if (selectingDateForTask) {
-      if (isCreatingTask && editingTask && editingTask.id === selectingDateForTask) {
+      if (editingTask && editingTask.id === selectingDateForTask) {
         if (editingTask.target_date !== destinationDate) {
           setEditingTask({
             ...editingTask,
@@ -310,7 +308,7 @@ function PlannerApp() {
 
   return (
     <div className="min-h-screen flex justify-center px-6 py-7 gap-10 bg-bgPrimary pl-24 max-[1560px]:pl-6 max-[1560px]:gap-6 max-[1200px]:gap-3 max-[1200px]:px-3 max-[1200px]:py-4 max-[900px]:flex-col max-[900px]:items-center max-[900px]:gap-5 max-[900px]:px-4 max-[900px]:py-5">
-      {isLoggedIn && (isSyncing || syncError) && (
+      {isLoggedIn && (!accountReady || isSyncing || syncError) && (
         <div className="fixed left-1/2 top-4 z-[90] -translate-x-1/2 rounded-full border border-line bg-surface px-4 py-2 text-sm shadow-lg">
           {syncError ? (
             <span className="flex items-center gap-3">
@@ -480,11 +478,11 @@ function PlannerApp() {
         />
       )}
 
-      {editingDeadline && (
+      {editingDeadline && !selectingDateForDeadline && (
         <DeadlineEditModal
           deadline={editingDeadline}
           onChange={setEditingDeadline}
-          onPickDate={() => { setIsTimePickerOpen(false); setSelectingDateForDeadline(editingDeadline.id); setEditingDeadline(null); }}
+          onPickDate={() => { setIsTimePickerOpen(false); setSelectingDateForDeadline(editingDeadline.id); }}
           onOpenTimePicker={() => openTimePicker('deadline')}
           onClose={() => { setIsTimePickerOpen(false); setEditingDeadline(null); }}
         />
@@ -500,12 +498,11 @@ function PlannerApp() {
           onPickDate={() => {
             setIsTimePickerOpen(false);
             setSelectingDateForTask(editingTask.id);
-            if (!isCreatingTask) setEditingTask(null);
           }}
           onOpenTimePicker={() => openTimePicker('task')}
           onDelete={async () => {
             const now = new Date().toISOString();
-            await db.tasks.update(editingTask.id, { deleted_at: now, updated_at: now, version: editingTask.version + 1 });
+            await runPlannerWrite(() => db.tasks.update(editingTask.id, { deleted_at: now, updated_at: now, version: editingTask.version + 1 }));
             setEditingTask(null);
           }}
           onSave={() => { void saveEditingTask(); }}

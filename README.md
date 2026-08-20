@@ -31,7 +31,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 npm run dev
 ```
 
-처음 쓰는 Supabase 프로젝트라면 `supabase/migrations/` SQL을 대시보드에서 실행합니다.
+처음 쓰는 Supabase 프로젝트라면 `supabase/migrations/` SQL을 대시보드에서 실행합니다. 이미 쓰는 프로젝트도 `20260820030000_profile_insert.sql`까지 적용되어 있어야 닉네임이 계정에 저장됩니다.
 
 ```bash
 npm run build

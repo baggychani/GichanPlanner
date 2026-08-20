@@ -3,6 +3,7 @@ import { Check, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { db, type Domain } from '../lib/db';
+import { runPlannerWrite } from '../lib/supabaseSync';
 import { emojiCategories, flagNameByEmoji } from '../lib/emojis';
 import { deleteCategory, reorderCategories } from '../lib/taskOps';
 import { EmojiIcon } from './EmojiIcon';
@@ -94,13 +95,13 @@ export function CategoryModal({
                                   onClick={async () => {
                                     if (!editingCategoryName.trim()) return;
                                     const now = new Date().toISOString();
-                                    await db.domains.put({
+                                    await runPlannerWrite(() => db.domains.put({
                                       ...category,
                                       name: editingCategoryName.trim(),
                                       icon: editingCategoryIcon,
                                       updated_at: now,
                                       version: category.version + 1,
-                                    });
+                                    }));
                                     setEditingCategoryId(null);
                                     setShowEmojiPicker(false);
                                   }}
@@ -166,7 +167,7 @@ export function CategoryModal({
                 const name = (new FormData(form).get('name') as string).trim();
                 if (!name) return;
                 const now = new Date().toISOString();
-                await db.domains.add({
+                await runPlannerWrite(() => db.domains.add({
                   id: crypto.randomUUID(),
                   version: 1,
                   created_at: now,
@@ -177,7 +178,7 @@ export function CategoryModal({
                   color: '#666666',
                   order: categories.length,
                   is_archived: false,
-                });
+                }));
                 form.reset();
                 setShowEmojiPicker(false);
               }}

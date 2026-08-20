@@ -3,6 +3,7 @@ import { Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { db, type Domain, type Task } from '../lib/db';
+import { runPlannerWrite } from '../lib/supabaseSync';
 import { ClearMark } from './ClearMark';
 import { CountBubble } from './CountBubble';
 import { EmojiIcon } from './EmojiIcon';
@@ -99,7 +100,7 @@ export function DailyPanel({
                       isDropped={justDroppedTaskId === task.id}
                       isGrabbing={draggedTaskId === task.id}
                       onToggleComplete={() => {
-                        void db.tasks.update(task.id, { is_completed: !task.is_completed, updated_at: new Date().toISOString(), version: task.version + 1 });
+                        void runPlannerWrite(() => db.tasks.update(task.id, { is_completed: !task.is_completed, updated_at: new Date().toISOString(), version: task.version + 1 }));
                       }}
                       onOpen={() => onOpenTask(task)}
                       onViewImage={onViewImage}

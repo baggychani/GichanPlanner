@@ -33,6 +33,23 @@ function enqueue(work: () => Promise<void>) {
   return run;
 }
 
+export async function waitForPlannerCloud() {
+  await Promise.resolve();
+  await syncChain;
+  if (lastError) throw lastError;
+}
+
+export async function runPlannerWrite<T>(op: () => Promise<T>): Promise<T> {
+  try {
+    const result = await op();
+    await waitForPlannerCloud();
+    return result;
+  } catch (error) {
+    notify(error);
+    throw error;
+  }
+}
+
 function whenCommitted(trans: Transaction, work: () => Promise<void>) {
   trans.on('complete', () => { void enqueue(work); });
 }
@@ -192,26 +209,30 @@ function mergeByUpdatedAt<T extends { id: string; updated_at: string }>(local: T
   return [...merged.values()];
 }
 
-async function pushTask(task: Task, ownerId: string) {
+async function pushTask(task: Task, ownerId: string, mode: 'user' | 'bulk') {
   const row = taskRow(task, ownerId, null);
   if (task.image_blob) {
     const extension = task.image_blob.type === 'image/png' ? 'png' : task.image_blob.type === 'image/jpeg' ? 'jpg' : 'webp';
     row.image_path = await uploadBlob('task-images', `${ownerId}/${task.id}.${extension}`, task.image_blob);
+  } else if (mode === 'user') {
+    row.image_path = null;
   } else {
     delete (row as { image_path?: string | null }).image_path;
   }
   await upsertRows('tasks', [row]);
 }
 
-async function pushProfile(profile: Profile, ownerId: string) {
+async function pushProfile(profile: Profile, ownerId: string, mode: 'user' | 'bulk') {
   if (!supabase) return;
   const payload: {
+    id: string;
     nickname: string;
     updated_at: string;
     birthday_month: number | null;
     birthday_day: number | null;
-    avatar_path?: string;
+    avatar_path?: string | null;
   } = {
+    id: ownerId,
     nickname: profile.nickname.slice(0, 40) || '사용자',
     birthday_month: profile.birthday_month,
     birthday_day: profile.birthday_day,
@@ -219,22 +240,13 @@ async function pushProfile(profile: Profile, ownerId: string) {
   };
   if (profile.avatar) {
     const extension = profile.avatar.type === 'image/png' ? 'png' : profile.avatar.type === 'image/jpeg' ? 'jpg' : 'webp';
-    const avatarPath = await uploadBlob('profile-images', `${ownerId}/avatar.${extension}`, profile.avatar);
-    if (avatarPath) payload.avatar_path = avatarPath;
+    payload.avatar_path = await uploadBlob('profile-images', `${ownerId}/avatar.${extension}`, profile.avatar);
+  } else if (mode === 'user') {
+    payload.avatar_path = null;
   }
-  const { error } = await supabase.from('profiles').update(payload).eq('id', ownerId);
-  if (error) {
-    const { birthday_month: _month, birthday_day: _day, ...withoutBirthday } = payload;
-    const { error: retryError } = await supabase.from('profiles').update(withoutBirthday).eq('id', ownerId);
-    if (retryError) throw retryError;
-  }
-}
-
-export async function persistProfileToCloud() {
-  const ownerId = await currentUserId();
-  const profile = await db.profiles.get('#profile');
-  if (!ownerId || !profile) return;
-  await pushProfile(profile, ownerId);
+  const { data, error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id').maybeSingle();
+  if (error) throw error;
+  if (!data) throw new Error('프로필을 계정에 저장하지 못했습니다.');
 }
 
 async function pushAllLocal(ownerId: string) {
@@ -242,18 +254,13 @@ async function pushAllLocal(ownerId: string) {
     db.tasks.toArray(), db.domains.toArray(), db.goals.toArray(), db.deadlines.toArray(),
     db.schedules.toArray(), db.routines.toArray(), db.profiles.get('#profile'),
   ]);
-  for (const task of tasks) await pushTask(task, ownerId);
+  for (const task of tasks) await pushTask(task, ownerId, 'bulk');
   await upsertRows('domains', domains.map(domain => domainRow(domain, ownerId)));
   await upsertRows('goals', goals.map(goal => goalRow(goal, ownerId)));
-  const deadlinePayload = deadlines.map(deadline => deadlineRow(deadline, ownerId));
-  try {
-    await upsertRows('deadlines', deadlinePayload);
-  } catch {
-    await upsertRows('deadlines', deadlinePayload.map(({ due_time: _dueTime, ...rest }) => rest));
-  }
+  await upsertRows('deadlines', deadlines.map(deadline => deadlineRow(deadline, ownerId)));
   await upsertRows('schedules', schedules.map(schedule => scheduleRow(schedule, ownerId)));
   await upsertRows('routines', routines.map(routine => routineRow(routine, ownerId)));
-  if (profile) await pushProfile(profile, ownerId);
+  if (profile) await pushProfile(profile, ownerId, 'bulk');
 }
 
 async function pullRemote(ownerId: string, email: string | null) {
@@ -281,7 +288,11 @@ async function pullRemote(ownerId: string, email: string | null) {
     const local = localById.get(id);
     const remote = remoteTasks.find(row => row.id === id);
     if (remote && (!local || Date.parse(remote.updated_at) > Date.parse(local.updated_at))) {
-      mergedTasks.push(taskFromRemote(remote, await downloadBlob('task-images', remote.image_path) ?? local?.image_blob ?? null));
+      const downloaded = remote.image_path ? await downloadBlob('task-images', remote.image_path) : null;
+      const imageBlob = remote.image_path
+        ? (downloaded ?? local?.image_blob ?? null)
+        : null;
+      mergedTasks.push(taskFromRemote(remote, imageBlob));
     } else if (local) {
       mergedTasks.push(local);
     }
@@ -307,7 +318,9 @@ async function pullRemote(ownerId: string, email: string | null) {
     ? {
       id: '#profile',
       nickname: remoteProfile.nickname,
-      avatar: await downloadBlob('profile-images', remoteProfile.avatar_path),
+      avatar: remoteProfile.avatar_path
+        ? (await downloadBlob('profile-images', remoteProfile.avatar_path) ?? localProfile?.avatar ?? null)
+        : null,
       legacy_dexie_user_id: localProfile?.legacy_dexie_user_id ?? null,
       email,
       birthday_month: remoteProfile.birthday_month ?? null,
@@ -355,13 +368,29 @@ async function clearLocalPlanner() {
   }
 }
 
+export function localAccountNeedsReset(userId: string) {
+  const storedOwner = localStorage.getItem(OWNER_KEY);
+  return Boolean(storedOwner && storedOwner !== userId);
+}
+
+export async function prepareLocalAccount(userId: string) {
+  const storedOwner = localStorage.getItem(OWNER_KEY);
+  if (storedOwner && storedOwner !== userId) await clearLocalPlanner();
+  localStorage.setItem(OWNER_KEY, userId);
+}
+
+export async function signOutPlanner() {
+  try { await waitForPlannerCloud(); } catch { /* keep signing out even if the last push failed */ }
+  if (supabase) await supabase.auth.signOut();
+  await clearLocalPlanner();
+  localStorage.removeItem(OWNER_KEY);
+}
+
 async function syncNow() {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  const storedOwner = localStorage.getItem(OWNER_KEY);
-  if (storedOwner && storedOwner !== user.id) await clearLocalPlanner();
-  localStorage.setItem(OWNER_KEY, user.id);
+  await prepareLocalAccount(user.id);
   await pullRemote(user.id, user.email ?? null);
   await pushAllLocal(user.id);
 }
@@ -376,14 +405,14 @@ export function installPlannerSync() {
 
   db.tasks.hook('creating', (_key, obj, trans) => {
     if (applyingRemote) return;
-    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushTask(obj, ownerId); });
+    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushTask(obj, ownerId, 'user'); });
   });
   db.tasks.hook('updating', (_mods, primKey, _obj, trans) => {
     if (applyingRemote) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.tasks.get(primKey);
-      if (ownerId && row) await pushTask(row, ownerId);
+      if (ownerId && row) await pushTask(row, ownerId, 'user');
     });
   });
   db.domains.hook('creating', (_key, obj, trans) => {
@@ -415,8 +444,7 @@ export function installPlannerSync() {
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       if (!ownerId) return;
-      try { await upsertRows('deadlines', [deadlineRow(obj, ownerId)]); }
-      catch { const { due_time: _dueTime, ...rest } = deadlineRow(obj, ownerId); await upsertRows('deadlines', [rest]); }
+      await upsertRows('deadlines', [deadlineRow(obj, ownerId)]);
     });
   });
   db.deadlines.hook('updating', (_mods, primKey, _obj, trans) => {
@@ -425,8 +453,7 @@ export function installPlannerSync() {
       const ownerId = await currentUserId();
       const row = await db.deadlines.get(primKey);
       if (!ownerId || !row) return;
-      try { await upsertRows('deadlines', [deadlineRow(row, ownerId)]); }
-      catch { const { due_time: _dueTime, ...rest } = deadlineRow(row, ownerId); await upsertRows('deadlines', [rest]); }
+      await upsertRows('deadlines', [deadlineRow(row, ownerId)]);
     });
   });
   db.schedules.hook('creating', (_key, obj, trans) => {
@@ -455,14 +482,14 @@ export function installPlannerSync() {
   });
   db.profiles.hook('creating', (_key, obj, trans) => {
     if (applyingRemote) return;
-    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushProfile(obj, ownerId); });
+    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushProfile(obj, ownerId, 'user'); });
   });
   db.profiles.hook('updating', (_mods, primKey, _obj, trans) => {
     if (applyingRemote) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.profiles.get(primKey);
-      if (ownerId && row) await pushProfile(row, ownerId);
+      if (ownerId && row) await pushProfile(row, ownerId, 'user');
     });
   });
 }

@@ -1,3 +1,6 @@
+import { db } from './db';
+import { runPlannerWrite } from './supabaseSync';
+
 const MAX_IMAGE_EDGE = 1600;
 const IMAGE_QUALITY = 0.84;
 
@@ -30,12 +33,13 @@ export async function migrateLegacyTaskImages() {
   const legacyTasks = (await db.tasks.toArray()).filter(task => !task.image_blob && task.image_data);
   if (legacyTasks.length === 0) return;
   const now = new Date().toISOString();
-  await db.tasks.bulkPut(await Promise.all(legacyTasks.map(async task => ({
-    ...task,
-    image_blob: await dataUrlToBlob(task.image_data!),
-    image_data: null,
-    updated_at: now,
-    version: task.version + 1,
-  }))));
+  await runPlannerWrite(async () => {
+    await db.tasks.bulkPut(await Promise.all(legacyTasks.map(async task => ({
+      ...task,
+      image_blob: await dataUrlToBlob(task.image_data!),
+      image_data: null,
+      updated_at: now,
+      version: task.version + 1,
+    }))));
+  });
 }
-import { db } from './db';

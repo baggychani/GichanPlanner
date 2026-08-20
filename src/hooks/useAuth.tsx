@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { subscribePlannerSync, syncPlannerWithCloud } from '../lib/supabaseSync';
+import { localAccountNeedsReset, prepareLocalAccount, subscribePlannerSync, syncPlannerWithCloud } from '../lib/supabaseSync';
 import { authErrorMessage } from '../components/authUi';
 
 type AuthValue = {
   session: Session | null;
   isLoading: boolean;
+  accountReady: boolean;
   isSyncing: boolean;
   syncError: string | null;
   retrySync: () => void;
@@ -17,6 +18,7 @@ type AuthValue = {
 const AuthContext = createContext<AuthValue>({
   session: null,
   isLoading: Boolean(supabase),
+  accountReady: true,
   isSyncing: false,
   syncError: null,
   retrySync: () => {},
@@ -27,6 +29,7 @@ const AuthContext = createContext<AuthValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
+  const [accountReady, setAccountReady] = useState(true);
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
@@ -54,13 +57,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (!session) {
+      setAccountReady(true);
       setIsSyncing(false);
       return;
     }
     let cancelled = false;
+    if (localAccountNeedsReset(session.user.id)) setAccountReady(false);
+    else setAccountReady(true);
+
     const run = () => {
       setIsSyncing(true);
-      void syncPlannerWithCloud()
+      void prepareLocalAccount(session.user.id)
+        .then(() => {
+          if (!cancelled) setAccountReady(true);
+          return syncPlannerWithCloud();
+        })
         .catch(() => {})
         .finally(() => { if (!cancelled) setIsSyncing(false); });
     };
@@ -83,6 +94,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         session,
         isLoading,
+        accountReady,
         isSyncing,
         syncError,
         retrySync: () => { void syncPlannerWithCloud().catch(() => {}); },

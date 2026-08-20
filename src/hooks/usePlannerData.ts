@@ -1,12 +1,10 @@
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Task } from '../lib/db';
 import { countVisibleTasksByDate } from '../lib/taskCounts';
 import { repairOrphanedTasks } from '../lib/taskOps';
 
 export function usePlannerData(optimisticTasks: Task[] | null) {
-  const hasRepairedOrphanedTasks = useRef(false);
-
   const persistedTasks = useLiveQuery(async () => {
     const list = await db.tasks.toArray();
     return list
@@ -26,10 +24,9 @@ export function usePlannerData(optimisticTasks: Task[] | null) {
   const deadlines = useLiveQuery(() => db.deadlines.filter(deadline => deadline.deleted_at === null).toArray()) || [];
 
   useEffect(() => {
-    if (categoryQuery === undefined || hasRepairedOrphanedTasks.current) return;
-    hasRepairedOrphanedTasks.current = true;
+    if (categoryQuery === undefined) return;
     void repairOrphanedTasks(categoryQuery.map(category => category.id));
-  }, [categoryQuery]);
+  }, [categoryQuery, persistedTasks]);
 
   return { tasks, categories, goals, deadlines, calendarTaskCountByDate };
 }

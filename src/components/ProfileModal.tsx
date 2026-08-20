@@ -7,7 +7,7 @@ import { Overlay } from './Overlay';
 import { db } from '../lib/db';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
-import { persistProfileToCloud } from '../lib/supabaseSync';
+import { runPlannerWrite, signOutPlanner } from '../lib/supabaseSync';
 import { AuthPanel } from './AuthScreen';
 import { BirthdayPickerModal } from './BirthdayPickerModal';
 import { authErrorMessage, authInputClass, PasswordField } from './authUi';
@@ -67,14 +67,14 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
       if (!existing) return;
       const email = accountEmail || existing.email || null;
       if (existing.email === email) return;
-      return db.profiles.put({ ...existing, email });
+      return runPlannerWrite(() => db.profiles.put({ ...existing, email }));
     });
   }, [accountEmail, openedLoggedIn]);
 
   const saveProfile = async (avatar = profile?.avatar ?? null) => {
     if (!nickname.trim()) return;
     const now = new Date().toISOString();
-    await db.profiles.put({
+    await runPlannerWrite(() => db.profiles.put({
       id: '#profile',
       nickname: nickname.trim(),
       avatar,
@@ -84,8 +84,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
       birthday_day: birthdayDay,
       created_at: profile?.created_at ?? now,
       updated_at: now,
-    });
-    await persistProfileToCloud();
+    }));
   };
 
   const submitPasswordChange = async (event: React.FormEvent) => {
@@ -117,7 +116,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   };
 
   const logout = async () => {
-    if (supabase) await supabase.auth.signOut();
+    await signOutPlanner();
     onClose();
   };
 

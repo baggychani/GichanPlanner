@@ -3,6 +3,7 @@ import { ko } from 'date-fns/locale';
 import { AlertCircle, Calendar as CalendarIcon, X } from 'lucide-react';
 import clsx from 'clsx';
 import { db, type Deadline } from '../lib/db';
+import { runPlannerWrite } from '../lib/supabaseSync';
 import { formatScheduledTime, parseDay } from '../lib/datetime';
 import { Overlay } from './Overlay';
 
@@ -160,7 +161,7 @@ export function DeadlineEditModal({
           <button
             onClick={async () => {
               const now = new Date().toISOString();
-              await db.deadlines.update(deadline.id, { deleted_at: now, updated_at: now, version: deadline.version + 1 });
+              await runPlannerWrite(() => db.deadlines.update(deadline.id, { deleted_at: now, updated_at: now, version: deadline.version + 1 }));
               onClose();
             }}
             className="rounded-xl bg-red-50 px-4 py-2.5 text-sm font-medium text-red-500 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/70"
@@ -171,7 +172,7 @@ export function DeadlineEditModal({
             onClick={async () => {
               if (!deadline.title.trim()) return;
               const now = new Date().toISOString();
-              await db.deadlines.put({ ...deadline, title: deadline.title.trim(), memo: deadline.memo.trim(), updated_at: now, version: deadline.version + 1 });
+              await runPlannerWrite(() => db.deadlines.put({ ...deadline, title: deadline.title.trim(), memo: deadline.memo.trim(), updated_at: now, version: deadline.version + 1 }));
               onClose();
             }}
             className="rounded-xl bg-ink text-on-ink px-4 py-2.5 text-sm font-medium hover:opacity-90"
