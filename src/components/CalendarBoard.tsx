@@ -242,7 +242,7 @@ export function CalendarBoard({
           </div>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="relative z-20 flex items-center gap-3 overflow-visible">
           <button onClick={() => onSelectWeek(startOfWeek(selectedDate, { weekStartsOn: 1 }))} aria-label="주간 목표" title="주간 목표" className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
             <Target size={22} />
           </button>
@@ -285,8 +285,8 @@ export function CalendarBoard({
             <Settings size={22} />
           </button>
           <ThemeToggle className="max-[560px]:hidden" />
-          <div className="relative">
-          <button
+          <div className="relative z-40 overflow-visible">
+            <button
             onClick={onOpenProfile}
             aria-label={isLoggedIn ? '프로필 및 계정' : '로그인'}
             title={isLoggedIn ? '프로필 및 계정' : '로그인'}
@@ -302,15 +302,24 @@ export function CalendarBoard({
             ) : (
               <UserRound size={21} />
             )}
-            {!isLoggedIn && (
-              <span className="absolute left-1/2 top-full z-40 mt-2.5 -translate-x-1/2">
-                <span className="absolute -top-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-l border-t border-line bg-surface" />
-                <span className="relative block whitespace-nowrap rounded-xl border border-line bg-surface px-3 py-1.5 text-xs font-medium text-fg shadow-sm">
-                  로그인해주세요
-                </span>
-              </span>
-            )}
           </button>
+          {!isLoggedIn && (
+            <button
+              type="button"
+              onClick={onOpenProfile}
+              aria-hidden
+              tabIndex={-1}
+              className="absolute left-1/2 top-full z-50 mt-0.5 flex -translate-x-1/2 flex-col items-center"
+            >
+              <svg width="16" height="8" viewBox="0 0 16 8" className="-mb-px block" aria-hidden>
+                <polygon points="8,1 1,8 15,8" fill="var(--color-surface)" stroke="var(--color-line-strong)" strokeLinejoin="round" />
+                <rect x="0" y="7" width="16" height="2" fill="var(--color-surface)" />
+              </svg>
+              <span className="whitespace-nowrap rounded-xl border border-line-strong bg-surface px-2.5 py-1 text-xs font-semibold text-fg shadow-sm">
+                제발 로그인 해주세요!
+              </span>
+            </button>
+          )}
           </div>
           <div className="w-px h-6 bg-line-strong mx-1" />
           <button onClick={onPrevMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
