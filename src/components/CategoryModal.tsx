@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Check, Download, FolderKanban, GripVertical, Pencil, Plus, Tags, Trash2, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Check, Download, FolderKanban, GripVertical, Pencil, Plus, Tags, Trash2, Upload, X } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { db, type Deadline, type Domain, type Project, type Task } from '../lib/db';
@@ -9,7 +9,9 @@ import { EmojiIcon } from './EmojiIcon';
 import { EmojiPickerOverlay } from './EmojiPickerOverlay';
 import { Overlay } from './Overlay';
 import { ProjectSettingsPanel } from './ProjectSettingsPanel';
-import { downloadPortablePlannerExport } from '../lib/portablePlannerExport';
+import { downloadPortablePlannerExport, parsePortablePlannerExport, type PortablePlannerExport } from '../lib/portablePlannerExport';
+import { importPortablePlannerExport } from '../lib/supabasePlannerImport';
+import { authErrorMessage } from './authUi';
 
 type SettingsSection = 'categories' | 'projects' | 'data';
 
@@ -41,7 +43,10 @@ export function CategoryModal({
   const [newCategoryEmoji, setNewCategoryEmoji] = useState('📁');
   const [iconPicker, setIconPicker] = useState<{ onSelect: (emoji: string) => void } | null>(null);
   const [isDownloadingBackup, setIsDownloadingBackup] = useState(false);
+  const [isRestoringBackup, setIsRestoringBackup] = useState(false);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
+  const [pendingBackup, setPendingBackup] = useState<{ fileName: string; archive: PortablePlannerExport } | null>(null);
+  const backupFileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (!backupStatus) return;
@@ -55,7 +60,8 @@ export function CategoryModal({
     <>
       <Overlay
         onEscape={() => {
-          if (editingCategoryId) setEditingCategoryId(null);
+          if (pendingBackup) { if (!isRestoringBackup) setPendingBackup(null); }
+          else if (editingCategoryId) setEditingCategoryId(null);
           else onClose();
         }}
       >
@@ -114,14 +120,30 @@ export function CategoryModal({
                 <p className="text-sm leading-6 text-fg-muted">
                   이 기기에 있는 할 일, 데드라인, 프로젝트, 사진을 JSON 파일로 저장합니다. 사이트 기능이 바뀌어도 이 파일은 그대로입니다.
                 </p>
+                <input
+                  ref={backupFileInputRef}
+                  type="file"
+                  accept="application/json,.json"
+                  className="sr-only"
+                  onChange={event => {
+                    const file = event.target.files?.[0];
+                    event.currentTarget.value = '';
+                    if (!file) return;
+                    void file.text().then(text => {
+                      setPendingBackup({ fileName: file.name, archive: parsePortablePlannerExport(text) });
+                    }).catch(caught => {
+                      setBackupStatus(authErrorMessage(caught));
+                    });
+                  }}
+                />
                 <button
                   type="button"
-                  disabled={isDownloadingBackup}
+                  disabled={isDownloadingBackup || isRestoringBackup}
                   onClick={() => {
                     setIsDownloadingBackup(true);
                     void downloadPortablePlannerExport()
                       .then(() => setBackupStatus('데이터를 받았습니다.'))
-                      .catch(() => setBackupStatus('데이터를 받지 못했습니다.'))
+                      .catch(caught => setBackupStatus(authErrorMessage(caught)))
                       .finally(() => setIsDownloadingBackup(false));
                   }}
                   className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-3 text-sm font-semibold text-on-ink disabled:opacity-40"
@@ -129,6 +151,18 @@ export function CategoryModal({
                   <Download size={16} />
                   {isDownloadingBackup ? '받는 중…' : '데이터 받기'}
                 </button>
+                <button
+                  type="button"
+                  disabled={isDownloadingBackup || isRestoringBackup}
+                  onClick={() => backupFileInputRef.current?.click()}
+                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface py-3 text-sm font-semibold text-fg hover:bg-surface-hover disabled:opacity-40"
+                >
+                  <Upload size={16} />
+                  데이터 넣기
+                </button>
+                <p className="mt-3 text-xs leading-5 text-fg-subtle">
+                  넣을 때는 같은 항목은 더 최근 것만 남기고, 파일에 없는 할 일은 지우지 않습니다.
+                </p>
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
@@ -298,6 +332,48 @@ export function CategoryModal({
             setIconPicker(null);
           }}
         />
+      )}
+      {pendingBackup && (
+        <Overlay zClassName="z-[80]" onEscape={() => { if (!isRestoringBackup) setPendingBackup(null); }}>
+          <div className="w-full max-w-sm rounded-3xl bg-surface p-6 shadow-xl">
+            <h3 className="mb-2 text-lg font-medium text-fg">이 파일을 넣을까요?</h3>
+            <p className="mb-2 truncate text-sm font-medium text-fg">{pendingBackup.fileName}</p>
+            <p className="mb-6 text-sm text-fg-muted">같은 항목은 더 최근 것만 남깁니다. 파일에 없는 할 일은 지우지 않습니다.</p>
+            <div className="flex justify-end gap-2">
+              <button
+                type="button"
+                disabled={isRestoringBackup}
+                onClick={() => setPendingBackup(null)}
+                className="rounded-xl px-4 py-2.5 text-sm font-medium text-fg-muted hover:bg-surface-hover disabled:opacity-40"
+              >
+                취소
+              </button>
+              <button
+                type="button"
+                disabled={isRestoringBackup}
+                onClick={() => {
+                  const archive = pendingBackup.archive;
+                  setIsRestoringBackup(true);
+                  void importPortablePlannerExport(archive)
+                    .then(report => {
+                      const written = report.imported.tasks + report.imported.schedules + report.imported.routines
+                        + report.imported.domains + report.imported.goals + report.imported.deadlines + report.imported.projects;
+                      setPendingBackup(null);
+                      setBackupStatus(written === 0 ? '넣을 더 새로운 항목이 없습니다.' : '데이터를 넣었습니다.');
+                    })
+                    .catch(caught => {
+                      setPendingBackup(null);
+                      setBackupStatus(authErrorMessage(caught));
+                    })
+                    .finally(() => setIsRestoringBackup(false));
+                }}
+                className="rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-on-ink hover:opacity-90 disabled:opacity-40"
+              >
+                {isRestoringBackup ? '넣는 중…' : '넣기'}
+              </button>
+            </div>
+          </div>
+        </Overlay>
       )}
     </>
   );

@@ -72,6 +72,17 @@ export function validatePortablePlannerExport(value: unknown): value is Portable
     && Array.isArray(candidate.tasks) && Array.isArray(candidate.attachments);
 }
 
+export function parsePortablePlannerExport(text: string): PortablePlannerExport {
+  let value: unknown;
+  try {
+    value = JSON.parse(text) as unknown;
+  } catch {
+    throw new Error('이 파일은 플래너 백업이 아닙니다.');
+  }
+  if (!validatePortablePlannerExport(value)) throw new Error('이 파일은 플래너 백업이 아닙니다.');
+  return value;
+}
+
 export async function downloadPortablePlannerExport() {
   const archive = await createPortablePlannerExport();
   const file = new Blob([JSON.stringify(archive)], { type: 'application/json' });
