@@ -3,8 +3,9 @@ import { ko } from 'date-fns/locale';
 import { ArrowRight, CalendarDays, CircleX, Copy, MoreHorizontal, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
-import type { Deadline } from '../lib/db';
+import type { Deadline, Project } from '../lib/db';
 import { formatScheduledTime, parseDay } from '../lib/datetime';
+import { EmojiIcon } from './EmojiIcon';
 
 type DeadlineNotice = { deadline: Deadline; remainingDays: number };
 
@@ -14,6 +15,7 @@ type PlannerPanelProps = {
   weeklyGoalWeekStart: Date | null;
   isDailyMenuOpen: boolean;
   deadlineNotices: DeadlineNotice[];
+  projects: Project[];
   children: ReactNode;
   onToggleDailyMenu: () => void;
   onMoveIncompleteTomorrow: () => void;
@@ -22,6 +24,7 @@ type PlannerPanelProps = {
   onCopyAll: () => void;
   onDeleteAll: () => void;
   onOpenDeadline: (deadline: Deadline) => void;
+  onOpenProject: (project: Project) => void;
 };
 
 export function PlannerPanel({
@@ -30,6 +33,7 @@ export function PlannerPanel({
   weeklyGoalWeekStart,
   isDailyMenuOpen,
   deadlineNotices,
+  projects,
   children,
   onToggleDailyMenu,
   onMoveIncompleteTomorrow,
@@ -38,6 +42,7 @@ export function PlannerPanel({
   onCopyAll,
   onDeleteAll,
   onOpenDeadline,
+  onOpenProject,
 }: PlannerPanelProps) {
   return (
     <div className="flex h-full min-h-0 w-[650px] max-w-[min(650px,46%)] min-w-0 shrink flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:shrink-0">
@@ -88,6 +93,9 @@ export function PlannerPanel({
           {deadlineNotices.map(({ deadline, remainingDays }) => {
             const isDueToday = remainingDays === 0;
             const dueTimeLabel = formatScheduledTime(deadline.due_time ?? null);
+            const project = deadline.project_id
+              ? projects.find(item => item.id === deadline.project_id) ?? null
+              : null;
             return (
               <div
                 key={deadline.id}
@@ -105,7 +113,23 @@ export function PlannerPanel({
               >
                 <span className={clsx('shrink-0 rounded-full px-2 py-1 text-xs text-white', isDueToday ? 'bg-red-600 font-bold' : 'bg-red-500 font-medium', deadline.memo ? 'mt-0.5' : '')}>{isDueToday ? 'D-DAY' : `D-${remainingDays}`}</span>
                 <div className="min-w-0">
-                  <p className={clsx('truncate text-sm', isDueToday ? 'font-bold text-red-700 dark:text-red-200' : 'font-medium text-fg')}>{deadline.title}</p>
+                  <div className="flex min-w-0 items-center gap-1.5">
+                    {project && (
+                      <button
+                        type="button"
+                        title={project.title}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          onOpenProject(project);
+                        }}
+                        className="inline-flex max-w-[7.5rem] shrink-0 items-center gap-0.5 rounded-md bg-white/70 px-1.5 py-0.5 hover:bg-white dark:bg-black/20 dark:hover:bg-black/30"
+                      >
+                        <EmojiIcon emoji={project.icon} className="h-3.5 w-3.5" />
+                        <span className="truncate text-[11px] font-medium leading-none text-fg-muted">{project.title}</span>
+                      </button>
+                    )}
+                    <p className={clsx('min-w-0 truncate text-sm', isDueToday ? 'font-bold text-red-700 dark:text-red-200' : 'font-medium text-fg')}>{deadline.title}</p>
+                  </div>
                   {deadline.memo && <p className={clsx('mt-1 line-clamp-2 text-xs', isDueToday ? 'font-medium text-red-500' : 'text-fg-muted')}>{deadline.memo}</p>}
                 </div>
                 <span className={clsx('ml-auto shrink-0 text-right text-xs', isDueToday ? 'font-bold text-red-600' : 'text-red-500', deadline.memo ? 'mt-0.5' : '')}>

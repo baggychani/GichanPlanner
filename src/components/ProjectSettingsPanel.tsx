@@ -189,6 +189,10 @@ export function ProjectSettingsPanel({
                             >
                               <AlertCircle size={14} className="shrink-0 text-red-500" />
                               <span className="w-10 shrink-0 text-xs text-red-500">{format(parseDay(deadline.due_date), 'M.d')}</span>
+                              <span className="inline-flex max-w-[7.5rem] shrink-0 items-center gap-0.5 rounded-md bg-surface-muted px-1.5 py-0.5">
+                                <EmojiIcon emoji={project.icon} className="h-3.5 w-3.5" />
+                                <span className="truncate text-[11px] font-medium leading-none text-fg-muted">{project.title}</span>
+                              </span>
                               <span className="min-w-0 flex-1 truncate text-sm text-fg">{deadline.title}</span>
                             </button>
                           </li>

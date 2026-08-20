@@ -430,6 +430,7 @@ function PlannerApp() {
         weeklyGoalWeekStart={weeklyGoalWeekStart}
         isDailyMenuOpen={isDailyMenuOpen}
         deadlineNotices={deadlineNotices}
+        projects={projects}
         onToggleDailyMenu={() => {
           if (!requireLogin()) return;
           setIsDailyMenuOpen(open => !open);
@@ -466,6 +467,12 @@ function PlannerApp() {
           if (!requireLogin()) return;
           setTaskFromSettings(false);
           setEditingDeadline(deadline);
+        }}
+        onOpenProject={(project) => {
+          if (!requireLogin()) return;
+          setSettingsSection('projects');
+          setSettingsProjectId(project.id);
+          setIsCategoryModalOpen(true);
         }}
       >
         {viewMode === 'DAILY' ? (

@@ -61,18 +61,18 @@ function CalendarAccountBar({ onOpen }: { onOpen: () => void }) {
       type="button"
       onClick={onOpen}
       aria-label={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}
-      className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-line bg-surface px-3 py-1.5 text-left shadow-sm hover:bg-surface-muted"
+      className="mb-4 flex w-full items-center gap-3 rounded-3xl border border-line bg-surface px-4 py-3 text-left shadow-sm hover:bg-surface-muted"
     >
-      <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-        {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserRound size={18} />}
+      <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+        {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserRound size={22} />}
       </span>
       {isLoggedIn ? (
-        <span className="min-w-0 leading-tight">
-          <span className="block truncate text-sm font-semibold text-fg">{nickname}</span>
-          <span className="block truncate text-xs text-fg-muted">{email}</span>
+        <span className="min-w-0">
+          <span className="block truncate text-[15px] font-semibold text-fg">{nickname}</span>
+          <span className="block truncate text-sm text-fg-muted">{email}</span>
         </span>
       ) : (
-        <span className="text-sm font-medium text-fg-muted">계정에 로그인하세요</span>
+        <span className="text-[15px] font-medium text-fg-muted">계정에 로그인하세요</span>
       )}
     </button>
   );
@@ -242,7 +242,7 @@ export function CalendarBoard({
           </div>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 overflow-visible">
           <button onClick={() => onSelectWeek(startOfWeek(selectedDate, { weekStartsOn: 1 }))} aria-label="주간 목표" title="주간 목표" className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
             <Target size={22} />
           </button>
@@ -290,7 +290,7 @@ export function CalendarBoard({
             aria-label={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}
             title={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}
             className={clsx(
-              'rounded-full transition-colors hover:bg-surface-hover',
+              'overflow-visible rounded-full transition-colors hover:bg-surface-hover',
               isLoggedIn ? 'p-0.5' : 'p-2 text-fg-muted',
             )}
           >
@@ -299,9 +299,9 @@ export function CalendarBoard({
                 {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserRound size={16} />}
               </span>
             ) : (
-              <span className="relative block h-[21px] w-[21px]">
-                <UserRound size={21} aria-hidden className="login-icon-glow pointer-events-none absolute left-0 top-0" />
-                <UserRound size={21} className="relative" />
+              <span className="relative block h-[21px] w-[21px] overflow-visible">
+                <UserRound size={21} aria-hidden className="login-icon-glow pointer-events-none absolute left-1/2 top-1/2" />
+                <UserRound size={21} className="login-icon-lit relative text-fg-muted" />
               </span>
             )}
           </button>
