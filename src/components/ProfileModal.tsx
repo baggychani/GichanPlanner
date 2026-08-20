@@ -63,19 +63,13 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
 
   useEffect(() => {
     if (!openedLoggedIn) return;
-    const now = new Date().toISOString();
-    void db.profiles.get('#profile').then(existing => db.profiles.put({
-      id: '#profile',
-      nickname: existing?.nickname || fallbackName,
-      avatar: existing?.avatar ?? null,
-      legacy_dexie_user_id: user?.userId ?? existing?.legacy_dexie_user_id ?? null,
-      email: accountEmail || existing?.email || null,
-      birthday_month: existing?.birthday_month ?? null,
-      birthday_day: existing?.birthday_day ?? null,
-      created_at: existing?.created_at ?? now,
-      updated_at: now,
-    }));
-  }, [accountEmail, fallbackName, openedLoggedIn, user?.userId]);
+    void db.profiles.get('#profile').then(existing => {
+      if (!existing) return;
+      const email = accountEmail || existing.email || null;
+      if (existing.email === email) return;
+      return db.profiles.put({ ...existing, email });
+    });
+  }, [accountEmail, openedLoggedIn]);
 
   const saveProfile = async (avatar = profile?.avatar ?? null) => {
     if (!nickname.trim()) return;

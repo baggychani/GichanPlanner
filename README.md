@@ -6,11 +6,12 @@
 
 저장소: https://github.com/baggychani/GichanPlanner
 
-## 로그인과 데이터는 역할이 다릅니다
+## 로그인하면 기기가 같은 데이터를 봅니다
 
 - **로그인:** Supabase 이메일·비밀번호입니다. Google 로그인이나 Dexie Cloud 로그인은 앱 화면에 없습니다.
-- **플래너 데이터:** 브라우저 IndexedDB에 둡니다. 그 로컬 DB를 다루는 라이브러리가 Dexie입니다. 할 일·카테고리·프로필 닉네임·사진이 여기에 있습니다.
-- **Dexie Cloud URL**은 예전 동기화용으로 `db.ts`에 남아 있을 수 있습니다. 현재 로그인 흐름과는 무관합니다.
+- **원본 저장소:** 로그인한 뒤 할 일·데드라인·주간 목표·카테고리·닉네임·사진·생일은 Supabase에 올라갑니다. 다른 기기에서 같은 계정으로 열면 그 내용이 내려옵니다.
+- **이 브라우저의 IndexedDB(Dexie)**는 화면을 빨리 그리기 위한 캐시입니다. 로그인하지 않으면 이 기기에만 남습니다.
+- **Dexie Cloud URL**은 예전 코드에 남아 있을 수 있습니다. 지금 기기 연동은 Supabase입니다.
 
 로그아웃하면 달력은 보이고, 할 일·데드라인 내용은 숨깁니다.
 
@@ -43,4 +44,4 @@ npm run build
 
 ## 스택
 
-Vite, React, TypeScript, Tailwind, Dexie(IndexedDB), Supabase Auth
+Vite, React, TypeScript, Tailwind, Dexie(IndexedDB 캐시), Supabase Auth·Postgres·Storage

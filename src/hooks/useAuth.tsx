@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
+import { syncPlannerWithCloud } from '../lib/supabaseSync';
 
 type AuthValue = {
   session: Session | null;
@@ -37,6 +38,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     });
     return () => listener.subscription.unsubscribe();
   }, []);
+
+  useEffect(() => {
+    if (!session) return;
+    void syncPlannerWithCloud();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') void syncPlannerWithCloud();
+    };
+    const onOnline = () => { void syncPlannerWithCloud(); };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('online', onOnline);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('online', onOnline);
+    };
+  }, [session?.user.id]);
 
   return (
     <AuthContext.Provider
