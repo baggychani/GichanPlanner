@@ -235,15 +235,26 @@ export async function deleteCategory(categoryId: string) {
 
 export async function deleteProject(projectId: string) {
   return runPlannerWrite(async () => {
-  await db.transaction('rw', db.tasks, db.projects, async () => {
+  await db.transaction('rw', db.tasks, db.deadlines, db.projects, async () => {
     const now = new Date().toISOString();
-    const projectTasks = await db.tasks.where('project_id').equals(projectId).toArray();
+    const [projectTasks, projectDeadlines] = await Promise.all([
+      db.tasks.where('project_id').equals(projectId).toArray(),
+      db.deadlines.where('project_id').equals(projectId).toArray(),
+    ]);
     if (projectTasks.length > 0) {
       await db.tasks.bulkPut(projectTasks.map(task => ({
         ...task,
         project_id: null,
         updated_at: now,
         version: task.version + 1,
+      })));
+    }
+    if (projectDeadlines.length > 0) {
+      await db.deadlines.bulkPut(projectDeadlines.map(deadline => ({
+        ...deadline,
+        project_id: null,
+        updated_at: now,
+        version: deadline.version + 1,
       })));
     }
     const project = await db.projects.get(projectId);

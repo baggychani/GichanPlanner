@@ -21,6 +21,7 @@ SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합
 3. `20260820020000_profile_birthday.sql`
 4. `20260820030000_profile_insert.sql` ← 닉네임 저장에 필요
 5. `20260820140000_projects.sql` ← 프로젝트 묶음. 이미 쓰는 프로젝트면 `supabase/ADD_MISSING.sql` 한 번으로도 됩니다.
+6. `20260820150000_deadline_project.sql` ← 데드라인에 프로젝트 연결.
 
 Authentication → URL Configuration:
 

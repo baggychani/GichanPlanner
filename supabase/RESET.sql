@@ -73,7 +73,7 @@ create table public.goals (
 create table public.deadlines (
   id uuid primary key, owner_id uuid not null references auth.users(id) on delete cascade, revision bigint not null default 1,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(), deleted_at timestamptz,
-  title text not null, memo text not null default '', due_date date not null, due_time timestamptz, reminder_days integer
+  title text not null, memo text not null default '', due_date date not null, due_time timestamptz, reminder_days integer, project_id uuid
 );
 create table public.projects (
   id uuid primary key, owner_id uuid not null references auth.users(id) on delete cascade, revision bigint not null default 1,

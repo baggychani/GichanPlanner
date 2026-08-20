@@ -74,7 +74,7 @@ const flagSections: EmojiSection[] = [
 
 // This is only the emoji dataset. The picker UI is rendered by this app in Korean.
 export const emojiCategories: readonly EmojiCategory[] = [
-  { id: '추천', icon: '⭐', emojis: '📁 📚 📝 ✅ 🎯 💡 💻 📌 🗓️ 🎨 🎵 📷 ☕ 🌱 ❤️ ✨ 🚀 🏆 🧠 🧘'.split(' ') },
+  { id: '추천', icon: '⭐', emojis: '📁 📚 📝 ✅ 🎯 💡 💻 👥 📌 🗓️ 🎨 🎵 📷 ☕ 🌱 ❤️ ✨ 🚀 🏆 🧠 🧘'.split(' ') },
   { id: '표정·사람', icon: '😀', emojis: allEmoji('smileys_people') },
   { id: '동물·자연', icon: '🌿', emojis: allEmoji('animals_nature') },
   { id: '음식·음료', icon: '🍎', emojis: allEmoji('food_drink') },

@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AlertCircle, Calendar as CalendarIcon, X } from 'lucide-react';
 import clsx from 'clsx';
-import { db, type Deadline } from '../lib/db';
+import { db, type Deadline, type Project } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { formatScheduledTime, parseDay } from '../lib/datetime';
 import { Overlay } from './Overlay';
@@ -18,6 +18,7 @@ function deadlineDraftKey(deadline: Deadline) {
     due_date: deadline.due_date,
     due_time: deadline.due_time,
     reminder_days: deadline.reminder_days,
+    project_id: deadline.project_id,
   });
 }
 
@@ -53,9 +54,12 @@ type DeadlineCreateModalProps = {
   dueDate: string;
   dueTime: string | null;
   reminderDays: number | null;
+  projects: Project[];
+  projectId: string | null;
   onTitleChange: (value: string) => void;
   onMemoChange: (value: string) => void;
   onReminderChange: (days: number | null) => void;
+  onProjectChange: (projectId: string | null) => void;
   onPickDate: () => void;
   onOpenTimePicker: () => void;
   onClose: () => void;
@@ -68,9 +72,12 @@ export function DeadlineCreateModal({
   dueDate,
   dueTime,
   reminderDays,
+  projects,
+  projectId,
   onTitleChange,
   onMemoChange,
   onReminderChange,
+  onProjectChange,
   onPickDate,
   onOpenTimePicker,
   onClose,
@@ -91,6 +98,19 @@ export function DeadlineCreateModal({
           <div>
             <label className="mb-1 block text-xs font-medium text-fg-subtle">메모</label>
             <textarea value={memo} onChange={(event) => onMemoChange(event.target.value)} placeholder="필요한 메모를 적어주세요" className="h-20 w-full resize-none rounded-xl border border-transparent bg-surface-muted p-3 text-sm outline-none focus:border-red-200" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-fg-subtle">프로젝트</label>
+            <select
+              value={projectId ?? ''}
+              onChange={event => onProjectChange(event.target.value || null)}
+              className="w-full rounded-xl border border-transparent bg-surface-muted p-3 text-sm outline-none focus:border-red-200"
+            >
+              <option value="">없음</option>
+              {projects.map(project => (
+                <option key={project.id} value={project.id}>{project.icon} {project.title}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-fg-subtle">데드라인 날짜</label>
@@ -123,12 +143,14 @@ export function DeadlineCreateModal({
 
 export function DeadlineEditModal({
   deadline,
+  projects,
   onChange,
   onPickDate,
   onOpenTimePicker,
   onClose,
 }: {
   deadline: Deadline;
+  projects: Project[];
   onChange: (deadline: Deadline) => void;
   onPickDate: () => void;
   onOpenTimePicker: () => void;
@@ -155,6 +177,22 @@ export function DeadlineEditModal({
           <div>
             <label className="mb-1 block text-xs font-medium text-fg-subtle">메모</label>
             <textarea value={deadline.memo} onChange={(event) => onChange({ ...deadline, memo: event.target.value })} placeholder="필요한 메모를 적어주세요" className="h-20 w-full resize-none rounded-xl border border-transparent bg-surface-muted p-3 text-sm outline-none focus:border-red-200" />
+          </div>
+          <div>
+            <label className="mb-1 block text-xs font-medium text-fg-subtle">프로젝트</label>
+            <select
+              value={deadline.project_id ?? ''}
+              onChange={event => onChange({ ...deadline, project_id: event.target.value || null })}
+              className="w-full rounded-xl border border-transparent bg-surface-muted p-3 text-sm outline-none focus:border-red-200"
+            >
+              <option value="">없음</option>
+              {deadline.project_id && !projects.some(project => project.id === deadline.project_id) && (
+                <option value={deadline.project_id}>없는 프로젝트</option>
+              )}
+              {projects.map(project => (
+                <option key={project.id} value={project.id}>{project.icon} {project.title}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-fg-subtle">데드라인 날짜</label>

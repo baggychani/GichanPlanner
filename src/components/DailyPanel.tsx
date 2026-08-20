@@ -26,6 +26,7 @@ type DailyPanelProps = {
   onQuickAddSubmit: (categoryId: string | null) => void;
   onQuickAddBlur: (categoryId: string | null) => void;
   onOpenTask: (task: Task) => void;
+  onOpenProject: (project: Project) => void;
   onViewImage: (src: string) => void;
 };
 
@@ -45,6 +46,7 @@ export function DailyPanel({
   onQuickAddSubmit,
   onQuickAddBlur,
   onOpenTask,
+  onOpenProject,
   onViewImage,
 }: DailyPanelProps) {
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -108,6 +110,7 @@ export function DailyPanel({
                         void runPlannerWrite(() => db.tasks.update(task.id, { is_completed: !task.is_completed, updated_at: new Date().toISOString(), version: task.version + 1 }));
                       }}
                       onOpen={() => onOpenTask(task)}
+                      onOpenProject={onOpenProject}
                       onViewImage={onViewImage}
                     />
                   )}

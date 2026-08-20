@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
-import { Check, ChevronRight, FolderKanban, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { AlertCircle, Check, ChevronRight, FolderKanban, Pencil, Plus, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
-import { db, type Project, type Task } from '../lib/db';
+import { db, type Deadline, type Project, type Task } from '../lib/db';
 import { parseDay } from '../lib/datetime';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { deleteProject } from '../lib/taskOps';
@@ -11,14 +11,18 @@ import { EmojiIcon } from './EmojiIcon';
 export function ProjectSettingsPanel({
   projects,
   tasks,
+  deadlines,
   initialOpenId = null,
   onOpenTask,
+  onOpenDeadline,
   onPickIcon,
 }: {
   projects: Project[];
   tasks: Task[];
+  deadlines: Deadline[];
   initialOpenId?: string | null;
   onOpenTask: (task: Task) => void;
+  onOpenDeadline: (deadline: Deadline) => void;
   onPickIcon: (onSelect: (emoji: string) => void) => void;
 }) {
   const [openId, setOpenId] = useState<string | null | undefined>(initialOpenId ?? undefined);
@@ -43,6 +47,20 @@ export function ProjectSettingsPanel({
     return grouped;
   }, [tasks]);
 
+  const deadlinesByProject = useMemo(() => {
+    const grouped = new Map<string, Deadline[]>();
+    for (const deadline of deadlines) {
+      if (!deadline.project_id) continue;
+      const list = grouped.get(deadline.project_id) ?? [];
+      list.push(deadline);
+      grouped.set(deadline.project_id, list);
+    }
+    for (const list of grouped.values()) {
+      list.sort((a, b) => a.due_date.localeCompare(b.due_date) || a.created_at.localeCompare(b.created_at));
+    }
+    return grouped;
+  }, [deadlines]);
+
   const closeEdit = () => setEditingId(null);
 
   return (
@@ -51,6 +69,7 @@ export function ProjectSettingsPanel({
         <div className="space-y-2">
           {projects.map(project => {
             const projectTasks = tasksByProject.get(project.id) ?? [];
+            const projectDeadlines = deadlinesByProject.get(project.id) ?? [];
             const completed = projectTasks.filter(task => task.is_completed).length;
             const total = projectTasks.length;
             const isOpen = activeId === project.id;
@@ -157,10 +176,23 @@ export function ProjectSettingsPanel({
                         <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((completed / total) * 100)}%` }} />
                       </div>
                     )}
-                    {projectTasks.length === 0 ? (
-                      <p className="px-1 py-3 text-sm text-fg-subtle">아직 묶인 할 일이 없습니다. 할 일 상세에서 이 프로젝트를 고르면 여기 모입니다.</p>
+                    {projectTasks.length === 0 && projectDeadlines.length === 0 ? (
+                      <p className="px-1 py-3 text-sm text-fg-subtle">아직 묶인 할 일이나 데드라인이 없습니다. 상세에서 이 프로젝트를 고르면 여기 모입니다.</p>
                     ) : (
                       <ul className="space-y-0.5">
+                        {projectDeadlines.map(deadline => (
+                          <li key={deadline.id}>
+                            <button
+                              type="button"
+                              onClick={() => onOpenDeadline(deadline)}
+                              className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-red-50 dark:hover:bg-red-950/40"
+                            >
+                              <AlertCircle size={14} className="shrink-0 text-red-500" />
+                              <span className="w-10 shrink-0 text-xs text-red-500">{format(parseDay(deadline.due_date), 'M.d')}</span>
+                              <span className="min-w-0 flex-1 truncate text-sm text-fg">{deadline.title}</span>
+                            </button>
+                          </li>
+                        ))}
                         {projectTasks.map(task => (
                           <li key={task.id}>
                             <button

@@ -91,6 +91,7 @@ export interface Deadline {
   due_date: string; // YYYY-MM-DD
   due_time: string | null; // ISO string, optional time on the due date
   reminder_days: number | null;
+  project_id: string | null;
 }
 
 export interface Project {
@@ -223,6 +224,21 @@ db.version(12).stores({
 }).upgrade(async (transaction) => {
   await transaction.table('tasks').toCollection().modify((task: Task) => {
     if (task.project_id === undefined) task.project_id = null;
+  });
+});
+
+db.version(13).stores({
+  tasks: 'id, target_date, is_completed, is_important, deleted_at, domain_id, project_id, order',
+  schedules: 'id, target_date, start_time, deleted_at',
+  routines: 'id, start_date, deleted_at',
+  domains: 'id, deleted_at, order',
+  goals: 'id, time_frame, start_date, deleted_at',
+  deadlines: 'id, due_date, deleted_at, project_id',
+  projects: 'id, deleted_at, order',
+  profiles: 'id',
+}).upgrade(async (transaction) => {
+  await transaction.table('deadlines').toCollection().modify((deadline: Deadline) => {
+    if (deadline.project_id === undefined) deadline.project_id = null;
   });
 });
 

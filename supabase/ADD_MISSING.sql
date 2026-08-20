@@ -5,6 +5,9 @@
 alter table public.deadlines
   add column if not exists due_time timestamptz;
 
+alter table public.deadlines
+  add column if not exists project_id uuid;
+
 alter table public.profiles
   add column if not exists birthday_month smallint,
   add column if not exists birthday_day smallint;

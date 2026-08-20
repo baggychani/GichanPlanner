@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Check, FolderKanban, GripVertical, Pencil, Plus, Tags, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { db, type Domain, type Project, type Task } from '../lib/db';
+import { db, type Deadline, type Domain, type Project, type Task } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { deleteCategory, reorderCategories } from '../lib/taskOps';
 import { EmojiIcon } from './EmojiIcon';
@@ -14,18 +14,22 @@ export function CategoryModal({
   categories,
   projects,
   tasks,
+  deadlines,
   initialSection = 'categories',
   initialProjectId = null,
   onClose,
   onOpenTask,
+  onOpenDeadline,
 }: {
   categories: Domain[];
   projects: Project[];
   tasks: Task[];
+  deadlines: Deadline[];
   initialSection?: 'categories' | 'projects';
   initialProjectId?: string | null;
   onClose: () => void;
   onOpenTask: (task: Task) => void;
+  onOpenDeadline: (deadline: Deadline) => void;
 }) {
   const [section, setSection] = useState<'categories' | 'projects'>(initialSection);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -42,8 +46,8 @@ export function CategoryModal({
           else onClose();
         }}
       >
-        <div className="relative flex h-[min(680px,85vh)] w-[min(680px,95vw)] overflow-hidden rounded-3xl bg-surface shadow-xl">
-          <nav className="flex w-40 shrink-0 flex-col gap-1 border-r border-line bg-surface-muted px-2 py-4">
+        <div className="relative flex h-[min(680px,85vh)] w-[min(712px,95vw)] overflow-hidden rounded-3xl bg-surface shadow-xl">
+          <nav className="flex w-48 shrink-0 flex-col gap-1 border-r border-line bg-surface-muted px-2 py-4">
             <p className="mb-2 px-3 text-xs font-medium text-fg-subtle">설정</p>
             <button
               type="button"
@@ -76,8 +80,10 @@ export function CategoryModal({
               <ProjectSettingsPanel
                 projects={projects}
                 tasks={tasks}
+                deadlines={deadlines}
                 initialOpenId={initialProjectId}
                 onOpenTask={onOpenTask}
+                onOpenDeadline={onOpenDeadline}
                 onPickIcon={(onSelect) => setIconPicker({ onSelect })}
               />
             ) : (

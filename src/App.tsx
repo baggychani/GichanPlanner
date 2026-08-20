@@ -63,6 +63,7 @@ function PlannerApp() {
   const [deadlineDueDate, setDeadlineDueDate] = useState(format(new Date(), 'yyyy-MM-dd'));
   const [deadlineDueTime, setDeadlineDueTime] = useState<string | null>(null);
   const [deadlineReminderDays, setDeadlineReminderDays] = useState<number | null>(null);
+  const [deadlineProjectId, setDeadlineProjectId] = useState<string | null>(null);
   const [timePickerKind, setTimePickerKind] = useState<'task' | 'deadline'>('task');
 
   const [quickAddCategoryId, setQuickAddCategoryId] = useState<string | null>(null);
@@ -153,14 +154,23 @@ function PlannerApp() {
     setIsTimePickerOpen(false);
   }, [isLoggedIn]);
 
+  const restoreSettingsAfterEditor = () => {
+    if (!taskFromSettings) return;
+    setIsCategoryModalOpen(true);
+    setTaskFromSettings(false);
+  };
+
   const closeTaskEditor = () => {
     setEditingTask(null);
     setIsCreatingTask(false);
     setIsTimePickerOpen(false);
-    if (taskFromSettings) {
-      setIsCategoryModalOpen(true);
-      setTaskFromSettings(false);
-    }
+    restoreSettingsAfterEditor();
+  };
+
+  const closeDeadlineEditor = () => {
+    setIsTimePickerOpen(false);
+    setEditingDeadline(null);
+    restoreSettingsAfterEditor();
   };
 
   const openTimePicker = (kind: 'task' | 'deadline') => {
@@ -233,12 +243,14 @@ function PlannerApp() {
       due_date: deadlineDueDate,
       due_time: deadlineDueTime,
       reminder_days: deadlineReminderDays,
+      project_id: deadlineProjectId,
     }));
     setDeadlineTitle('');
     setDeadlineMemo('');
     setDeadlineDueDate(format(selectedDate, 'yyyy-MM-dd'));
     setDeadlineDueTime(null);
     setDeadlineReminderDays(null);
+    setDeadlineProjectId(null);
     setIsDeadlineModalOpen(false);
     setIsTimePickerOpen(false);
   };
@@ -366,6 +378,7 @@ function PlannerApp() {
           if (!requireLogin()) return;
           setDeadlineDueDate(format(selectedDate, 'yyyy-MM-dd'));
           setDeadlineDueTime(null);
+          setDeadlineProjectId(null);
           setIsDeadlineModalOpen(true);
           setIsQuickCreateMenuOpen(false);
         }}
@@ -437,6 +450,7 @@ function PlannerApp() {
         }}
         onOpenDeadline={(deadline) => {
           if (!requireLogin()) return;
+          setTaskFromSettings(false);
           setEditingDeadline(deadline);
         }}
       >
@@ -468,6 +482,11 @@ function PlannerApp() {
               void saveQuickAdd(categoryId, true);
             }}
             onOpenTask={(task) => { setTaskFromSettings(false); setIsCreatingTask(false); setEditingTask(task); }}
+            onOpenProject={(project) => {
+              setSettingsSection('projects');
+              setSettingsProjectId(project.id);
+              setIsCategoryModalOpen(true);
+            }}
             onViewImage={setViewingImage}
           />
           ) : null
@@ -491,12 +510,15 @@ function PlannerApp() {
           dueDate={deadlineDueDate}
           dueTime={deadlineDueTime}
           reminderDays={deadlineReminderDays}
+          projects={projects}
+          projectId={deadlineProjectId}
           onTitleChange={setDeadlineTitle}
           onMemoChange={setDeadlineMemo}
           onReminderChange={setDeadlineReminderDays}
+          onProjectChange={setDeadlineProjectId}
           onPickDate={() => { setIsTimePickerOpen(false); setIsDeadlineModalOpen(false); setIsSelectingDeadlineDate(true); }}
           onOpenTimePicker={() => openTimePicker('deadline')}
-          onClose={() => { setIsTimePickerOpen(false); setIsDeadlineModalOpen(false); }}
+          onClose={() => { setIsTimePickerOpen(false); setIsDeadlineModalOpen(false); setDeadlineProjectId(null); }}
           onSave={() => { void saveDeadline(); }}
         />
       )}
@@ -504,10 +526,11 @@ function PlannerApp() {
       {editingDeadline && !selectingDateForDeadline && (
         <DeadlineEditModal
           deadline={editingDeadline}
+          projects={projects}
           onChange={setEditingDeadline}
           onPickDate={() => { setIsTimePickerOpen(false); setSelectingDateForDeadline(editingDeadline.id); }}
           onOpenTimePicker={() => openTimePicker('deadline')}
-          onClose={() => { setIsTimePickerOpen(false); setEditingDeadline(null); }}
+          onClose={closeDeadlineEditor}
         />
       )}
 
@@ -592,6 +615,7 @@ function PlannerApp() {
           categories={categories}
           projects={projects}
           tasks={tasks}
+          deadlines={deadlines}
           initialSection={settingsSection}
           initialProjectId={settingsProjectId}
           onClose={() => setIsCategoryModalOpen(false)}
@@ -602,6 +626,13 @@ function PlannerApp() {
             setIsCategoryModalOpen(false);
             setIsCreatingTask(false);
             setEditingTask(task);
+          }}
+          onOpenDeadline={(deadline) => {
+            setTaskFromSettings(true);
+            setSettingsSection('projects');
+            setSettingsProjectId(deadline.project_id);
+            setIsCategoryModalOpen(false);
+            setEditingDeadline(deadline);
           }}
         />
       )}

@@ -20,6 +20,7 @@ type TaskRowProps = {
   isGrabbing: boolean;
   onToggleComplete: () => void;
   onOpen: () => void;
+  onOpenProject: (project: Project) => void;
   onViewImage: (src: string) => void;
 };
 
@@ -32,6 +33,7 @@ export function TaskRow({
   isGrabbing,
   onToggleComplete,
   onOpen,
+  onOpenProject,
   onViewImage,
 }: TaskRowProps) {
   const scheduledLabel = formatScheduledTime(task.scheduled_time);
@@ -69,16 +71,21 @@ export function TaskRow({
       <div className="flex-1 min-w-0" onClick={onOpen}>
         <div className="flex items-center gap-1.5 min-w-0">
           {project && (
-            <span
+            <button
+              type="button"
               title={project.title}
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenProject(project);
+              }}
               className={clsx(
-                'inline-flex max-w-[7.5rem] shrink-0 items-center gap-0.5 rounded-md bg-surface-muted px-1.5 py-0.5',
+                'inline-flex max-w-[7.5rem] shrink-0 items-center gap-0.5 rounded-md bg-surface-muted px-1.5 py-0.5 hover:bg-surface-hover',
                 task.is_completed ? 'opacity-50' : '',
               )}
             >
               <EmojiIcon emoji={project.icon} className="h-3.5 w-3.5" />
               <span className="truncate text-[11px] font-medium leading-none text-fg-muted">{project.title}</span>
-            </span>
+            </button>
           )}
           {task.is_important && (
             <Star size={14} strokeWidth={2} fill="currentColor" className={clsx('shrink-0', task.is_completed ? 'text-fg-faint' : 'text-amber-500')} />

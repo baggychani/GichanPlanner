@@ -61,7 +61,7 @@ export function ProjectCreateModal({ nextOrder, onClose, onCreated }: ProjectCre
                   void save();
                 }
               }}
-              placeholder="묶을 일의 이름을 적어주세요"
+              placeholder="프로젝트의 이름을 적어주세요"
               className="w-full rounded-xl border border-transparent bg-surface-muted p-3 text-base font-medium outline-none focus:border-line-strong"
             />
           </div>

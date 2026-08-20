@@ -155,7 +155,7 @@ function deadlineRow(deadline: Deadline, ownerId: string) {
     id: deadline.id, owner_id: ownerId, revision: deadline.version,
     created_at: deadline.created_at, updated_at: deadline.updated_at, deleted_at: deadline.deleted_at,
     title: deadline.title, memo: deadline.memo, due_date: deadline.due_date, due_time: deadline.due_time,
-    reminder_days: deadline.reminder_days,
+    reminder_days: deadline.reminder_days, project_id: deadline.project_id ?? null,
   };
 }
 
@@ -217,6 +217,7 @@ function deadlineFromRemote(row: RemoteStamp & Deadline): Deadline {
   return {
     id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
     title: row.title, memo: row.memo, due_date: row.due_date, due_time: row.due_time ?? null, reminder_days: row.reminder_days,
+    project_id: row.project_id ?? null,
   };
 }
 
