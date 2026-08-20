@@ -107,6 +107,11 @@ body {
   height: var(--cal-icon);
 }
 
+.calendar-cleared-check {
+  width: calc(var(--cal-bubble) * 0.78);
+  height: calc(var(--cal-bubble) * 0.78);
+}
+
 @keyframes clear-shimmer {
   0%, 100% { background-position: 0% 50%; }
   50% { background-position: 100% 50%; }
@@ -149,17 +154,6 @@ body {
 
 .dark .clear-mark-text {
   background-image: linear-gradient(110deg, #2a1c08 0%, #0c0a06 36%, #c9a227 50%, #1a1408 68%, #2a1c08 100%);
-}
-
-.clear-mark-calendar {
-  height: var(--cal-bubble);
-  padding: 0 calc(var(--cal-bubble-px) + 1px) 0 var(--cal-bubble-px);
-}
-
-.clear-mark-calendar .clear-mark-text {
-  font-size: max(8px, calc(var(--cal-bubble-font) * 0.72));
-  letter-spacing: 0.1em;
-  transform: translateY(0);
 }
 
 /* 스크롤바는 카드 오른쪽 끝에 고정하고, 본문 폭은 스크롤 유무와 상관없이 같게 둔다. */
