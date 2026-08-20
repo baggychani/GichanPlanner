@@ -177,7 +177,7 @@ export function ProjectSettingsPanel({
                       </div>
                     )}
                     {projectTasks.length === 0 && projectDeadlines.length === 0 ? (
-                      <p className="px-1 py-3 text-sm text-fg-subtle">아직 묶인 할 일이나 데드라인이 없습니다. 상세에서 이 프로젝트를 고르면 여기 모입니다.</p>
+                      <p className="px-1 py-3 text-sm text-fg-subtle">아직 묶인 할 일이나 데드라인이 없습니다.</p>
                     ) : (
                       <ul className="space-y-0.5">
                         {projectDeadlines.map(deadline => (
