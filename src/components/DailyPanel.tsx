@@ -2,7 +2,7 @@ import { format } from 'date-fns';
 import { Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import { db, type Domain, type Task } from '../lib/db';
+import { db, type Domain, type Project, type Task } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { taskMatchesCategory } from '../lib/taskOps';
 import { ClearMark } from './ClearMark';
@@ -13,6 +13,7 @@ import { TaskRow } from './TaskRow';
 type DailyPanelProps = {
   selectedDate: Date;
   categories: Domain[];
+  projects: Project[];
   tasks: Task[];
   quickAddCategoryId: string | null;
   quickAddTitle: string;
@@ -31,6 +32,7 @@ type DailyPanelProps = {
 export function DailyPanel({
   selectedDate,
   categories,
+  projects,
   tasks,
   quickAddCategoryId,
   quickAddTitle,
@@ -97,6 +99,7 @@ export function DailyPanel({
                   {(provided, snapshot) => (
                     <TaskRow
                       task={task}
+                      project={projects.find(candidate => candidate.id === task.project_id) ?? null}
                       provided={provided}
                       snapshot={snapshot}
                       isDropped={justDroppedTaskId === task.id}

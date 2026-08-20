@@ -73,21 +73,25 @@ export function ImageViewer({ src, onClose }: { src: string; onClose: () => void
   return (
     <Overlay
       zClassName="z-[100]"
-      className="relative cursor-zoom-out !bg-black/80 p-8 dark:!bg-black/80"
+      className="cursor-zoom-out !bg-black/80 p-6 dark:!bg-black/80"
       onEscape={onClose}
       onBackdropClick={onClose}
     >
-      <img
-        src={src}
-        alt="크게 보기"
-        className="max-h-full max-w-full rounded-xl object-contain shadow-2xl"
-      />
-      <button
-        className="absolute right-6 top-6 rounded-full bg-white/10 p-2 text-white transition-colors hover:bg-white/20"
-        onClick={onClose}
-      >
-        <X size={24} />
-      </button>
+      <div className="relative max-h-full max-w-full">
+        <img
+          src={src}
+          alt="크게 보기"
+          className="max-h-[min(85vh,900px)] max-w-[min(90vw,1100px)] rounded-2xl object-contain shadow-2xl"
+        />
+        <button
+          type="button"
+          aria-label="이미지 닫기"
+          className="absolute right-3 top-3 rounded-full bg-black/55 p-2 text-white transition-colors hover:bg-black/75"
+          onClick={onClose}
+        >
+          <X size={22} />
+        </button>
+      </div>
     </Overlay>
   );
 }

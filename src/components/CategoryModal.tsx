@@ -1,21 +1,25 @@
 import { useMemo, useState } from 'react';
-import { Check, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, FolderKanban, GripVertical, Pencil, Plus, Tags, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { db, type Domain } from '../lib/db';
+import { db, type Domain, type Project } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { emojiCategories, flagNameByEmoji } from '../lib/emojis';
 import { deleteCategory, reorderCategories } from '../lib/taskOps';
 import { EmojiIcon } from './EmojiIcon';
 import { Overlay } from './Overlay';
+import { ProjectSettingsPanel } from './ProjectSettingsPanel';
 
 export function CategoryModal({
   categories,
+  projects,
   onClose,
 }: {
   categories: Domain[];
+  projects: Project[];
   onClose: () => void;
 }) {
+  const [section, setSection] = useState<'categories' | 'projects'>('categories');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [editingCategoryIcon, setEditingCategoryIcon] = useState('📁');
@@ -38,11 +42,40 @@ export function CategoryModal({
           else onClose();
         }}
       >
-        <div className="bg-surface rounded-3xl p-5 w-[420px] h-[min(680px,85vh)] shadow-xl flex flex-col relative">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-bold">카테고리 관리</h3>
-            <button onClick={onClose} className="p-1 hover:bg-surface-hover rounded-full"><X size={20} /></button>
+        <div className="relative flex h-[min(680px,85vh)] w-[min(680px,95vw)] overflow-hidden rounded-3xl bg-surface shadow-xl">
+          <nav className="flex w-[148px] shrink-0 flex-col gap-1 border-r border-line bg-surface-muted px-2 py-4">
+            <p className="mb-2 px-3 text-xs font-medium text-fg-subtle">설정</p>
+            <button
+              type="button"
+              onClick={() => { setSection('categories'); setShowEmojiPicker(false); }}
+              className={clsx(
+                'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
+                section === 'categories' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
+              )}
+            >
+              <Tags size={16} /> 카테고리
+            </button>
+            <button
+              type="button"
+              onClick={() => { setSection('projects'); setShowEmojiPicker(false); setEditingCategoryId(null); }}
+              className={clsx(
+                'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
+                section === 'projects' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
+              )}
+            >
+              <FolderKanban size={16} /> 프로젝트
+            </button>
+          </nav>
+          <div className="flex min-w-0 flex-1 flex-col p-5">
+          <div className="mb-4 flex items-center justify-between">
+            <h3 className="text-lg font-bold">{section === 'categories' ? '카테고리 관리' : '프로젝트 관리'}</h3>
+            <button onClick={onClose} className="rounded-full p-1 hover:bg-surface-hover"><X size={20} /></button>
           </div>
+
+          {section === 'projects' ? (
+            <ProjectSettingsPanel projects={projects} />
+          ) : (
+          <div className="flex min-h-0 flex-1 flex-col">
 
           <div className="mb-4 min-h-0 flex-1 overflow-y-scroll [scrollbar-gutter:stable]">
             <DragDropContext onDragEnd={(result) => { void reorderCategories(categories, result); }}>
@@ -252,6 +285,9 @@ export function CategoryModal({
                 </div>
               )}
             </form>
+          </div>
+          </div>
+          )}
           </div>
         </div>
       </Overlay>

@@ -3,9 +3,8 @@ import { FolderKanban, X } from 'lucide-react';
 import { db } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { Overlay } from './Overlay';
+import { PROJECT_ICONS } from '../lib/projectIcons';
 import { EmojiIcon } from './EmojiIcon';
-
-const PROJECT_ICONS = ['📁', '🎯', '💻', '📚', '🗣️', '📝', '🏠', '💼', '🧪', '✈️'];
 
 type ProjectCreateModalProps = {
   nextOrder: number;

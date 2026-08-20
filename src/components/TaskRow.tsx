@@ -1,9 +1,10 @@
 import clsx from 'clsx';
 import { Clock, Star } from 'lucide-react';
 import type { DraggableProvided, DraggableStateSnapshot } from '@hello-pangea/dnd';
-import type { Task } from '../lib/db';
+import type { Project, Task } from '../lib/db';
 import { formatScheduledTime } from '../lib/datetime';
 import { useObjectUrl } from '../hooks/useObjectUrl';
+import { EmojiIcon } from './EmojiIcon';
 
 // 이전 카드형 할 일 UI. 지금은 텍스트 행을 쓰지만 레거시 스타일은 남겨 둔다.
 const useLegacyTaskCards = false;
@@ -12,6 +13,7 @@ const textTaskRowClass = 'flex gap-3 px-3 py-1.5 rounded-xl bg-transparent';
 
 type TaskRowProps = {
   task: Task;
+  project: Project | null;
   provided: DraggableProvided;
   snapshot: DraggableStateSnapshot;
   isDropped: boolean;
@@ -23,6 +25,7 @@ type TaskRowProps = {
 
 export function TaskRow({
   task,
+  project,
   provided,
   snapshot,
   isDropped,
@@ -65,6 +68,18 @@ export function TaskRow({
 
       <div className="flex-1 min-w-0" onClick={onOpen}>
         <div className="flex items-center gap-1.5 min-w-0">
+          {project && (
+            <span
+              title={project.title}
+              className={clsx(
+                'inline-flex max-w-[7.5rem] shrink-0 items-center gap-0.5 rounded-md bg-surface-muted px-1.5 py-0.5',
+                task.is_completed ? 'opacity-50' : '',
+              )}
+            >
+              <EmojiIcon emoji={project.icon} className="h-3.5 w-3.5" />
+              <span className="truncate text-[11px] font-medium leading-none text-fg-muted">{project.title}</span>
+            </span>
+          )}
           {task.is_important && (
             <Star size={14} strokeWidth={2} fill="currentColor" className={clsx('shrink-0', task.is_completed ? 'text-fg-faint' : 'text-amber-500')} />
           )}

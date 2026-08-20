@@ -47,16 +47,17 @@ export function Overlay({
   }, [onEscape != null]);
 
   return (
-    <div
-      className={clsx(
-        'fixed inset-0 flex justify-center bg-black/20 p-4 dark:bg-black/55',
-        align === 'bottom' ? 'items-end sm:items-center' : 'items-center',
-        zClassName,
-        className,
-      )}
-      onClick={onBackdropClick ? (event) => { if (event.target === event.currentTarget) onBackdropClick(); } : undefined}
-    >
-      {children}
+    <div className={clsx('fixed inset-0', zClassName)}>
+      <div
+        className={clsx(
+          'flex h-full w-full justify-center bg-black/20 p-4 dark:bg-black/55',
+          align === 'bottom' ? 'items-end sm:items-center' : 'items-center',
+          className,
+        )}
+        onClick={onBackdropClick ? (event) => { if (event.target === event.currentTarget) onBackdropClick(); } : undefined}
+      >
+        {children}
+      </div>
     </div>
   );
 }

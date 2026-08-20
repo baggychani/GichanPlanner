@@ -432,6 +432,7 @@ function PlannerApp() {
           <DailyPanel
             selectedDate={selectedDate}
             categories={categories}
+            projects={projects}
             tasks={tasks}
             quickAddCategoryId={quickAddCategoryId}
             quickAddTitle={quickAddTitle}
@@ -574,7 +575,7 @@ function PlannerApp() {
       )}
 
       {isCategoryModalOpen && (
-        <CategoryModal categories={categories} onClose={() => setIsCategoryModalOpen(false)} />
+        <CategoryModal categories={categories} projects={projects} onClose={() => setIsCategoryModalOpen(false)} />
       )}
       {isProfileOpen && <ProfileModal onClose={() => setIsProfileOpen(false)} />}
       {isPasswordRecovery && (
