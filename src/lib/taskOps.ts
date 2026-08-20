@@ -27,13 +27,12 @@ export function createBlankTask(targetDate: string): Task {
 }
 
 export async function repairOrphanedTasks(activeDomainIds: string[]) {
-  return runPlannerWrite(async () => {
   const visible = new Set(activeDomainIds);
-  await db.transaction('rw', db.tasks, async () => {
-    const orphanedTasks = (await db.tasks.toArray()).filter(task =>
-      task.deleted_at === null && task.domain_id !== null && !visible.has(task.domain_id)
-    );
-    if (orphanedTasks.length === 0) return;
+  const orphanedTasks = (await db.tasks.toArray()).filter(task =>
+    task.deleted_at === null && task.domain_id !== null && !visible.has(task.domain_id)
+  );
+  if (orphanedTasks.length === 0) return;
+  return runPlannerWrite(async () => {
     const now = new Date().toISOString();
     await db.tasks.bulkPut(orphanedTasks.map(task => ({
       ...task,
@@ -41,7 +40,6 @@ export async function repairOrphanedTasks(activeDomainIds: string[]) {
       updated_at: now,
       version: task.version + 1,
     })));
-  });
   });
 }
 

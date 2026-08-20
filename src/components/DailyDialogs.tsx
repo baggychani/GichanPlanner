@@ -30,6 +30,27 @@ export function ConfirmDailyDeleteDialog({
   );
 }
 
+export function ConfirmDiscardDialog({
+  onCancel,
+  onDiscard,
+}: {
+  onCancel: () => void;
+  onDiscard: () => void;
+}) {
+  return (
+    <Overlay zClassName="z-[80]" onEscape={onCancel}>
+      <div className="w-full max-w-sm rounded-3xl bg-surface p-6 shadow-xl">
+        <h3 className="mb-2 text-lg font-medium text-fg">저장하지 않고 닫을까요?</h3>
+        <p className="mb-6 text-sm text-fg-muted">지금 닫으면 이 창에서 고친 내용이 사라집니다.</p>
+        <div className="flex justify-end gap-2">
+          <button onClick={onCancel} className="rounded-xl px-4 py-2.5 text-sm font-medium text-fg-muted hover:bg-surface-hover">계속 편집</button>
+          <button onClick={onDiscard} className="rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-on-ink hover:opacity-90">닫기</button>
+        </div>
+      </div>
+    </Overlay>
+  );
+}
+
 export function NoIncompleteNoticeDialog({
   dateLabel,
   onClose,

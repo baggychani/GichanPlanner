@@ -1,3 +1,4 @@
+import { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import { AlertCircle, Calendar as CalendarIcon, X } from 'lucide-react';
@@ -6,8 +7,19 @@ import { db, type Deadline } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { formatScheduledTime, parseDay } from '../lib/datetime';
 import { Overlay } from './Overlay';
+import { ConfirmDiscardDialog } from './DailyDialogs';
 
 const REMINDER_DAYS = [null, 1, 3, 7, 14, 30] as const;
+
+function deadlineDraftKey(deadline: Deadline) {
+  return JSON.stringify({
+    title: deadline.title,
+    memo: deadline.memo,
+    due_date: deadline.due_date,
+    due_time: deadline.due_time,
+    reminder_days: deadline.reminder_days,
+  });
+}
 
 function ReminderPicker({
   value,
@@ -122,12 +134,18 @@ export function DeadlineEditModal({
   onOpenTimePicker: () => void;
   onClose: () => void;
 }) {
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const initialDraft = useRef(deadlineDraftKey(deadline));
+  const requestClose = () => {
+    if (deadlineDraftKey(deadline) !== initialDraft.current) setDiscardOpen(true);
+    else onClose();
+  };
   return (
-    <Overlay onEscape={onClose}>
+    <Overlay onEscape={requestClose}>
       <div className="flex max-h-[90vh] w-[440px] flex-col rounded-3xl bg-surface shadow-xl">
         <div className="flex shrink-0 items-center justify-between p-6 pb-4">
           <div className="flex items-center gap-2 text-red-500"><AlertCircle size={20} /><h3 className="text-lg font-medium text-fg">데드라인 상세</h3></div>
-          <button onClick={onClose} aria-label="데드라인 상세 닫기" className="rounded-full p-1 text-fg-subtle hover:bg-surface-hover hover:text-fg"><X size={20} /></button>
+          <button onClick={requestClose} aria-label="데드라인 상세 닫기" className="rounded-full p-1 text-fg-subtle hover:bg-surface-hover hover:text-fg"><X size={20} /></button>
         </div>
         <div className="space-y-4 overflow-y-auto px-6 pb-6">
           <div>
@@ -181,6 +199,7 @@ export function DeadlineEditModal({
           </button>
         </div>
       </div>
+      {discardOpen && <ConfirmDiscardDialog onCancel={() => setDiscardOpen(false)} onDiscard={onClose} />}
     </Overlay>
   );
 }

@@ -149,7 +149,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
             <div className="mb-2 flex justify-end">
               <button onClick={onClose} aria-label="닫기" className="-mr-2 rounded-full p-2 text-fg-muted hover:bg-surface-hover"><X size={20} /></button>
             </div>
-            <AuthPanel onSuccess={onClose} />
+            <AuthPanel onSuccess={() => setOpenedLoggedIn(true)} />
           </>
         )}
         {openedLoggedIn === true && (

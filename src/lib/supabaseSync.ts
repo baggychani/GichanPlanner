@@ -21,7 +21,10 @@ export function subscribePlannerSync(listener: (error: unknown) => void) {
   return () => { listeners.delete(listener); };
 }
 
+let inflight = 0;
+
 function enqueue(work: () => Promise<void>) {
+  inflight += 1;
   const run = syncChain.then(async () => {
     await work();
     notify(null);
@@ -29,13 +32,18 @@ function enqueue(work: () => Promise<void>) {
   syncChain = run.catch(error => {
     console.error('[gichanplanner] 동기화 실패', error);
     notify(error);
+  }).finally(() => {
+    inflight -= 1;
   });
   return run;
 }
 
 export async function waitForPlannerCloud() {
-  await Promise.resolve();
-  await syncChain;
+  await new Promise<void>(resolve => { window.setTimeout(resolve, 0); });
+  for (let i = 0; i < 8; i += 1) {
+    await syncChain;
+    if (inflight === 0) break;
+  }
   if (lastError) throw lastError;
 }
 
@@ -68,6 +76,19 @@ async function uploadBlob(bucket: 'profile-images' | 'task-images', path: string
   });
   if (error) throw error;
   return path;
+}
+
+async function removeStorageObjects(bucket: 'profile-images' | 'task-images', paths: string[]) {
+  if (!supabase || paths.length === 0) return;
+  await supabase.storage.from(bucket).remove(paths);
+}
+
+function taskImagePaths(ownerId: string, taskId: string) {
+  return [`${ownerId}/${taskId}.webp`, `${ownerId}/${taskId}.png`, `${ownerId}/${taskId}.jpg`];
+}
+
+function avatarPaths(ownerId: string) {
+  return [`${ownerId}/avatar.webp`, `${ownerId}/avatar.png`, `${ownerId}/avatar.jpg`];
 }
 
 async function downloadBlob(bucket: 'profile-images' | 'task-images', path: string | null) {
@@ -199,12 +220,19 @@ function routineFromRemote(row: RemoteStamp & Routine): Routine {
   };
 }
 
-function mergeByUpdatedAt<T extends { id: string; updated_at: string }>(local: T[], remote: T[]) {
+function isNewer(candidate: { updated_at: string; version?: number }, current: { updated_at: string; version?: number }) {
+  const candidateTime = Date.parse(candidate.updated_at);
+  const currentTime = Date.parse(current.updated_at);
+  if (candidateTime !== currentTime) return candidateTime > currentTime;
+  return (candidate.version ?? 0) > (current.version ?? 0);
+}
+
+function mergeByUpdatedAt<T extends { id: string; updated_at: string; version?: number }>(local: T[], remote: T[]) {
   const merged = new Map<string, T>();
   for (const row of local) merged.set(row.id, row);
   for (const row of remote) {
     const existing = merged.get(row.id);
-    if (!existing || Date.parse(row.updated_at) > Date.parse(existing.updated_at)) merged.set(row.id, row);
+    if (!existing || isNewer(row, existing)) merged.set(row.id, row);
   }
   return [...merged.values()];
 }
@@ -214,8 +242,12 @@ async function pushTask(task: Task, ownerId: string, mode: 'user' | 'bulk') {
   if (task.image_blob) {
     const extension = task.image_blob.type === 'image/png' ? 'png' : task.image_blob.type === 'image/jpeg' ? 'jpg' : 'webp';
     row.image_path = await uploadBlob('task-images', `${ownerId}/${task.id}.${extension}`, task.image_blob);
+    if (mode === 'user') {
+      await removeStorageObjects('task-images', taskImagePaths(ownerId, task.id).filter(path => path !== row.image_path));
+    }
   } else if (mode === 'user') {
     row.image_path = null;
+    await removeStorageObjects('task-images', taskImagePaths(ownerId, task.id));
   } else {
     delete (row as { image_path?: string | null }).image_path;
   }
@@ -241,8 +273,12 @@ async function pushProfile(profile: Profile, ownerId: string, mode: 'user' | 'bu
   if (profile.avatar) {
     const extension = profile.avatar.type === 'image/png' ? 'png' : profile.avatar.type === 'image/jpeg' ? 'jpg' : 'webp';
     payload.avatar_path = await uploadBlob('profile-images', `${ownerId}/avatar.${extension}`, profile.avatar);
+    if (mode === 'user') {
+      await removeStorageObjects('profile-images', avatarPaths(ownerId).filter(path => path !== payload.avatar_path));
+    }
   } else if (mode === 'user') {
     payload.avatar_path = null;
+    await removeStorageObjects('profile-images', avatarPaths(ownerId));
   }
   const { data, error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id').maybeSingle();
   if (error) throw error;
@@ -287,7 +323,7 @@ async function pullRemote(ownerId: string, email: string | null) {
   for (const id of taskIds) {
     const local = localById.get(id);
     const remote = remoteTasks.find(row => row.id === id);
-    if (remote && (!local || Date.parse(remote.updated_at) > Date.parse(local.updated_at))) {
+    if (remote && (!local || isNewer({ updated_at: remote.updated_at, version: versionFrom(remote) }, local))) {
       const downloaded = remote.image_path ? await downloadBlob('task-images', remote.image_path) : null;
       const imageBlob = remote.image_path
         ? (downloaded ?? local?.image_blob ?? null)

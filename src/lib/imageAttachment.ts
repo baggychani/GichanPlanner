@@ -16,7 +16,14 @@ export async function compressImage(file: File): Promise<Blob> {
   image.close();
 
   return new Promise((resolve, reject) => {
-    canvas.toBlob(blob => blob ? resolve(blob) : reject(new Error('이미지를 압축하지 못했습니다.')), 'image/webp', IMAGE_QUALITY);
+    const finish = (blob: Blob | null) => {
+      if (blob) resolve(blob);
+      else reject(new Error('이미지를 압축하지 못했습니다.'));
+    };
+    canvas.toBlob(blob => {
+      if (blob) finish(blob);
+      else canvas.toBlob(finish, 'image/jpeg', IMAGE_QUALITY);
+    }, 'image/webp', IMAGE_QUALITY);
   });
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Image as ImageIcon, Star, Trash2, Upload, X } from 'lucide-react';
 import clsx from 'clsx';
@@ -7,6 +7,20 @@ import { formatScheduledTime, parseDay } from '../lib/datetime';
 import { compressImage } from '../lib/imageAttachment';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 import { Overlay } from './Overlay';
+import { ConfirmDiscardDialog } from './DailyDialogs';
+
+function taskDraftKey(task: Task) {
+  return JSON.stringify({
+    title: task.title,
+    memo: task.memo,
+    domain_id: task.domain_id,
+    is_important: task.is_important,
+    target_date: task.target_date,
+    scheduled_time: task.scheduled_time,
+    hasImage: Boolean(task.image_blob || task.image_data),
+    imageSize: task.image_blob?.size ?? 0,
+  });
+}
 
 type TaskEditModalProps = {
   task: Task;
@@ -33,7 +47,14 @@ export function TaskEditModal({
 }: TaskEditModalProps) {
   const [isFileHover, setIsFileHover] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
+  const [discardOpen, setDiscardOpen] = useState(false);
+  const initialDraft = useRef(taskDraftKey(task));
   const imageUrl = useObjectUrl(task.image_blob ?? null) ?? task.image_data ?? null;
+
+  const requestClose = () => {
+    if (taskDraftKey(task) !== initialDraft.current) setDiscardOpen(true);
+    else onClose();
+  };
 
   const handleImageUpload = async (file: File | null) => {
     if (!file || !file.type.startsWith('image/')) return;
@@ -47,11 +68,11 @@ export function TaskEditModal({
   };
 
   return (
-    <Overlay onEscape={onClose}>
+    <Overlay onEscape={requestClose}>
       <div className="bg-surface rounded-3xl w-[420px] max-w-full shadow-xl flex flex-col max-h-[90vh]">
         <div className="flex justify-between items-center p-6 pb-4 shrink-0">
           <h3 className="text-[17px] font-bold">{isCreating ? '할 일 만들기' : '할 일 상세'}</h3>
-          <button onClick={onClose} className="p-1 hover:bg-surface-hover rounded-full"><X size={20} /></button>
+          <button onClick={requestClose} className="p-1 hover:bg-surface-hover rounded-full"><X size={20} /></button>
         </div>
 
         <div className="overflow-y-auto px-6 pb-6 space-y-4">
@@ -173,7 +194,7 @@ export function TaskEditModal({
 
         <div className="px-6 pb-6 pt-4 shrink-0 flex justify-between gap-3 border-t border-line">
           {isCreating ? (
-            <button onClick={onClose} className="px-4 py-3 text-fg-muted bg-surface-hover hover:bg-line-strong rounded-xl transition-colors font-bold flex items-center justify-center">
+            <button onClick={requestClose} className="px-4 py-3 text-fg-muted bg-surface-hover hover:bg-line-strong rounded-xl transition-colors font-bold flex items-center justify-center">
               취소
             </button>
           ) : (
@@ -190,6 +211,7 @@ export function TaskEditModal({
           </button>
         </div>
       </div>
+      {discardOpen && <ConfirmDiscardDialog onCancel={() => setDiscardOpen(false)} onDiscard={onClose} />}
     </Overlay>
   );
 }

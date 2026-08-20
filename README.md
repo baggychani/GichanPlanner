@@ -12,7 +12,27 @@
 
 로그아웃하면 달력은 보이고, 할 일·데드라인 내용은 숨깁니다.
 
-GitHub Pages에서 비밀번호 찾기·가입 인증 메일을 쓰려면 Supabase Authentication의 Redirect URLs에 `https://baggychani.github.io/GichanPlanner/`를 넣습니다. Site URL도 같은 주소로 둡니다.
+## Supabase에서 해야 하는 것
+
+SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합니다. 이미 넣은 파일은 건너뛰고, 없는 것만 넣으면 됩니다.
+
+1. `20260820000000_initial_schema.sql`
+2. `20260820010000_deadline_due_time.sql`
+3. `20260820020000_profile_birthday.sql`
+4. `20260820030000_profile_insert.sql` ← 닉네임 저장에 필요
+
+Authentication → URL Configuration:
+
+- **Site URL:** `https://baggychani.github.io/GichanPlanner/`
+- **Redirect URLs**에 아래를 모두 넣습니다.
+  - `https://baggychani.github.io/GichanPlanner/`
+  - `https://baggychani.github.io/GichanPlanner/**`
+  - `http://localhost:5173/`
+  - `http://localhost:8734/`
+
+Authentication → Providers → Email이 켜져 있으면 됩니다. 이메일 인증을 강제 중이면 가입 후 메일 링크를 눌러야 로그인됩니다. 개인용으로 바로 쓰려면 Confirm email을 꺼도 됩니다.
+
+Storage에 `profile-images`, `task-images` 버킷이 있어야 합니다. 초기 스키마 SQL을 실행했다면 이미 있습니다.
 
 ## 실행
 
@@ -31,7 +51,7 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 npm run dev
 ```
 
-처음 쓰는 Supabase 프로젝트라면 `supabase/migrations/` SQL을 대시보드에서 실행합니다. 이미 쓰는 프로젝트도 `20260820030000_profile_insert.sql`까지 적용되어 있어야 닉네임이 계정에 저장됩니다.
+처음 쓰는 Supabase 프로젝트라면 위의 SQL과 URL 설정을 먼저 맞춥니다.
 
 ```bash
 npm run build
