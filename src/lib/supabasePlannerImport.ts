@@ -2,7 +2,7 @@ import { supabase } from './supabase';
 import type { PortableAttachment, PortablePlannerExport } from './portablePlannerExport';
 
 export type SupabaseImportReport = {
-  imported: Record<'tasks' | 'schedules' | 'routines' | 'domains' | 'goals' | 'deadlines' | 'attachments', number>;
+  imported: Record<'tasks' | 'schedules' | 'routines' | 'domains' | 'goals' | 'deadlines' | 'projects' | 'attachments', number>;
 };
 
 function attachmentToBlob(attachment: PortableAttachment) {
@@ -37,14 +37,16 @@ export async function importPortablePlannerExport(archive: PortablePlannerExport
     else profileAvatarPath = path;
   }
 
-  const put = async (table: 'tasks' | 'schedules' | 'routines' | 'domains' | 'goals' | 'deadlines', rows: object[]) => {
+  const put = async (table: 'tasks' | 'schedules' | 'routines' | 'domains' | 'goals' | 'deadlines' | 'projects', rows: object[]) => {
     if (rows.length === 0) return;
     const { error } = await client.from(table).upsert(rows, { onConflict: 'id' });
     if (error) throw error;
   };
   const withOwner = <T extends { id: string; version: number }>(item: T) => ({ ...item, owner_id: user.id, revision: item.version });
 
+  const projects = archive.projects ?? [];
   await put('domains', archive.domains.map(withOwner));
+  await put('projects', projects.map(withOwner));
   await put('goals', archive.goals.map(withOwner));
   await put('tasks', archive.tasks.map(task => ({ ...withOwner(task), image_path: taskAttachmentPaths.get(task.id) ?? null })));
   await put('schedules', archive.schedules.map(withOwner));
@@ -62,5 +64,5 @@ export async function importPortablePlannerExport(archive: PortablePlannerExport
     if (error) throw error;
   }
 
-  return { imported: { tasks: archive.tasks.length, schedules: archive.schedules.length, routines: archive.routines.length, domains: archive.domains.length, goals: archive.goals.length, deadlines: archive.deadlines.length, attachments: archive.attachments.length } };
+  return { imported: { tasks: archive.tasks.length, schedules: archive.schedules.length, routines: archive.routines.length, domains: archive.domains.length, goals: archive.goals.length, deadlines: archive.deadlines.length, projects: projects.length, attachments: archive.attachments.length } };
 }

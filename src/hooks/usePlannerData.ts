@@ -17,6 +17,7 @@ export function usePlannerData(optimisticTasks: Task[] | null) {
   const categories = categoryQuery ?? [];
   const goals = useLiveQuery(() => db.goals.filter(g => g.deleted_at === null).toArray()) || [];
   const deadlines = useLiveQuery(() => db.deadlines.filter(deadline => deadline.deleted_at === null).toArray()) || [];
+  const projects = useLiveQuery(() => db.projects.filter(project => project.deleted_at === null).sortBy('order')) ?? [];
 
-  return { tasks, categories, goals, deadlines, calendarTaskCountByDate };
+  return { tasks, categories, goals, deadlines, projects, calendarTaskCountByDate };
 }

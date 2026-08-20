@@ -21,6 +21,7 @@ import { ConfirmDailyDeleteDialog, ImageViewer, NoIncompleteNoticeDialog } from 
 import { DailyPanel } from './components/DailyPanel';
 import { DeadlineCreateModal, DeadlineEditModal } from './components/DeadlineModals';
 import { PlannerPanel } from './components/PlannerPanel';
+import { ProjectCreateModal } from './components/ProjectCreateModal';
 import { TaskEditModal } from './components/TaskEditModal';
 import { TimePickerModal } from './components/TimePickerModal';
 import { WeeklyPanel } from './components/WeeklyPanel';
@@ -51,6 +52,7 @@ function PlannerApp() {
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
   const [isQuickCreateMenuOpen, setIsQuickCreateMenuOpen] = useState(false);
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
+  const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isSelectingDeadlineDate, setIsSelectingDeadlineDate] = useState(false);
   const [selectingDateForDeadline, setSelectingDateForDeadline] = useState<string | null>(null);
   const [deadlineTitle, setDeadlineTitle] = useState('');
@@ -83,6 +85,7 @@ function PlannerApp() {
   const categories = showPlanner ? planner.categories : [];
   const goals = showPlanner ? planner.goals : [];
   const deadlines = showPlanner ? planner.deadlines : [];
+  const projects = showPlanner ? planner.projects : [];
   const calendarTaskCountByDate = showPlanner ? planner.calendarTaskCountByDate : {};
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const selectedDateLabel = format(selectedDate, 'yyyy-MM-dd EEEE', { locale: ko });
@@ -136,6 +139,7 @@ function PlannerApp() {
     setIsDailyMenuOpen(false);
     setIsCategoryModalOpen(false);
     setIsDeadlineModalOpen(false);
+    setIsProjectModalOpen(false);
     setEditingTask(null);
     setIsCreatingTask(false);
     setEditingDeadline(null);
@@ -354,6 +358,11 @@ function PlannerApp() {
           setIsDeadlineModalOpen(true);
           setIsQuickCreateMenuOpen(false);
         }}
+        onCreateProject={() => {
+          if (!requireLogin()) return;
+          setIsProjectModalOpen(true);
+          setIsQuickCreateMenuOpen(false);
+        }}
         onOpenCategories={() => {
           if (!requireLogin()) return;
           setIsCategoryModalOpen(true);
@@ -488,11 +497,20 @@ function PlannerApp() {
         />
       )}
 
+      {isProjectModalOpen && (
+        <ProjectCreateModal
+          nextOrder={projects.reduce((maximum, project) => Math.max(maximum, project.order), -1) + 1}
+          onClose={() => setIsProjectModalOpen(false)}
+          onCreated={() => setIsProjectModalOpen(false)}
+        />
+      )}
+
       {editingTask && !selectingDateForTask && (
         <TaskEditModal
           task={editingTask}
           isCreating={isCreatingTask}
           categories={categories}
+          projects={projects}
           onChange={setEditingTask}
           onClose={closeTaskEditor}
           onPickDate={() => {

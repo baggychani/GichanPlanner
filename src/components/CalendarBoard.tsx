@@ -2,7 +2,7 @@ import {
   format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
   isSameMonth, isSameDay, isToday, differenceInCalendarDays,
 } from 'date-fns';
-import { AlertCircle, CalendarDays, Cake, ChevronLeft, ChevronRight, Flag, Plus, Repeat2, Settings, Target, ListTodo, UserRound } from 'lucide-react';
+import { AlertCircle, CalendarDays, Cake, ChevronLeft, ChevronRight, Flag, FolderKanban, Plus, Repeat2, Settings, Target, ListTodo, UserRound } from 'lucide-react';
 import clsx from 'clsx';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Deadline, Goal } from '../lib/db';
@@ -32,6 +32,7 @@ type CalendarBoardProps = {
   onToggleQuickCreate: () => void;
   onCreateTask: () => void;
   onCreateDeadline: () => void;
+  onCreateProject: () => void;
   onOpenCategories: () => void;
   onOpenProfile: () => void;
   onCancelSelection: () => void;
@@ -90,6 +91,7 @@ export function CalendarBoard({
   onToggleQuickCreate,
   onCreateTask,
   onCreateDeadline,
+  onCreateProject,
   onOpenCategories,
   onOpenProfile,
   onCancelSelection,
@@ -250,6 +252,9 @@ export function CalendarBoard({
               </button>
               <button onClick={onCreateDeadline} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 transition-colors">
                 <AlertCircle size={16} /> 데드라인 만들기
+              </button>
+              <button onClick={onCreateProject} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-surface-muted hover:text-fg transition-colors">
+                <FolderKanban size={16} /> 프로젝트 만들기
               </button>
               <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
                 <Cake size={16} /> 기념일 만들기

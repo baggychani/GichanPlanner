@@ -13,6 +13,7 @@ export interface Task {
   scheduled_time: string | null; // ISO string, time selected for the task
   domain_id: string | null;
   goal_id: string | null;
+  project_id: string | null;
   is_important: boolean;
   is_completed: boolean;
   memo: string;
@@ -92,6 +93,20 @@ export interface Deadline {
   reminder_days: number | null;
 }
 
+export interface Project {
+  id: string;
+  version: number;
+  updated_at: string;
+  created_at: string;
+  deleted_at: string | null;
+
+  title: string;
+  icon: string;
+  domain_id: string | null;
+  due_date: string | null;
+  order: number;
+}
+
 export interface Profile {
   id: '#profile';
   nickname: string;
@@ -111,6 +126,7 @@ const db = new Dexie('GichanPlanDB') as Dexie & {
   domains: EntityTable<Domain, 'id'>;
   goals: EntityTable<Goal, 'id'>;
   deadlines: EntityTable<Deadline, 'id'>;
+  projects: EntityTable<Project, 'id'>;
   profiles: EntityTable<Profile, 'id'>;
 };
 
@@ -192,6 +208,21 @@ db.version(11).stores({
   await transaction.table('profiles').toCollection().modify((profile: Profile) => {
     if (profile.birthday_month === undefined) profile.birthday_month = null;
     if (profile.birthday_day === undefined) profile.birthday_day = null;
+  });
+});
+
+db.version(12).stores({
+  tasks: 'id, target_date, is_completed, is_important, deleted_at, domain_id, project_id, order',
+  schedules: 'id, target_date, start_time, deleted_at',
+  routines: 'id, start_date, deleted_at',
+  domains: 'id, deleted_at, order',
+  goals: 'id, time_frame, start_date, deleted_at',
+  deadlines: 'id, due_date, deleted_at',
+  projects: 'id, deleted_at, order',
+  profiles: 'id',
+}).upgrade(async (transaction) => {
+  await transaction.table('tasks').toCollection().modify((task: Task) => {
+    if (task.project_id === undefined) task.project_id = null;
   });
 });
 

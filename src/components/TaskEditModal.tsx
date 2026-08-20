@@ -2,7 +2,7 @@ import { useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { Calendar as CalendarIcon, Image as ImageIcon, Star, Trash2, Upload, X } from 'lucide-react';
 import clsx from 'clsx';
-import type { Domain, Task } from '../lib/db';
+import type { Domain, Project, Task } from '../lib/db';
 import { formatScheduledTime, parseDay } from '../lib/datetime';
 import { compressImage } from '../lib/imageAttachment';
 import { useObjectUrl } from '../hooks/useObjectUrl';
@@ -14,6 +14,7 @@ function taskDraftKey(task: Task) {
     title: task.title,
     memo: task.memo,
     domain_id: task.domain_id,
+    project_id: task.project_id,
     is_important: task.is_important,
     target_date: task.target_date,
     scheduled_time: task.scheduled_time,
@@ -26,6 +27,7 @@ type TaskEditModalProps = {
   task: Task;
   isCreating: boolean;
   categories: Domain[];
+  projects: Project[];
   onChange: (task: Task) => void;
   onClose: () => void;
   onPickDate: () => void;
@@ -38,6 +40,7 @@ export function TaskEditModal({
   task,
   isCreating,
   categories,
+  projects,
   onChange,
   onClose,
   onPickDate,
@@ -114,6 +117,22 @@ export function TaskEditModal({
                 중요
               </button>
             </div>
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-subtle mb-1">프로젝트</label>
+            <select
+              value={task.project_id ?? ''}
+              onChange={event => onChange({ ...task, project_id: event.target.value || null })}
+              className="w-full bg-surface-muted rounded-xl p-3 outline-none font-sans text-sm border border-transparent focus:border-line-strong"
+            >
+              <option value="">없음</option>
+              {task.project_id && !projects.some(project => project.id === task.project_id) && (
+                <option value={task.project_id}>없는 프로젝트</option>
+              )}
+              {projects.map(project => (
+                <option key={project.id} value={project.id}>{project.icon} {project.title}</option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="block text-xs font-medium text-fg-subtle mb-1">메모</label>

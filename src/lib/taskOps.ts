@@ -18,6 +18,7 @@ export function createBlankTask(targetDate: string): Task {
     scheduled_time: null,
     domain_id: null,
     goal_id: null,
+    project_id: null,
     is_important: false,
     is_completed: false,
     order: 0,

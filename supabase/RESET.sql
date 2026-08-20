@@ -12,6 +12,7 @@ drop table if exists public.routines cascade;
 drop table if exists public.domains cascade;
 drop table if exists public.goals cascade;
 drop table if exists public.deadlines cascade;
+drop table if exists public.projects cascade;
 drop table if exists public.profiles cascade;
 
 create table public.profiles (
@@ -44,7 +45,7 @@ create table public.tasks (
   revision bigint not null default 1,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(), deleted_at timestamptz,
   title text not null, target_date date not null, deadline timestamptz, scheduled_time timestamptz,
-  domain_id uuid, goal_id uuid, is_important boolean not null default false, is_completed boolean not null default false,
+  domain_id uuid, goal_id uuid, project_id uuid, is_important boolean not null default false, is_completed boolean not null default false,
   memo text not null default '', "order" integer not null default 0, image_path text
 );
 
@@ -74,6 +75,11 @@ create table public.deadlines (
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(), deleted_at timestamptz,
   title text not null, memo text not null default '', due_date date not null, due_time timestamptz, reminder_days integer
 );
+create table public.projects (
+  id uuid primary key, owner_id uuid not null references auth.users(id) on delete cascade, revision bigint not null default 1,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(), deleted_at timestamptz,
+  title text not null, icon text not null default '📁', domain_id uuid, due_date date, "order" integer not null default 0
+);
 
 create table public.legacy_dexie_identities (
   provider text not null check (provider = 'dexie_cloud'),
@@ -92,6 +98,7 @@ alter table public.routines enable row level security;
 alter table public.domains enable row level security;
 alter table public.goals enable row level security;
 alter table public.deadlines enable row level security;
+alter table public.projects enable row level security;
 alter table public.legacy_dexie_identities enable row level security;
 
 create policy "read own profile" on public.profiles for select using ((select auth.uid()) = id);
@@ -106,6 +113,7 @@ create policy "own routines" on public.routines for all using ((select auth.uid(
 create policy "own domains" on public.domains for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
 create policy "own goals" on public.goals for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
 create policy "own deadlines" on public.deadlines for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
+create policy "own projects" on public.projects for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
 create policy "create own legacy mapping" on public.legacy_dexie_identities for insert with check ((select auth.uid()) = user_id);
 create policy "read own legacy mapping" on public.legacy_dexie_identities for select using ((select auth.uid()) = user_id);
 create policy "update own legacy mapping" on public.legacy_dexie_identities for update using ((select auth.uid()) = user_id) with check ((select auth.uid()) = user_id);
@@ -119,6 +127,7 @@ grant select, insert, update, delete on table
   public.domains,
   public.goals,
   public.deadlines,
+  public.projects,
   public.legacy_dexie_identities
 to authenticated;
 

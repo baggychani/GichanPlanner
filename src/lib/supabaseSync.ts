@@ -1,5 +1,5 @@
 import type { Transaction } from 'dexie';
-import { db, type Deadline, type Domain, type Goal, type Profile, type Routine, type Schedule, type Task } from './db';
+import { db, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
 import { supabase } from './supabase';
 
 const OWNER_KEY = 'gichanplan-sync-owner';
@@ -97,7 +97,7 @@ async function downloadBlob(bucket: 'profile-images' | 'task-images', path: stri
   return data;
 }
 
-async function upsertRows(table: 'tasks' | 'schedules' | 'routines' | 'domains' | 'goals' | 'deadlines', rows: object[]) {
+async function upsertRows(table: 'tasks' | 'schedules' | 'routines' | 'domains' | 'goals' | 'deadlines' | 'projects', rows: object[]) {
   if (!supabase || rows.length === 0) return;
   const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
   if (error) throw error;
@@ -120,7 +120,7 @@ function taskRow(task: Task, ownerId: string, imagePath: string | null) {
     id: task.id, owner_id: ownerId, revision: task.version,
     created_at: task.created_at, updated_at: task.updated_at, deleted_at: task.deleted_at,
     title: task.title, target_date: task.target_date, deadline: task.deadline, scheduled_time: task.scheduled_time,
-    domain_id: task.domain_id, goal_id: task.goal_id, is_important: task.is_important, is_completed: task.is_completed,
+    domain_id: task.domain_id, goal_id: task.goal_id, project_id: task.project_id ?? null, is_important: task.is_important, is_completed: task.is_completed,
     memo: task.memo, order: task.order, image_path: imagePath,
   };
 }
@@ -130,6 +130,14 @@ function domainRow(domain: Domain, ownerId: string) {
     id: domain.id, owner_id: ownerId, revision: domain.version,
     created_at: domain.created_at, updated_at: domain.updated_at, deleted_at: domain.deleted_at,
     name: domain.name, icon: domain.icon, color: domain.color, order: domain.order, is_archived: domain.is_archived,
+  };
+}
+
+function projectRow(project: Project, ownerId: string) {
+  return {
+    id: project.id, owner_id: ownerId, revision: project.version,
+    created_at: project.created_at, updated_at: project.updated_at, deleted_at: project.deleted_at,
+    title: project.title, icon: project.icon, domain_id: project.domain_id, due_date: project.due_date, order: project.order,
   };
 }
 
@@ -170,7 +178,7 @@ function routineRow(routine: Routine, ownerId: string) {
 
 type RemoteTask = RemoteStamp & {
   title: string; target_date: string; deadline: string | null; scheduled_time: string | null;
-  domain_id: string | null; goal_id: string | null; is_important: boolean; is_completed: boolean;
+  domain_id: string | null; goal_id: string | null; project_id: string | null; is_important: boolean; is_completed: boolean;
   memo: string; order: number; image_path: string | null;
 };
 
@@ -178,7 +186,7 @@ function taskFromRemote(row: RemoteTask, imageBlob: Blob | null): Task {
   return {
     id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
     title: row.title, target_date: row.target_date, deadline: row.deadline, scheduled_time: row.scheduled_time,
-    domain_id: row.domain_id, goal_id: row.goal_id, is_important: row.is_important, is_completed: row.is_completed,
+    domain_id: row.domain_id, goal_id: row.goal_id, project_id: row.project_id ?? null, is_important: row.is_important, is_completed: row.is_completed,
     memo: row.memo ?? '', order: row.order ?? 0, image_blob: imageBlob, image_data: null,
   };
 }
@@ -187,6 +195,13 @@ function domainFromRemote(row: RemoteStamp & Domain): Domain {
   return {
     id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
     name: row.name, icon: row.icon, color: row.color, order: row.order, is_archived: row.is_archived,
+  };
+}
+
+function projectFromRemote(row: RemoteStamp & Project): Project {
+  return {
+    id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
+    title: row.title, icon: row.icon, domain_id: row.domain_id ?? null, due_date: row.due_date ?? null, order: row.order ?? 0,
   };
 }
 
@@ -235,7 +250,8 @@ function sameTaskCore(a: Task, b: Task) {
     && a.order === b.order
     && a.deadline === b.deadline
     && a.scheduled_time === b.scheduled_time
-    && a.goal_id === b.goal_id;
+    && a.goal_id === b.goal_id
+    && a.project_id === b.project_id;
 }
 
 // 할 일만 먼저 도착해 카테고리가 비어 보일 때, 분류만 지운 쪽을 다른 기기의 분류로 되돌린다.
@@ -325,9 +341,9 @@ async function pushProfile(profile: Profile, ownerId: string, mode: 'user' | 'bu
 }
 
 async function pushAllLocal(ownerId: string) {
-  const [tasks, domains, goals, deadlines, schedules, routines, profile] = await Promise.all([
+  const [tasks, domains, goals, deadlines, schedules, routines, projects, profile] = await Promise.all([
     db.tasks.toArray(), db.domains.toArray(), db.goals.toArray(), db.deadlines.toArray(),
-    db.schedules.toArray(), db.routines.toArray(), db.profiles.get('#profile'),
+    db.schedules.toArray(), db.routines.toArray(), db.projects.toArray(), db.profiles.get('#profile'),
   ]);
   for (const task of tasks) await pushTask(task, ownerId, 'bulk');
   await upsertRows('domains', domains.map(domain => domainRow(domain, ownerId)));
@@ -335,22 +351,24 @@ async function pushAllLocal(ownerId: string) {
   await upsertRows('deadlines', deadlines.map(deadline => deadlineRow(deadline, ownerId)));
   await upsertRows('schedules', schedules.map(schedule => scheduleRow(schedule, ownerId)));
   await upsertRows('routines', routines.map(routine => routineRow(routine, ownerId)));
+  await upsertRows('projects', projects.map(project => projectRow(project, ownerId)));
   if (profile) await pushProfile(profile, ownerId, 'bulk');
 }
 
 async function pullRemote(ownerId: string, email: string | null) {
   if (!supabase) return;
   const client = supabase;
-  const [tasksRes, domainsRes, goalsRes, deadlinesRes, schedulesRes, routinesRes, profileRes] = await Promise.all([
+  const [tasksRes, domainsRes, goalsRes, deadlinesRes, schedulesRes, routinesRes, projectsRes, profileRes] = await Promise.all([
     client.from('tasks').select('*'),
     client.from('domains').select('*'),
     client.from('goals').select('*'),
     client.from('deadlines').select('*'),
     client.from('schedules').select('*'),
     client.from('routines').select('*'),
+    client.from('projects').select('*'),
     client.from('profiles').select('*').eq('id', ownerId).maybeSingle(),
   ]);
-  for (const result of [tasksRes, domainsRes, goalsRes, deadlinesRes, schedulesRes, routinesRes, profileRes]) {
+  for (const result of [tasksRes, domainsRes, goalsRes, deadlinesRes, schedulesRes, routinesRes, projectsRes, profileRes]) {
     if (result.error) throw result.error;
   }
 
@@ -381,6 +399,7 @@ async function pullRemote(ownerId: string, email: string | null) {
   const deadlines = mergeByUpdatedAt(await db.deadlines.toArray(), ((deadlinesRes.data ?? []) as Array<RemoteStamp & Deadline>).map(deadlineFromRemote));
   const schedules = mergeByUpdatedAt(await db.schedules.toArray(), ((schedulesRes.data ?? []) as Array<RemoteStamp & Schedule>).map(scheduleFromRemote));
   const routines = mergeByUpdatedAt(await db.routines.toArray(), ((routinesRes.data ?? []) as Array<RemoteStamp & Routine>).map(routineFromRemote));
+  const projects = mergeByUpdatedAt(await db.projects.toArray(), ((projectsRes.data ?? []) as Array<RemoteStamp & Project>).map(projectFromRemote));
 
   const remoteProfile = profileRes.data as {
     nickname: string;
@@ -420,14 +439,15 @@ async function pullRemote(ownerId: string, email: string | null) {
 
   applyingRemote = true;
   try {
-    await db.transaction('rw', [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.profiles], async () => {
-      await Promise.all([db.tasks.clear(), db.domains.clear(), db.goals.clear(), db.deadlines.clear(), db.schedules.clear(), db.routines.clear()]);
+    await db.transaction('rw', [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.projects, db.profiles], async () => {
+      await Promise.all([db.tasks.clear(), db.domains.clear(), db.goals.clear(), db.deadlines.clear(), db.schedules.clear(), db.routines.clear(), db.projects.clear()]);
       if (mergedTasks.length) await db.tasks.bulkPut(mergedTasks);
       if (domains.length) await db.domains.bulkPut(domains);
       if (goals.length) await db.goals.bulkPut(goals);
       if (deadlines.length) await db.deadlines.bulkPut(deadlines);
       if (schedules.length) await db.schedules.bulkPut(schedules);
       if (routines.length) await db.routines.bulkPut(routines);
+      if (projects.length) await db.projects.bulkPut(projects);
       await db.profiles.put(profile.email === email || !email ? profile : { ...profile, email });
     });
     await repairTasksInDeletedCategories();
@@ -439,8 +459,8 @@ async function pullRemote(ownerId: string, email: string | null) {
 async function clearLocalPlanner() {
   applyingRemote = true;
   try {
-    await db.transaction('rw', [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.profiles], async () => {
-      await Promise.all([db.tasks.clear(), db.domains.clear(), db.goals.clear(), db.deadlines.clear(), db.schedules.clear(), db.routines.clear(), db.profiles.clear()]);
+    await db.transaction('rw', [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.projects, db.profiles], async () => {
+      await Promise.all([db.tasks.clear(), db.domains.clear(), db.goals.clear(), db.deadlines.clear(), db.schedules.clear(), db.routines.clear(), db.projects.clear(), db.profiles.clear()]);
     });
   } finally {
     applyingRemote = false;
@@ -567,6 +587,18 @@ export function installPlannerSync() {
       const ownerId = await currentUserId();
       const row = await db.routines.get(primKey);
       if (ownerId && row) await upsertRows('routines', [routineRow(row, ownerId)]);
+    });
+  });
+  db.projects.hook('creating', (_key, obj, trans) => {
+    if (skipCloudPush()) return;
+    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('projects', [projectRow(obj, ownerId)]); });
+  });
+  db.projects.hook('updating', (_mods, primKey, _obj, trans) => {
+    if (skipCloudPush()) return;
+    whenCommitted(trans, async () => {
+      const ownerId = await currentUserId();
+      const row = await db.projects.get(primKey);
+      if (ownerId && row) await upsertRows('projects', [projectRow(row, ownerId)]);
     });
   });
   db.profiles.hook('creating', (_key, obj, trans) => {
