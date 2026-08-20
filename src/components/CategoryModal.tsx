@@ -171,6 +171,7 @@ export function CategoryModal({
                     });
                   }}
                 />
+                <div className="mt-5 flex gap-2">
                 <button
                   type="button"
                   disabled={backupBusy}
@@ -181,7 +182,7 @@ export function CategoryModal({
                       .catch(caught => setBackupStatus(authErrorMessage(caught)))
                       .finally(() => setIsDownloadingBackup(false));
                   }}
-                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-3 text-sm font-semibold text-on-ink disabled:opacity-40"
+                  className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl bg-ink py-3 text-sm font-semibold text-on-ink disabled:opacity-40"
                 >
                   <Download size={16} />
                   {isDownloadingBackup ? '받는 중…' : '데이터 받기'}
@@ -190,11 +191,12 @@ export function CategoryModal({
                   type="button"
                   disabled={backupBusy}
                   onClick={() => backupFileInputRef.current?.click()}
-                  className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface py-3 text-sm font-semibold text-fg hover:bg-surface-hover disabled:opacity-40"
+                  className="flex min-w-0 flex-1 items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface py-3 text-sm font-semibold text-fg hover:bg-surface-hover disabled:opacity-40"
                 >
                   <Upload size={16} />
                   데이터 넣기
                 </button>
+                </div>
                 <p className="mt-3 text-xs leading-5 text-fg-subtle">
                   넣을 때는 같은 항목은 더 최근 것만 남기고, 파일에 없는 할 일은 지우지 않습니다. 로그인하면 하루에 한 번 계정에도 사본을 남기고, 최근 7개만 둡니다.
                 </p>

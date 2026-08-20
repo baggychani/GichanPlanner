@@ -113,6 +113,9 @@ export function CalendarBoard({
   const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
   const weekCount = Math.ceil((differenceInCalendarDays(endDate, startDate) + 1) / 7);
   const { rootRef, bodyRef } = useCalendarCellMetrics(weekCount);
+  const profile = useLiveQuery(() => db.profiles.get('#profile'));
+  const birthdayMonth = profile?.birthday_month ?? null;
+  const birthdayDay = profile?.birthday_day ?? null;
   const rows = [];
   let days = [];
   let day = startDate;
@@ -129,6 +132,9 @@ export function CalendarBoard({
       const dayDeadlines = deadlines.filter(deadline => deadline.due_date === dateStr);
       const hasDeadline = dayDeadlines.length > 0;
       const isWeekend = i === 5 || i === 6;
+      const isBirthday = birthdayMonth != null && birthdayDay != null
+        && birthdayMonth === cloneDay.getMonth() + 1
+        && birthdayDay === cloneDay.getDate();
 
       days.push(
         <div
@@ -148,13 +154,18 @@ export function CalendarBoard({
           )}
         >
           <div className="flex shrink-0 justify-between items-start">
-            <span className={clsx(
-              'flex items-center justify-center rounded-full font-semibold h-[var(--cal-date)] w-[var(--cal-date)] text-[length:var(--cal-date-font)]',
-              isToday(day) ? 'bg-primary text-on-primary' :
-              i === 5 ? 'text-blue-500' :
-              i === 6 ? 'text-red-500' : '',
-            )}>
-              {format(day, 'd')}
+            <span className="flex min-w-0 items-center gap-0.5">
+              <span className={clsx(
+                'flex items-center justify-center rounded-full font-semibold h-[var(--cal-date)] w-[var(--cal-date)] text-[length:var(--cal-date-font)]',
+                isToday(day) ? 'bg-primary text-on-primary' :
+                i === 5 ? 'text-blue-500' :
+                i === 6 ? 'text-red-500' : '',
+              )}>
+                {format(day, 'd')}
+              </span>
+              {isBirthday && (
+                <span aria-label="생일" className="leading-none text-[length:var(--cal-date-font)]">🎂</span>
+              )}
             </span>
             {hasDeadline && <AlertCircle className="calendar-deadline-icon shrink-0 text-red-500 drop-shadow-sm" strokeWidth={2.5} aria-label={`${dayDeadlines.length}개의 데드라인`} />}
           </div>
@@ -253,17 +264,17 @@ export function CalendarBoard({
               <button onClick={onCreateDeadline} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 transition-colors">
                 <AlertCircle size={16} /> 데드라인 만들기
               </button>
+              <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
+                <Repeat2 size={16} /> 루틴 만들기
+              </button>
               <button onClick={onCreateProject} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-surface-muted hover:text-fg transition-colors">
                 <FolderKanban size={16} /> 프로젝트 만들기
-              </button>
-              <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
-                <Cake size={16} /> 기념일 만들기
               </button>
               <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
                 <Flag size={16} /> 디데이 만들기
               </button>
               <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
-                <Repeat2 size={16} /> 루틴 만들기
+                <Cake size={16} /> 기념일 만들기
               </button>
             </div>
           </div>
