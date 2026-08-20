@@ -7,9 +7,9 @@ import clsx from 'clsx';
 import { useLiveQuery } from 'dexie-react-hooks';
 import type { Deadline, Goal } from '../lib/db';
 import { db } from '../lib/db';
+import { krHolidayNames } from '../lib/krHolidays';
 import { EMPTY_DAY_COUNTS, isDayCleared, type DayTaskCounts } from '../lib/taskCounts';
 import { CountBubble } from './CountBubble';
-import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '../hooks/useAuth';
 import { useCalendarCellMetrics } from '../hooks/useCalendarCellMetrics';
 import { useObjectUrl } from '../hooks/useObjectUrl';
@@ -138,6 +138,8 @@ export function CalendarBoard({
       const dayDeadlines = deadlines.filter(deadline => deadline.due_date === dateStr);
       const hasDeadline = dayDeadlines.length > 0;
       const isWeekend = i === 5 || i === 6;
+      const holidayNames = krHolidayNames(dateStr);
+      const isRedDay = i === 6 || holidayNames !== null;
       const isBirthday = birthdayMonth != null && birthdayDay != null
         && birthdayMonth === cloneDay.getMonth() + 1
         && birthdayDay === cloneDay.getDate();
@@ -146,10 +148,13 @@ export function CalendarBoard({
         <div
           key={day.toString()}
           onClick={() => onCellClick(cloneDay)}
+          title={holidayNames?.join(', ')}
           className={clsx(
             'relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-line transition-[filter] duration-150 cursor-pointer group p-[var(--cal-pad)]',
             isSelecting ? 'hover:bg-primary/20' : 'hover:brightness-95',
-            isWeekend && !isSelecting ? (i === 6 ? 'bg-red-50/30 dark:bg-red-950/25' : 'bg-blue-50/30 dark:bg-blue-950/25') : 'bg-surface',
+            !isSelecting && isRedDay ? 'bg-red-50/30 dark:bg-red-950/25'
+              : !isSelecting && isWeekend ? 'bg-blue-50/30 dark:bg-blue-950/25'
+              : 'bg-surface',
             !isSameMonth(day, monthStart) ? 'opacity-40' : '',
             isSameDay(day, selectedDate) && !isSelecting && viewMode === 'DAILY' ? 'ring-2 ring-primary ring-inset z-10' : '',
             hasDeadline ? 'shadow-[inset_-5px_0_12px_-7px_rgba(239,68,68,0.95)]' : '',
@@ -164,8 +169,8 @@ export function CalendarBoard({
               <span className={clsx(
                 'flex items-center justify-center rounded-full font-semibold h-[var(--cal-date)] w-[var(--cal-date)] text-[length:var(--cal-date-font)]',
                 isToday(day) ? 'bg-primary text-on-primary' :
-                i === 5 ? 'text-blue-500' :
-                i === 6 ? 'text-red-500' : '',
+                isRedDay ? 'text-red-500' :
+                i === 5 ? 'text-blue-500' : '',
               )}>
                 {format(day, 'd')}
               </span>
@@ -284,7 +289,6 @@ export function CalendarBoard({
           <button onClick={onOpenCategories} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted" title="설정" aria-label="설정">
             <Settings size={22} />
           </button>
-          <ThemeToggle className="max-[560px]:hidden" />
           <button
             onClick={onOpenProfile}
             aria-label={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}

@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Download, FolderKanban, GripVertical, Pencil, Plus, Tags, Trash2, Upload, X } from 'lucide-react';
+import { Check, Download, FolderKanban, GripVertical, Pencil, Plus, SunMoon, Tags, Trash2, Upload, X } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { db, type Deadline, type Domain, type Project, type Task } from '../lib/db';
@@ -8,6 +8,7 @@ import { deleteCategory, reorderCategories } from '../lib/taskOps';
 import { EmojiIcon } from './EmojiIcon';
 import { EmojiPickerOverlay } from './EmojiPickerOverlay';
 import { Overlay } from './Overlay';
+import { AppearanceSettings } from './AppearanceSettings';
 import { ProjectSettingsPanel } from './ProjectSettingsPanel';
 import { downloadPortablePlannerExport, parsePortablePlannerExport, type PortablePlannerExport } from '../lib/portablePlannerExport';
 import {
@@ -20,7 +21,10 @@ import {
 import { importPortablePlannerExport } from '../lib/supabasePlannerImport';
 import { authErrorMessage } from './authUi';
 
-type SettingsSection = 'categories' | 'projects' | 'data';
+type SettingsSection = 'appearance' | 'categories' | 'projects' | 'data';
+
+// 데이터 받기·넣기는 고급 기능이라 설정 메뉴에서는 숨긴다. 기능 코드는 그대로 둔다.
+const SHOW_DATA_SETTINGS = false;
 
 function snapshotLabel(iso: string) {
   const date = new Date(iso);
@@ -89,7 +93,13 @@ export function CategoryModal({
     return () => { cancelled = true; };
   }, [section, snapshotNonce]);
 
-  const sectionTitle = section === 'categories' ? '카테고리 관리' : section === 'projects' ? '프로젝트 관리' : '데이터';
+  const sectionTitle = section === 'appearance'
+    ? '보기'
+    : section === 'categories'
+      ? '카테고리 관리'
+      : section === 'projects'
+        ? '프로젝트 관리'
+        : '데이터';
 
   return (
     <>
@@ -103,6 +113,16 @@ export function CategoryModal({
         <div className="relative flex h-[min(680px,85vh)] w-[min(712px,95vw)] overflow-hidden rounded-3xl bg-surface shadow-xl">
           <nav className="flex w-48 shrink-0 flex-col gap-1 border-r border-line bg-surface-muted px-2 py-4">
             <p className="mb-2 px-3 text-xs font-medium text-fg-subtle">설정</p>
+            <button
+              type="button"
+              onClick={() => { setSection('appearance'); setEditingCategoryId(null); }}
+              className={clsx(
+                'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
+                section === 'appearance' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
+              )}
+            >
+              <SunMoon size={16} /> 보기
+            </button>
             <button
               type="button"
               onClick={() => setSection('categories')}
@@ -123,16 +143,18 @@ export function CategoryModal({
             >
               <FolderKanban size={16} /> 프로젝트
             </button>
-            <button
-              type="button"
-              onClick={() => { setSection('data'); setEditingCategoryId(null); }}
-              className={clsx(
-                'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
-                section === 'data' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
-              )}
-            >
-              <Download size={16} /> 데이터
-            </button>
+            {SHOW_DATA_SETTINGS && (
+              <button
+                type="button"
+                onClick={() => { setSection('data'); setEditingCategoryId(null); }}
+                className={clsx(
+                  'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
+                  section === 'data' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
+                )}
+              >
+                <Download size={16} /> 데이터
+              </button>
+            )}
           </nav>
           <div className="flex min-w-0 flex-1 flex-col p-5">
             <div className="mb-4 flex items-center justify-between">
@@ -140,7 +162,9 @@ export function CategoryModal({
               <button onClick={onClose} className="rounded-full p-1 hover:bg-surface-hover"><X size={20} /></button>
             </div>
 
-            {section === 'projects' ? (
+            {section === 'appearance' ? (
+              <AppearanceSettings />
+            ) : section === 'projects' ? (
               <ProjectSettingsPanel
                 projects={projects}
                 tasks={tasks}
