@@ -43,7 +43,7 @@ type CalendarBoardProps = {
 const WEEKDAYS = ['월', '화', '수', '목', '금', '토', '일'];
 
 // true 로 두면 달력 위 큰 계정 칸이 다시 보입니다.
-const SHOW_CALENDAR_ACCOUNT_BAR = false;
+const SHOW_CALENDAR_ACCOUNT_BAR = true;
 
 function CalendarAccountBar({ onOpen }: { onOpen: () => void }) {
   const { session } = useAuth();
@@ -60,19 +60,19 @@ function CalendarAccountBar({ onOpen }: { onOpen: () => void }) {
     <button
       type="button"
       onClick={onOpen}
-      aria-label={isLoggedIn ? '프로필 및 계정' : '로그인'}
-      className="mb-4 flex w-full items-center gap-3 rounded-3xl border border-line bg-surface px-4 py-3 text-left shadow-sm hover:bg-surface-muted"
+      aria-label={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}
+      className="mb-3 flex w-full items-center gap-2.5 rounded-2xl border border-line bg-surface px-3 py-1.5 text-left shadow-sm hover:bg-surface-muted"
     >
-      <span className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-        {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserRound size={22} />}
+      <span className="grid h-8 w-8 shrink-0 place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+        {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserRound size={18} />}
       </span>
       {isLoggedIn ? (
-        <span className="min-w-0">
-          <span className="block truncate text-[15px] font-semibold text-fg">{nickname}</span>
-          <span className="block truncate text-sm text-fg-muted">{email}</span>
+        <span className="min-w-0 leading-tight">
+          <span className="block truncate text-sm font-semibold text-fg">{nickname}</span>
+          <span className="block truncate text-xs text-fg-muted">{email}</span>
         </span>
       ) : (
-        <span className="text-[15px] font-medium text-fg-muted">계정에 로그인하세요</span>
+        <span className="text-sm font-medium text-fg-muted">계정에 로그인하세요</span>
       )}
     </button>
   );

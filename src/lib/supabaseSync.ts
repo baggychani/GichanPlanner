@@ -121,10 +121,47 @@ async function downloadBlob(bucket: 'profile-images' | 'task-images', path: stri
   return data;
 }
 
+async function mapPool<T, R>(items: T[], limit: number, fn: (item: T) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await fn(items[index]);
+    }
+  }
+  const workers = Math.min(Math.max(limit, 1), Math.max(items.length, 1));
+  if (items.length === 0) return results;
+  await Promise.all(Array.from({ length: workers }, () => worker()));
+  return results;
+}
+
+function imageCacheKey(bucket: 'profile-images' | 'task-images', path: string) {
+  return `${bucket}:${path}`;
+}
+
+async function downloadBlobs(needs: Array<{ bucket: 'profile-images' | 'task-images'; path: string }>) {
+  const unique = new Map<string, { bucket: 'profile-images' | 'task-images'; path: string }>();
+  for (const need of needs) unique.set(imageCacheKey(need.bucket, need.path), need);
+  const blobs = new Map<string, Blob | null>();
+  await mapPool([...unique.values()], 6, async (need) => {
+    blobs.set(imageCacheKey(need.bucket, need.path), await downloadBlob(need.bucket, need.path));
+  });
+  return blobs;
+}
+
+function localHasImage(localPath: string | null | undefined, localBlob: Blob | null | undefined, remotePath: string | null) {
+  return Boolean(remotePath && localBlob && localPath === remotePath);
+}
+
 async function upsertRows(table: PlannerSyncTable, rows: object[]) {
   if (!supabase || rows.length === 0) return;
-  const { error } = await supabase.from(table).upsert(rows, { onConflict: 'id' });
-  if (error) throw error;
+  for (let offset = 0; offset < rows.length; offset += 250) {
+    const chunk = rows.slice(offset, offset + 250);
+    const { error } = await supabase.from(table).upsert(chunk, { onConflict: 'id' });
+    if (error) throw error;
+  }
 }
 
 function sameTaskCore(a: Task, b: Task) {
@@ -369,12 +406,30 @@ async function pushSimpleRow(
 
 async function pushAllLocal(ownerId: string) {
   const [tasks, profile] = await Promise.all([db.tasks.toArray(), db.profiles.get('#profile')]);
-  for (const task of tasks) await pushTask(task, ownerId, 'bulk');
+  const resolved = await mapPool(tasks, 4, async task => ({ task, image: await resolveTaskImagePath(task, ownerId, 'bulk') }));
+  await mapPool(
+    resolved.filter(({ task, image }) => !image.omit && image.path !== task.image_path),
+    4,
+    ({ task, image }) => persistTaskImagePath(task.id, image.path),
+  );
+  await upsertRows('tasks', resolved.map(({ task, image }) => {
+    const row = taskRow(task, ownerId, image.path);
+    if (image.omit) delete (row as { image_path?: string | null }).image_path;
+    return row;
+  }));
+  const shadows: CloudShadow[] = resolved.map(({ task, image }) => {
+    const stored = { ...task, image_path: image.omit ? task.image_path : image.path };
+    return shadowRecord('tasks', stored, shadowFields(stored, TASK_MERGE_KEYS));
+  });
   for (const spec of SIMPLE_SYNC_TABLES) {
-    const rows = await spec.table.toArray();
-    for (const row of rows) await pushSimpleRow(spec, row as { id: string; updated_at: string; version: number }, ownerId, 'bulk');
+    const rows = await spec.table.toArray() as Array<{ id: string; updated_at: string; version: number }>;
+    await upsertRows(spec.name, rows.map(row => spec.toRow(row as never, ownerId)));
+    for (const row of rows) {
+      shadows.push(shadowRecord(spec.name as ShadowTable, row, shadowFields(row as never, SIMPLE_MERGE_KEYS[spec.name] as never)));
+    }
   }
   if (profile) await pushProfile(profile, ownerId, 'bulk');
+  if (shadows.length) await db.cloudShadows.bulkPut(shadows);
 }
 
 async function pullRemote(ownerId: string, email: string | null) {
@@ -419,32 +474,7 @@ async function pullRemote(ownerId: string, email: string | null) {
   const localTasks = await db.tasks.toArray();
   const localById = new Map(localTasks.map(task => [task.id, task]));
   const remoteTasks = (tasksRes.data ?? []) as RemoteTask[];
-  const taskIds = new Set([...localById.keys(), ...remoteTasks.map(row => row.id)]);
-  const mergedTasks: Task[] = [];
-  for (const id of taskIds) {
-    const local = localById.get(id);
-    const remote = remoteTasks.find(row => row.id === id);
-    if (remote && local) {
-      const downloaded = remote.image_path && remote.image_path !== local.image_path
-        ? await downloadBlob('task-images', remote.image_path)
-        : null;
-      const remoteImage = remote.image_path
-        ? (downloaded ?? (remote.image_path === local.image_path ? local.image_blob ?? null : null))
-        : null;
-      const fromRemote = taskFromRemote(remote, remoteImage ?? (remote.image_path === local.image_path ? local.image_blob ?? null : null));
-      mergedTasks.push(mergeTask(rowFromShadow<Task>(shadows.get(`tasks:${id}`), id), local, fromRemote, domains));
-    } else if (remote) {
-      const downloaded = remote.image_path ? await downloadBlob('task-images', remote.image_path) : null;
-      mergedTasks.push(taskFromRemote(remote, downloaded));
-    } else if (local) {
-      mergedTasks.push(local);
-    }
-    if (remote) {
-      const fromRemote = taskFromRemote(remote, null);
-      remoteShadows.push(shadowRecord('tasks', fromRemote, shadowFields(fromRemote, TASK_MERGE_KEYS)));
-    }
-  }
-
+  const remoteTaskById = new Map(remoteTasks.map(row => [row.id, row]));
   const remoteProfileRow = profileRes.data as {
     nickname: string;
     avatar_path: string | null;
@@ -454,6 +484,43 @@ async function pullRemote(ownerId: string, email: string | null) {
     updated_at: string;
   } | null;
   const localProfile = await db.profiles.get('#profile');
+  const imageNeeds: Array<{ bucket: 'profile-images' | 'task-images'; path: string }> = [];
+  for (const remote of remoteTasks) {
+    if (!remote.image_path) continue;
+    const local = localById.get(remote.id);
+    if (!localHasImage(local?.image_path, local?.image_blob, remote.image_path)) {
+      imageNeeds.push({ bucket: 'task-images', path: remote.image_path });
+    }
+  }
+  if (remoteProfileRow?.avatar_path && !localHasImage(localProfile?.avatar_path, localProfile?.avatar, remoteProfileRow.avatar_path)) {
+    imageNeeds.push({ bucket: 'profile-images', path: remoteProfileRow.avatar_path });
+  }
+  const blobs = await downloadBlobs(imageNeeds);
+
+  const taskIds = new Set([...localById.keys(), ...remoteTaskById.keys()]);
+  const mergedTasks: Task[] = [];
+  for (const id of taskIds) {
+    const local = localById.get(id);
+    const remote = remoteTaskById.get(id);
+    if (remote && local) {
+      const downloaded = remote.image_path ? blobs.get(imageCacheKey('task-images', remote.image_path)) ?? null : null;
+      const remoteImage = remote.image_path
+        ? (downloaded ?? (remote.image_path === local.image_path ? local.image_blob ?? null : null))
+        : null;
+      const fromRemote = taskFromRemote(remote, remoteImage ?? (remote.image_path === local.image_path ? local.image_blob ?? null : null));
+      mergedTasks.push(mergeTask(rowFromShadow<Task>(shadows.get(`tasks:${id}`), id), local, fromRemote, domains));
+    } else if (remote) {
+      const downloaded = remote.image_path ? blobs.get(imageCacheKey('task-images', remote.image_path)) ?? null : null;
+      mergedTasks.push(taskFromRemote(remote, downloaded ?? null));
+    } else if (local) {
+      mergedTasks.push(local);
+    }
+    if (remote) {
+      const fromRemote = taskFromRemote(remote, null);
+      remoteShadows.push(shadowRecord('tasks', fromRemote, shadowFields(fromRemote, TASK_MERGE_KEYS)));
+    }
+  }
+
   let profile: Profile = localProfile ?? {
     id: '#profile',
     nickname: email?.split('@')[0] || '사용자',
@@ -467,8 +534,11 @@ async function pullRemote(ownerId: string, email: string | null) {
     updated_at: new Date().toISOString(),
   };
   if (remoteProfileRow) {
+    const downloaded = remoteProfileRow.avatar_path
+      ? blobs.get(imageCacheKey('profile-images', remoteProfileRow.avatar_path)) ?? null
+      : null;
     const remoteAvatar = remoteProfileRow.avatar_path
-      ? (await downloadBlob('profile-images', remoteProfileRow.avatar_path) ?? (remoteProfileRow.avatar_path === localProfile?.avatar_path ? localProfile.avatar ?? null : null))
+      ? (downloaded ?? (remoteProfileRow.avatar_path === localProfile?.avatar_path ? localProfile.avatar ?? null : null))
       : null;
     const fromRemote = profileFromRemote(remoteProfileRow, remoteAvatar, localProfile, email);
     profile = localProfile
@@ -524,12 +594,14 @@ export async function signOutPlanner() {
   localStorage.removeItem(OWNER_KEY);
 }
 
-async function syncNow() {
+async function syncNow(onHydrated?: () => void) {
   if (!supabase) return;
-  const { data: { user } } = await supabase.auth.getUser();
+  const { data: { session } } = await supabase.auth.getSession();
+  const user = session?.user;
   if (!user) return;
   await prepareLocalAccount(user.id);
   await pullRemote(user.id, user.email ?? null);
+  onHydrated?.();
   await pushAllLocal(user.id);
   await rememberShadows();
   void maybeSavePlannerCloudSnapshot().catch(error => {
@@ -537,8 +609,8 @@ async function syncNow() {
   });
 }
 
-export function syncPlannerWithCloud() {
-  return enqueue(() => syncNow());
+export function syncPlannerWithCloud(onHydrated?: () => void) {
+  return enqueue(() => syncNow(onHydrated));
 }
 
 export function installPlannerSync() {

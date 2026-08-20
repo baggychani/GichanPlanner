@@ -77,11 +77,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (showStatus) setIsSyncing(true);
       void prepareLocalAccount(session.user.id)
         .then(() => {
-          if (!cancelled) setAccountReady(true);
-          return syncPlannerWithCloud();
+          if (!hydrateFromCloud && !cancelled) setAccountReady(true);
+          return syncPlannerWithCloud(() => {
+            if (cancelled) return;
+            setAccountReady(true);
+            if (showStatus) setIsSyncing(false);
+          });
         })
         .catch(() => {})
-        .finally(() => { if (!cancelled && showStatus) setIsSyncing(false); });
+        .finally(() => {
+          if (cancelled) return;
+          setAccountReady(true);
+          if (showStatus) setIsSyncing(false);
+        });
     };
     run(announce);
     const onVisible = () => {
