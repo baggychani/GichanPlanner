@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { localAccountNeedsReset, prepareLocalAccount, subscribePlannerSync, syncPlannerWithCloud } from '../lib/supabaseSync';
+import { localAccountNeedsCloudHydration, prepareLocalAccount, subscribePlannerSync, syncPlannerWithCloud } from '../lib/supabaseSync';
 import { authErrorMessage } from '../components/authUi';
 
 type AuthValue = {
@@ -67,10 +67,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    const switchingAccount = localAccountNeedsReset(session.user.id);
-    const announce = switchingAccount || pendingLoginSync.current;
+    const hydrateFromCloud = localAccountNeedsCloudHydration(session.user.id);
+    const announce = hydrateFromCloud || pendingLoginSync.current;
     pendingLoginSync.current = false;
-    if (switchingAccount) setAccountReady(false);
+    if (hydrateFromCloud) setAccountReady(false);
     else setAccountReady(true);
 
     const run = (showStatus: boolean) => {

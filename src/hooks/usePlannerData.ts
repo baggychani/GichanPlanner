@@ -1,8 +1,6 @@
-import { useEffect } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { db, type Task } from '../lib/db';
 import { countVisibleTasksByDate } from '../lib/taskCounts';
-import { repairOrphanedTasks } from '../lib/taskOps';
 
 export function usePlannerData(optimisticTasks: Task[] | null) {
   const persistedTasks = useLiveQuery(async () => {
@@ -13,20 +11,12 @@ export function usePlannerData(optimisticTasks: Task[] | null) {
   }) || [];
   const tasks = optimisticTasks ?? persistedTasks;
 
-  const calendarTaskCountByDate = useLiveQuery(async () => {
-    const [storedTasks, storedCategories] = await Promise.all([db.tasks.toArray(), db.domains.toArray()]);
-    return countVisibleTasksByDate(storedTasks, storedCategories);
-  }, []) ?? {};
+  const calendarTaskCountByDate = useLiveQuery(async () => countVisibleTasksByDate(await db.tasks.toArray()), []) ?? {};
 
   const categoryQuery = useLiveQuery(() => db.domains.filter(d => d.deleted_at === null).sortBy('order'));
   const categories = categoryQuery ?? [];
   const goals = useLiveQuery(() => db.goals.filter(g => g.deleted_at === null).toArray()) || [];
   const deadlines = useLiveQuery(() => db.deadlines.filter(deadline => deadline.deleted_at === null).toArray()) || [];
-
-  useEffect(() => {
-    if (categoryQuery === undefined) return;
-    void repairOrphanedTasks(categoryQuery.map(category => category.id));
-  }, [categoryQuery, persistedTasks]);
 
   return { tasks, categories, goals, deadlines, calendarTaskCountByDate };
 }

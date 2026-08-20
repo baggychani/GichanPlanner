@@ -40,7 +40,7 @@ export function PlannerPanel({
   onOpenDeadline,
 }: PlannerPanelProps) {
   return (
-    <div className="w-[650px] bg-surface flex flex-col h-[calc(100vh-3.5rem)] sticky top-7 rounded-3xl shadow-sm border border-line overflow-hidden max-[1200px]:w-[calc(55vw-3rem)] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:static">
+    <div className="flex h-[calc(100vh-3.5rem)] w-[650px] max-w-[min(650px,46%)] min-w-0 shrink flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm sticky top-7 max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:static max-[900px]:shrink-0">
       <div className="flex items-center justify-between mb-6 shrink-0 px-8 pt-8 max-[1200px]:px-6 max-[1200px]:pt-6">
         <h2 className="flex min-h-8 items-center gap-3.5 text-2xl font-bold">
           {viewMode === 'DAILY'

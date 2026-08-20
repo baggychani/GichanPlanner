@@ -130,7 +130,7 @@ export function CalendarBoard({
           key={day.toString()}
           onClick={() => onCellClick(cloneDay)}
           className={clsx(
-            'min-h-[102px] p-1.5 border-line transition-[filter] duration-150 cursor-pointer relative group max-[1200px]:min-h-[82px]',
+            'min-h-[102px] min-w-0 overflow-hidden p-1.5 border-line transition-[filter] duration-150 cursor-pointer relative group max-[1200px]:min-h-[82px] max-[1100px]:min-h-[68px] max-[1100px]:p-1',
             isSelecting ? 'hover:bg-primary/20' : 'hover:brightness-95',
             isWeekend && !isSelecting ? (i === 6 ? 'bg-red-50/30 dark:bg-red-950/25' : 'bg-blue-50/30 dark:bg-blue-950/25') : 'bg-surface',
             !isSameMonth(day, monthStart) ? 'opacity-40' : '',
@@ -138,13 +138,11 @@ export function CalendarBoard({
             hasDeadline ? 'shadow-[inset_-5px_0_12px_-7px_rgba(239,68,68,0.95)]' : '',
             !isLastRow ? 'border-b' : '',
             i !== 6 ? 'border-r' : '',
-            isLastRow && i === 0 ? 'rounded-bl-3xl' : '',
-            isLastRow && i === 6 ? 'rounded-br-3xl' : '',
           )}
         >
           <div className="flex justify-between items-start">
             <span className={clsx(
-              'flex items-center justify-center w-8 h-8 rounded-full text-base font-semibold',
+              'flex items-center justify-center w-8 h-8 rounded-full text-base font-semibold max-[1100px]:h-7 max-[1100px]:w-7 max-[1100px]:text-sm',
               isToday(day) ? 'bg-primary text-on-primary' :
               i === 5 ? 'text-blue-500' :
               i === 6 ? 'text-red-500' : '',
@@ -180,10 +178,10 @@ export function CalendarBoard({
     ).length;
 
     rows.push(
-      <div className="relative grid grid-cols-7" key={cloneWeekStart.toString()}>
+      <div className="contents" key={cloneWeekStart.toString()}>
         <div
           className={clsx(
-            'absolute -left-16 top-1/2 -translate-y-1/2 w-9 h-9 rounded-full border shadow-sm flex items-center justify-center cursor-pointer transition-transform duration-200 z-10 max-[900px]:hidden',
+            'relative self-center justify-self-center w-9 h-9 rounded-full border shadow-sm flex items-center justify-center cursor-pointer transition-transform duration-200 z-10 max-[900px]:hidden',
             isSelectedWeek ? 'bg-primary border-primary text-on-primary scale-110' : 'bg-surface border-line-strong text-fg-subtle hover:text-primary hover:bg-surface-muted hover:scale-110',
           )}
           onClick={() => onSelectWeek(cloneWeekStart)}
@@ -203,9 +201,9 @@ export function CalendarBoard({
   }
 
   return (
-    <div className="w-[760px] shrink-0 relative max-[1560px]:w-[45vw] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:pl-0">
-      <div className="flex justify-between items-center mb-4 pl-4 relative">
-        <div className="flex items-center gap-4">
+    <div className="relative min-w-0 w-full max-w-[52rem] flex-1 max-[900px]:max-w-[760px] max-[900px]:flex-none">
+      <div className="mb-4 flex min-w-0 flex-wrap items-center justify-between gap-2 relative">
+        <div className="flex min-w-0 items-center gap-3 max-[1100px]:gap-2">
           <h1 className="text-3xl font-bold leading-tight">
             <span className="max-[600px]:hidden">{format(currentDate, 'yyyy.')}</span>
             <span className="hidden max-[600px]:inline">{format(currentDate, 'yy.')}</span>
@@ -223,7 +221,7 @@ export function CalendarBoard({
           </div>
         )}
 
-        <div className="flex items-center gap-3">
+        <div className="flex shrink-0 items-center gap-1 min-[1100px]:gap-2">
           <button onClick={() => onSelectWeek(startOfWeek(selectedDate, { weekStartsOn: 1 }))} aria-label="주간 목표" title="주간 목표" className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
             <Target size={22} />
           </button>
@@ -272,18 +270,19 @@ export function CalendarBoard({
 
       <CalendarAccountBar onOpen={onOpenProfile} />
 
-      <div className="bg-surface rounded-3xl shadow-sm border border-line relative z-0">
-        <div className="grid grid-cols-7 bg-surface rounded-t-3xl pt-1.5 pb-1.5 border-b border-line">
+      <div className="relative z-0 min-w-0 overflow-hidden rounded-3xl border border-line bg-surface shadow-sm">
+        <div className="grid min-w-0 grid-cols-[3rem_repeat(7,minmax(0,1fr))] bg-surface max-[900px]:grid-cols-7">
+          <div className="border-b border-line max-[900px]:hidden" aria-hidden />
           {WEEKDAYS.map((label, i) => (
             <div key={label} className={clsx(
-              'text-center text-sm font-medium py-1.5',
+              'border-b border-line py-1.5 text-center text-sm font-medium',
               i === 5 ? 'text-blue-500' : i === 6 ? 'text-red-500' : 'text-fg-muted',
             )}>
               {label}
             </div>
           ))}
+          {rows}
         </div>
-        <div className="bg-surface rounded-b-3xl">{rows}</div>
       </div>
     </div>
   );

@@ -51,7 +51,23 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 npm run dev
 ```
 
-처음 쓰는 Supabase 프로젝트라면 위의 SQL과 URL 설정을 먼저 맞춥니다.
+## 다른 기기에서 카테고리가 미분류로 보이면
+
+앱이 할 일을 불러오는 동안 카테고리를 비어 있다고 오해하고 분류를 지운 적이 있습니다. 그 수정은 코드에 들어 있습니다.
+
+**원래 쓰던 기기**(분류가 아직 남아 있는 브라우저)에서 이 배포를 한 번 열어 로그인하면, 그 기기의 분류가 클라우드에 다시 올라갑니다. 원래 기기까지 이미 미분류로 덮였다면 클라우드에서도 복구할 수 없고, 할 일을 다시 분류해야 합니다.
+
+Supabase SQL Editor에서 현재 상태를 보려면:
+
+```sql
+select t.title, t.domain_id, d.name as category
+from public.tasks t
+left join public.domains d on d.id = t.domain_id
+where t.deleted_at is null
+order by t.target_date, t.title;
+```
+
+`domain_id`가 비어 있으면 클라우드에도 분류가 없는 상태입니다. 이 버그를 고치기 위해 새 SQL을 넣을 필요는 없습니다.
 
 ```bash
 npm run build

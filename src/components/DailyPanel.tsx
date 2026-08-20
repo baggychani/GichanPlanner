@@ -4,6 +4,7 @@ import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
 import { db, type Domain, type Task } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
+import { taskMatchesCategory } from '../lib/taskOps';
 import { ClearMark } from './ClearMark';
 import { CountBubble } from './CountBubble';
 import { EmojiIcon } from './EmojiIcon';
@@ -46,9 +47,10 @@ export function DailyPanel({
 }: DailyPanelProps) {
   const dateStr = format(selectedDate, 'yyyy-MM-dd');
   const dayTasks = tasks.filter(task => task.target_date === dateStr);
+  const activeCategoryIds = new Set(categories.map(category => category.id));
 
   const renderCategorySection = (categoryId: string | null, name: string, icon: string) => {
-    const categoryTasks = dayTasks.filter(task => task.domain_id === categoryId);
+    const categoryTasks = dayTasks.filter(task => taskMatchesCategory(task, categoryId, activeCategoryIds));
     const incompleteCategoryTasks = categoryTasks.filter(task => !task.is_completed);
     const importantCategoryCount = incompleteCategoryTasks.filter(task => task.is_important).length;
     const activeCategoryCount = incompleteCategoryTasks.length - importantCategoryCount;

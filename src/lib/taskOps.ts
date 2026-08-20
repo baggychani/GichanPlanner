@@ -26,21 +26,9 @@ export function createBlankTask(targetDate: string): Task {
   };
 }
 
-export async function repairOrphanedTasks(activeDomainIds: string[]) {
-  const visible = new Set(activeDomainIds);
-  const orphanedTasks = (await db.tasks.toArray()).filter(task =>
-    task.deleted_at === null && task.domain_id !== null && !visible.has(task.domain_id)
-  );
-  if (orphanedTasks.length === 0) return;
-  return runPlannerWrite(async () => {
-    const now = new Date().toISOString();
-    await db.tasks.bulkPut(orphanedTasks.map(task => ({
-      ...task,
-      domain_id: null,
-      updated_at: now,
-      version: task.version + 1,
-    })));
-  });
+export function taskMatchesCategory(task: Task, categoryId: string | null, activeCategoryIds: Set<string>) {
+  if (categoryId === null) return task.domain_id === null || !activeCategoryIds.has(task.domain_id);
+  return task.domain_id === categoryId;
 }
 
 export async function moveIncompleteTasksToDate(sourceDate: string, destinationDate: string) {

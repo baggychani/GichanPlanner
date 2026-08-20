@@ -5,6 +5,7 @@ import { supabase } from './supabase';
 const OWNER_KEY = 'gichanplan-sync-owner';
 
 let applyingRemote = false;
+let syncInFlight = false;
 let hooksInstalled = false;
 let syncChain: Promise<void> = Promise.resolve();
 let lastError: unknown = null;
@@ -225,6 +226,46 @@ function isNewer(candidate: { updated_at: string; version?: number }, current: {
   return (candidate.version ?? 0) > (current.version ?? 0);
 }
 
+function sameTaskCore(a: Task, b: Task) {
+  return a.title === b.title
+    && a.target_date === b.target_date
+    && a.is_completed === b.is_completed
+    && a.is_important === b.is_important
+    && a.memo === b.memo
+    && a.order === b.order
+    && a.deadline === b.deadline
+    && a.scheduled_time === b.scheduled_time
+    && a.goal_id === b.goal_id;
+}
+
+// 할 일만 먼저 도착해 카테고리가 비어 보일 때, 분류만 지운 쪽을 다른 기기의 분류로 되돌린다.
+function preserveDomainIfCleared(winner: Task, loser: Task, domains: Domain[]): Task {
+  if (winner.domain_id != null || loser.domain_id == null) return winner;
+  if (!domains.some(domain => domain.id === loser.domain_id && domain.deleted_at === null)) return winner;
+  if (!sameTaskCore(winner, loser)) return winner;
+  return { ...winner, domain_id: loser.domain_id };
+}
+
+function skipCloudPush() {
+  return applyingRemote || syncInFlight;
+}
+
+async function repairTasksInDeletedCategories() {
+  const [tasks, domains] = await Promise.all([db.tasks.toArray(), db.domains.toArray()]);
+  const deletedIds = new Set(domains.filter(domain => domain.deleted_at !== null).map(domain => domain.id));
+  const orphanedTasks = tasks.filter(task =>
+    task.deleted_at === null && task.domain_id !== null && deletedIds.has(task.domain_id)
+  );
+  if (orphanedTasks.length === 0) return;
+  const now = new Date().toISOString();
+  await db.tasks.bulkPut(orphanedTasks.map(task => ({
+    ...task,
+    domain_id: null,
+    updated_at: now,
+    version: task.version + 1,
+  })));
+}
+
 function mergeByUpdatedAt<T extends { id: string; updated_at: string; version?: number }>(local: T[], remote: T[]) {
   const merged = new Map<string, T>();
   for (const row of local) merged.set(row.id, row);
@@ -313,6 +354,7 @@ async function pullRemote(ownerId: string, email: string | null) {
     if (result.error) throw result.error;
   }
 
+  const domains = mergeByUpdatedAt(await db.domains.toArray(), ((domainsRes.data ?? []) as Array<RemoteStamp & Domain>).map(domainFromRemote));
   const localTasks = await db.tasks.toArray();
   const localById = new Map(localTasks.map(task => [task.id, task]));
   const remoteTasks = (tasksRes.data ?? []) as RemoteTask[];
@@ -321,18 +363,20 @@ async function pullRemote(ownerId: string, email: string | null) {
   for (const id of taskIds) {
     const local = localById.get(id);
     const remote = remoteTasks.find(row => row.id === id);
-    if (remote && (!local || isNewer({ updated_at: remote.updated_at, version: versionFrom(remote) }, local))) {
+    if (remote && local) {
       const downloaded = remote.image_path ? await downloadBlob('task-images', remote.image_path) : null;
-      const imageBlob = remote.image_path
-        ? (downloaded ?? local?.image_blob ?? null)
-        : null;
-      mergedTasks.push(taskFromRemote(remote, imageBlob));
+      const remoteImage = remote.image_path ? (downloaded ?? local.image_blob ?? null) : null;
+      const fromRemote = taskFromRemote(remote, remoteImage);
+      const remoteNewer = isNewer({ updated_at: remote.updated_at, version: versionFrom(remote) }, local);
+      mergedTasks.push(preserveDomainIfCleared(remoteNewer ? fromRemote : local, remoteNewer ? local : fromRemote, domains));
+    } else if (remote) {
+      const downloaded = remote.image_path ? await downloadBlob('task-images', remote.image_path) : null;
+      mergedTasks.push(taskFromRemote(remote, downloaded));
     } else if (local) {
       mergedTasks.push(local);
     }
   }
 
-  const domains = mergeByUpdatedAt(await db.domains.toArray(), ((domainsRes.data ?? []) as Array<RemoteStamp & Domain>).map(domainFromRemote));
   const goals = mergeByUpdatedAt(await db.goals.toArray(), ((goalsRes.data ?? []) as Array<RemoteStamp & Goal>).map(goalFromRemote));
   const deadlines = mergeByUpdatedAt(await db.deadlines.toArray(), ((deadlinesRes.data ?? []) as Array<RemoteStamp & Deadline>).map(deadlineFromRemote));
   const schedules = mergeByUpdatedAt(await db.schedules.toArray(), ((schedulesRes.data ?? []) as Array<RemoteStamp & Schedule>).map(scheduleFromRemote));
@@ -386,6 +430,7 @@ async function pullRemote(ownerId: string, email: string | null) {
       if (routines.length) await db.routines.bulkPut(routines);
       await db.profiles.put(profile.email === email || !email ? profile : { ...profile, email });
     });
+    await repairTasksInDeletedCategories();
   } finally {
     applyingRemote = false;
   }
@@ -407,6 +452,11 @@ export function localAccountNeedsReset(userId: string) {
   return Boolean(storedOwner && storedOwner !== userId);
 }
 
+export function localAccountNeedsCloudHydration(userId: string) {
+  const storedOwner = localStorage.getItem(OWNER_KEY);
+  return !storedOwner || storedOwner !== userId;
+}
+
 export async function prepareLocalAccount(userId: string) {
   const storedOwner = localStorage.getItem(OWNER_KEY);
   if (storedOwner && storedOwner !== userId) await clearLocalPlanner();
@@ -424,9 +474,14 @@ async function syncNow() {
   if (!supabase) return;
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return;
-  await prepareLocalAccount(user.id);
-  await pullRemote(user.id, user.email ?? null);
-  await pushAllLocal(user.id);
+  syncInFlight = true;
+  try {
+    await prepareLocalAccount(user.id);
+    await pullRemote(user.id, user.email ?? null);
+    await pushAllLocal(user.id);
+  } finally {
+    syncInFlight = false;
+  }
 }
 
 export function syncPlannerWithCloud() {
@@ -438,11 +493,11 @@ export function installPlannerSync() {
   hooksInstalled = true;
 
   db.tasks.hook('creating', (_key, obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushTask(obj, ownerId, 'user'); });
   });
   db.tasks.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.tasks.get(primKey);
@@ -450,11 +505,11 @@ export function installPlannerSync() {
     });
   });
   db.domains.hook('creating', (_key, obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('domains', [domainRow(obj, ownerId)]); });
   });
   db.domains.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.domains.get(primKey);
@@ -462,11 +517,11 @@ export function installPlannerSync() {
     });
   });
   db.goals.hook('creating', (_key, obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('goals', [goalRow(obj, ownerId)]); });
   });
   db.goals.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.goals.get(primKey);
@@ -474,7 +529,7 @@ export function installPlannerSync() {
     });
   });
   db.deadlines.hook('creating', (_key, obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       if (!ownerId) return;
@@ -482,7 +537,7 @@ export function installPlannerSync() {
     });
   });
   db.deadlines.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.deadlines.get(primKey);
@@ -491,11 +546,11 @@ export function installPlannerSync() {
     });
   });
   db.schedules.hook('creating', (_key, obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('schedules', [scheduleRow(obj, ownerId)]); });
   });
   db.schedules.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.schedules.get(primKey);
@@ -503,11 +558,11 @@ export function installPlannerSync() {
     });
   });
   db.routines.hook('creating', (_key, obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('routines', [routineRow(obj, ownerId)]); });
   });
   db.routines.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.routines.get(primKey);
@@ -515,11 +570,11 @@ export function installPlannerSync() {
     });
   });
   db.profiles.hook('creating', (_key, obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushProfile(obj, ownerId, 'user'); });
   });
   db.profiles.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (applyingRemote) return;
+    if (skipCloudPush()) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.profiles.get(primKey);

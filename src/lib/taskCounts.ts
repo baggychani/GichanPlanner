@@ -1,4 +1,4 @@
-import type { Domain, Task } from './db';
+import type { Task } from './db';
 
 export type DayTaskCounts = {
   active: number;
@@ -14,13 +14,11 @@ export const EMPTY_DAY_COUNTS: DayTaskCounts = {
   completedImportant: 0,
 };
 
-export function countVisibleTasksByDate(tasks: Task[], categories: Domain[]): Record<string, DayTaskCounts> {
+export function countVisibleTasksByDate(tasks: Task[]): Record<string, DayTaskCounts> {
   const countByDate: Record<string, DayTaskCounts> = {};
-  const visibleDomainIds = new Set(categories.filter(category => category.deleted_at === null).map(category => category.id));
 
   for (const task of tasks) {
-    const isVisible = task.domain_id === null || visibleDomainIds.has(task.domain_id);
-    if (task.deleted_at !== null || !isVisible) continue;
+    if (task.deleted_at !== null) continue;
     const counts = countByDate[task.target_date] ?? { ...EMPTY_DAY_COUNTS };
     if (task.is_completed) {
       if (task.is_important) counts.completedImportant += 1;
