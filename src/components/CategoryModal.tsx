@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Check, FolderKanban, GripVertical, Pencil, Plus, Tags, Trash2, X } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Check, Download, FolderKanban, GripVertical, Pencil, Plus, Tags, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
 import { db, type Deadline, type Domain, type Project, type Task } from '../lib/db';
@@ -9,6 +9,9 @@ import { EmojiIcon } from './EmojiIcon';
 import { EmojiPickerOverlay } from './EmojiPickerOverlay';
 import { Overlay } from './Overlay';
 import { ProjectSettingsPanel } from './ProjectSettingsPanel';
+import { downloadPortablePlannerExport } from '../lib/portablePlannerExport';
+
+type SettingsSection = 'categories' | 'projects' | 'data';
 
 export function CategoryModal({
   categories,
@@ -25,18 +28,28 @@ export function CategoryModal({
   projects: Project[];
   tasks: Task[];
   deadlines: Deadline[];
-  initialSection?: 'categories' | 'projects';
+  initialSection?: SettingsSection;
   initialProjectId?: string | null;
   onClose: () => void;
   onOpenTask: (task: Task) => void;
   onOpenDeadline: (deadline: Deadline) => void;
 }) {
-  const [section, setSection] = useState<'categories' | 'projects'>(initialSection);
+  const [section, setSection] = useState<SettingsSection>(initialSection);
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
   const [editingCategoryName, setEditingCategoryName] = useState('');
   const [editingCategoryIcon, setEditingCategoryIcon] = useState('📁');
   const [newCategoryEmoji, setNewCategoryEmoji] = useState('📁');
   const [iconPicker, setIconPicker] = useState<{ onSelect: (emoji: string) => void } | null>(null);
+  const [isDownloadingBackup, setIsDownloadingBackup] = useState(false);
+  const [backupStatus, setBackupStatus] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!backupStatus) return;
+    const timer = window.setTimeout(() => setBackupStatus(null), 2200);
+    return () => window.clearTimeout(timer);
+  }, [backupStatus]);
+
+  const sectionTitle = section === 'categories' ? '카테고리 관리' : section === 'projects' ? '프로젝트 관리' : '데이터';
 
   return (
     <>
@@ -69,10 +82,20 @@ export function CategoryModal({
             >
               <FolderKanban size={16} /> 프로젝트
             </button>
+            <button
+              type="button"
+              onClick={() => { setSection('data'); setEditingCategoryId(null); }}
+              className={clsx(
+                'flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium transition-colors',
+                section === 'data' ? 'bg-surface text-fg shadow-sm' : 'text-fg-muted hover:bg-surface-hover hover:text-fg',
+              )}
+            >
+              <Download size={16} /> 데이터
+            </button>
           </nav>
           <div className="flex min-w-0 flex-1 flex-col p-5">
             <div className="mb-4 flex items-center justify-between">
-              <h3 className="text-lg font-bold">{section === 'categories' ? '카테고리 관리' : '프로젝트 관리'}</h3>
+              <h3 className="text-lg font-bold">{sectionTitle}</h3>
               <button onClick={onClose} className="rounded-full p-1 hover:bg-surface-hover"><X size={20} /></button>
             </div>
 
@@ -86,6 +109,27 @@ export function CategoryModal({
                 onOpenDeadline={onOpenDeadline}
                 onPickIcon={(onSelect) => setIconPicker({ onSelect })}
               />
+            ) : section === 'data' ? (
+              <div className="flex min-h-0 flex-1 flex-col">
+                <p className="text-sm leading-6 text-fg-muted">
+                  이 기기에 있는 할 일, 데드라인, 프로젝트, 사진을 JSON 파일로 저장합니다. 사이트 기능이 바뀌어도 이 파일은 그대로입니다.
+                </p>
+                <button
+                  type="button"
+                  disabled={isDownloadingBackup}
+                  onClick={() => {
+                    setIsDownloadingBackup(true);
+                    void downloadPortablePlannerExport()
+                      .then(() => setBackupStatus('데이터를 받았습니다.'))
+                      .catch(() => setBackupStatus('데이터를 받지 못했습니다.'))
+                      .finally(() => setIsDownloadingBackup(false));
+                  }}
+                  className="mt-5 flex w-full items-center justify-center gap-2 rounded-xl bg-ink py-3 text-sm font-semibold text-on-ink disabled:opacity-40"
+                >
+                  <Download size={16} />
+                  {isDownloadingBackup ? '받는 중…' : '데이터 받기'}
+                </button>
+              </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">
                 <div className="mb-4 min-h-0 flex-1 overflow-y-scroll [scrollbar-gutter:stable]">
@@ -239,6 +283,11 @@ export function CategoryModal({
               </div>
             )}
           </div>
+          {backupStatus && (
+            <p role="status" className="pointer-events-none absolute bottom-5 left-1/2 -translate-x-1/2 rounded-full bg-ink px-4 py-2 text-sm font-medium text-on-ink shadow-lg">
+              {backupStatus}
+            </p>
+          )}
         </div>
       </Overlay>
       {iconPicker && (

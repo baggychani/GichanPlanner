@@ -50,7 +50,7 @@ function PlannerApp() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
-  const [settingsSection, setSettingsSection] = useState<'categories' | 'projects'>('categories');
+  const [settingsSection, setSettingsSection] = useState<'categories' | 'projects' | 'data'>('categories');
   const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
   const [taskFromSettings, setTaskFromSettings] = useState(false);
   const [isQuickCreateMenuOpen, setIsQuickCreateMenuOpen] = useState(false);
