@@ -138,6 +138,10 @@ function PlannerApp() {
   useEffect(() => { void migrateLegacyTaskImages(); }, []);
 
   useEffect(() => {
+    setIsDailyMenuOpen(false);
+  }, [selectedDateString, viewMode]);
+
+  useEffect(() => {
     if (isLoggedIn) return;
     setIsQuickCreateMenuOpen(false);
     setIsDailyMenuOpen(false);

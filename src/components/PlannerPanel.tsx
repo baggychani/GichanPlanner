@@ -3,8 +3,10 @@ import { ko } from 'date-fns/locale';
 import { ArrowRight, CalendarDays, CircleX, Copy, MoreHorizontal, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
 import type { Deadline, Project } from '../lib/db';
-import { formatScheduledTime, parseDay } from '../lib/datetime';
+import { db } from '../lib/db';
+import { formatScheduledTime, isSameBirthday, parseDay } from '../lib/datetime';
 import { krHolidayLabel } from '../lib/krHolidays';
 import { EmojiIcon } from './EmojiIcon';
 
@@ -46,6 +48,8 @@ export function PlannerPanel({
   onOpenProject,
 }: PlannerPanelProps) {
   const holidayLabel = viewMode === 'DAILY' ? krHolidayLabel(format(selectedDate, 'yyyy-MM-dd')) : null;
+  const profile = useLiveQuery(() => db.profiles.get('#profile'));
+  const isBirthday = viewMode === 'DAILY' && isSameBirthday(selectedDate, profile?.birthday_month, profile?.birthday_day);
 
   return (
     <div className="flex h-full min-h-0 w-[650px] max-w-[min(650px,46%)] min-w-0 shrink flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:shrink-0">
@@ -64,6 +68,11 @@ export function PlannerPanel({
                 {holidayLabel}
               </span>
             )}
+            {isBirthday && (
+              <span className="shrink-0 text-[13px] font-medium leading-none text-rose-500 dark:text-rose-400">
+                생일 축하합니다 💗
+              </span>
+            )}
           </span>
           {viewMode === 'DAILY' && isToday(selectedDate) && (
             <span className="rounded-full bg-primary px-3 py-1 text-[13px] font-semibold leading-none text-on-primary">오늘</span>
@@ -72,7 +81,7 @@ export function PlannerPanel({
         <div className="relative grid h-10 w-10 shrink-0 place-items-center">
           {viewMode === 'DAILY' && (
             <>
-              {/* 바깥 클릭으로 닫히지 않음. 메뉴를 연 채 날짜를 확인하는 흐름을 유지하기 위한 의도. */}
+              {/* 바깥 클릭으로는 닫히지 않는다. 날짜가 바뀌면 어느 날 메뉴인지 헷갈리지 않게 닫는다. */}
               <button onClick={onToggleDailyMenu} aria-label="일별 할 일 메뉴" aria-expanded={isDailyMenuOpen} className="grid h-10 w-10 place-items-center rounded-full text-fg-subtle hover:bg-surface-hover hover:text-fg transition-colors">
                 <MoreHorizontal size={22} />
               </button>

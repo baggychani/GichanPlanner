@@ -8,6 +8,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import type { Deadline, Goal } from '../lib/db';
 import { db } from '../lib/db';
 import { krHolidayNames } from '../lib/krHolidays';
+import { isSameBirthday } from '../lib/datetime';
 import { EMPTY_DAY_COUNTS, isDayCleared, type DayTaskCounts } from '../lib/taskCounts';
 import { CountBubble } from './CountBubble';
 import { useAuth } from '../hooks/useAuth';
@@ -140,9 +141,7 @@ export function CalendarBoard({
       const isWeekend = i === 5 || i === 6;
       const holidayNames = krHolidayNames(dateStr);
       const isRedDay = i === 6 || holidayNames !== null;
-      const isBirthday = birthdayMonth != null && birthdayDay != null
-        && birthdayMonth === cloneDay.getMonth() + 1
-        && birthdayDay === cloneDay.getDate();
+      const isBirthday = isSameBirthday(cloneDay, birthdayMonth, birthdayDay);
 
       days.push(
         <div
@@ -151,7 +150,8 @@ export function CalendarBoard({
           className={clsx(
             'relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-line transition-[filter] duration-150 cursor-pointer group p-[var(--cal-pad)]',
             isSelecting ? 'hover:bg-primary/20' : 'hover:brightness-95',
-            !isSelecting && isRedDay ? 'bg-red-50/30 dark:bg-red-950/25'
+            !isSelecting && isBirthday ? 'bg-rose-50/55 dark:bg-rose-950/35'
+              : !isSelecting && isRedDay ? 'bg-red-50/30 dark:bg-red-950/25'
               : !isSelecting && isWeekend ? 'bg-blue-50/30 dark:bg-blue-950/25'
               : 'bg-surface',
             !isSameMonth(day, monthStart) ? 'opacity-40' : '',
@@ -168,6 +168,7 @@ export function CalendarBoard({
               <span className={clsx(
                 'flex items-center justify-center rounded-full font-semibold h-[var(--cal-date)] w-[var(--cal-date)] text-[length:var(--cal-date-font)]',
                 isToday(day) ? 'bg-primary text-on-primary' :
+                isBirthday ? 'text-rose-500 dark:text-rose-400' :
                 isRedDay ? 'text-red-500' :
                 i === 5 ? 'text-blue-500' : '',
               )}>

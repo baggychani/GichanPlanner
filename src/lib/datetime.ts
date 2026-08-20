@@ -46,3 +46,7 @@ export function isoFromTimeParts(targetDate: string, meridiem: Meridiem, hour: n
   date.setHours(hours, minute, 0, 0);
   return date.toISOString();
 }
+
+export function isSameBirthday(date: Date, month: number | null | undefined, day: number | null | undefined): boolean {
+  return month != null && day != null && date.getMonth() + 1 === month && date.getDate() === day;
+}
