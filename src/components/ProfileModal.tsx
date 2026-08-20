@@ -1,18 +1,18 @@
 import { useEffect, useState } from 'react';
 import { Camera, ChevronLeft, LogOut, UserRound, X, Calendar as CalendarIcon } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import type { UserLogin } from 'dexie-cloud-addon';
 import clsx from 'clsx';
 import { AvatarCropDialog } from './AvatarCropDialog';
 import { Overlay } from './Overlay';
 import { db } from '../lib/db';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
+import { persistProfileToCloud } from '../lib/supabaseSync';
 import { AuthPanel } from './AuthScreen';
 import { BirthdayPickerModal } from './BirthdayPickerModal';
 import { authErrorMessage, authInputClass, PasswordField } from './authUi';
 
-export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; onClose: () => void }) {
+export function ProfileModal({ onClose }: { onClose: () => void }) {
   const { session, isLoading } = useAuth();
   const [openedLoggedIn, setOpenedLoggedIn] = useState<boolean | null>(() => (isLoading ? null : Boolean(session)));
   const profile = useLiveQuery(() => db.profiles.get('#profile'));
@@ -78,13 +78,14 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
       id: '#profile',
       nickname: nickname.trim(),
       avatar,
-      legacy_dexie_user_id: user?.userId ?? profile?.legacy_dexie_user_id ?? null,
+      legacy_dexie_user_id: profile?.legacy_dexie_user_id ?? null,
       email: accountEmail || profile?.email || null,
       birthday_month: birthdayMonth,
       birthday_day: birthdayDay,
       created_at: profile?.created_at ?? now,
       updated_at: now,
     });
+    await persistProfileToCloud();
   };
 
   const submitPasswordChange = async (event: React.FormEvent) => {
@@ -117,7 +118,6 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
 
   const logout = async () => {
     if (supabase) await supabase.auth.signOut();
-    if (user?.isLoggedIn) await db.cloud.logout();
     onClose();
   };
 
@@ -220,7 +220,11 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
               </div>
             </div>
             <button
-              onClick={() => { void saveProfile().then(() => setToast('프로필을 저장했습니다.')); }}
+              onClick={() => {
+                void saveProfile()
+                  .then(() => setToast('프로필을 저장했습니다.'))
+                  .catch(caught => setToast(authErrorMessage(caught)));
+              }}
               disabled={!nickname.trim()}
               className="mt-4 w-full rounded-xl bg-ink py-3 font-semibold text-on-ink disabled:opacity-40"
             >
@@ -275,7 +279,10 @@ export function ProfileModal({ user, onClose }: { user: UserLogin | undefined; o
           onClose={() => setCroppingFile(null)}
           onSave={image => {
             setCroppingFile(null);
-            void saveProfile(image).then(() => setToast('프로필 사진을 저장했습니다.'));
+            void saveProfile(image).then(
+              () => setToast('프로필 사진을 저장했습니다.'),
+              caught => setToast(authErrorMessage(caught)),
+            );
           }}
         />
       )}

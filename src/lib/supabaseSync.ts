@@ -1,3 +1,4 @@
+import type { Transaction } from 'dexie';
 import { db, type Deadline, type Domain, type Goal, type Profile, type Routine, type Schedule, type Task } from './db';
 import { supabase } from './supabase';
 
@@ -6,16 +7,34 @@ const OWNER_KEY = 'gichanplan-sync-owner';
 let applyingRemote = false;
 let hooksInstalled = false;
 let syncChain: Promise<void> = Promise.resolve();
+let lastError: unknown = null;
+const listeners = new Set<(error: unknown) => void>();
 
-function enqueue(work: () => Promise<void>) {
-  syncChain = syncChain.then(work).catch(error => {
-    console.error('[gichanplanner] 동기화 실패', error);
-  });
-  return syncChain;
+function notify(error: unknown) {
+  lastError = error;
+  for (const listener of listeners) listener(error);
 }
 
-function afterCommit(work: () => Promise<void>) {
-  window.setTimeout(() => { void enqueue(work); }, 0);
+export function subscribePlannerSync(listener: (error: unknown) => void) {
+  listeners.add(listener);
+  listener(lastError);
+  return () => { listeners.delete(listener); };
+}
+
+function enqueue(work: () => Promise<void>) {
+  const run = syncChain.then(async () => {
+    await work();
+    notify(null);
+  });
+  syncChain = run.catch(error => {
+    console.error('[gichanplanner] 동기화 실패', error);
+    notify(error);
+  });
+  return run;
+}
+
+function whenCommitted(trans: Transaction, work: () => Promise<void>) {
+  trans.on('complete', () => { void enqueue(work); });
 }
 
 async function currentUserId() {
@@ -174,37 +193,48 @@ function mergeByUpdatedAt<T extends { id: string; updated_at: string }>(local: T
 }
 
 async function pushTask(task: Task, ownerId: string) {
-  let imagePath: string | null = null;
+  const row = taskRow(task, ownerId, null);
   if (task.image_blob) {
     const extension = task.image_blob.type === 'image/png' ? 'png' : task.image_blob.type === 'image/jpeg' ? 'jpg' : 'webp';
-    imagePath = await uploadBlob('task-images', `${ownerId}/${task.id}.${extension}`, task.image_blob);
+    row.image_path = await uploadBlob('task-images', `${ownerId}/${task.id}.${extension}`, task.image_blob);
+  } else {
+    delete (row as { image_path?: string | null }).image_path;
   }
-  await upsertRows('tasks', [taskRow(task, ownerId, imagePath)]);
+  await upsertRows('tasks', [row]);
 }
 
 async function pushProfile(profile: Profile, ownerId: string) {
   if (!supabase) return;
-  let avatarPath: string | null = null;
-  if (profile.avatar) {
-    const extension = profile.avatar.type === 'image/png' ? 'png' : profile.avatar.type === 'image/jpeg' ? 'jpg' : 'webp';
-    avatarPath = await uploadBlob('profile-images', `${ownerId}/avatar.${extension}`, profile.avatar);
-  }
-  const payload = {
+  const payload: {
+    nickname: string;
+    updated_at: string;
+    birthday_month: number | null;
+    birthday_day: number | null;
+    avatar_path?: string;
+  } = {
     nickname: profile.nickname.slice(0, 40) || '사용자',
-    avatar_path: avatarPath,
     birthday_month: profile.birthday_month,
     birthday_day: profile.birthday_day,
     updated_at: profile.updated_at,
   };
+  if (profile.avatar) {
+    const extension = profile.avatar.type === 'image/png' ? 'png' : profile.avatar.type === 'image/jpeg' ? 'jpg' : 'webp';
+    const avatarPath = await uploadBlob('profile-images', `${ownerId}/avatar.${extension}`, profile.avatar);
+    if (avatarPath) payload.avatar_path = avatarPath;
+  }
   const { error } = await supabase.from('profiles').update(payload).eq('id', ownerId);
   if (error) {
-    const { error: retryError } = await supabase.from('profiles').update({
-      nickname: payload.nickname,
-      avatar_path: avatarPath,
-      updated_at: payload.updated_at,
-    }).eq('id', ownerId);
+    const { birthday_month: _month, birthday_day: _day, ...withoutBirthday } = payload;
+    const { error: retryError } = await supabase.from('profiles').update(withoutBirthday).eq('id', ownerId);
     if (retryError) throw retryError;
   }
+}
+
+export async function persistProfileToCloud() {
+  const ownerId = await currentUserId();
+  const profile = await db.profiles.get('#profile');
+  if (!ownerId || !profile) return;
+  await pushProfile(profile, ownerId);
 }
 
 async function pushAllLocal(ownerId: string) {
@@ -344,54 +374,54 @@ export function installPlannerSync() {
   if (hooksInstalled) return;
   hooksInstalled = true;
 
-  db.tasks.hook('creating', (_key, obj) => {
+  db.tasks.hook('creating', (_key, obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => { const ownerId = await currentUserId(); if (ownerId) await pushTask(obj, ownerId); });
+    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushTask(obj, ownerId); });
   });
-  db.tasks.hook('updating', (_mods, primKey) => {
+  db.tasks.hook('updating', (_mods, primKey, _obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => {
+    whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.tasks.get(primKey);
       if (ownerId && row) await pushTask(row, ownerId);
     });
   });
-  db.domains.hook('creating', (_key, obj) => {
+  db.domains.hook('creating', (_key, obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('domains', [domainRow(obj, ownerId)]); });
+    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('domains', [domainRow(obj, ownerId)]); });
   });
-  db.domains.hook('updating', (_mods, primKey) => {
+  db.domains.hook('updating', (_mods, primKey, _obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => {
+    whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.domains.get(primKey);
       if (ownerId && row) await upsertRows('domains', [domainRow(row, ownerId)]);
     });
   });
-  db.goals.hook('creating', (_key, obj) => {
+  db.goals.hook('creating', (_key, obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('goals', [goalRow(obj, ownerId)]); });
+    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('goals', [goalRow(obj, ownerId)]); });
   });
-  db.goals.hook('updating', (_mods, primKey) => {
+  db.goals.hook('updating', (_mods, primKey, _obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => {
+    whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.goals.get(primKey);
       if (ownerId && row) await upsertRows('goals', [goalRow(row, ownerId)]);
     });
   });
-  db.deadlines.hook('creating', (_key, obj) => {
+  db.deadlines.hook('creating', (_key, obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => {
+    whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       if (!ownerId) return;
       try { await upsertRows('deadlines', [deadlineRow(obj, ownerId)]); }
       catch { const { due_time: _dueTime, ...rest } = deadlineRow(obj, ownerId); await upsertRows('deadlines', [rest]); }
     });
   });
-  db.deadlines.hook('updating', (_mods, primKey) => {
+  db.deadlines.hook('updating', (_mods, primKey, _obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => {
+    whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.deadlines.get(primKey);
       if (!ownerId || !row) return;
@@ -399,37 +429,37 @@ export function installPlannerSync() {
       catch { const { due_time: _dueTime, ...rest } = deadlineRow(row, ownerId); await upsertRows('deadlines', [rest]); }
     });
   });
-  db.schedules.hook('creating', (_key, obj) => {
+  db.schedules.hook('creating', (_key, obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('schedules', [scheduleRow(obj, ownerId)]); });
+    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('schedules', [scheduleRow(obj, ownerId)]); });
   });
-  db.schedules.hook('updating', (_mods, primKey) => {
+  db.schedules.hook('updating', (_mods, primKey, _obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => {
+    whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.schedules.get(primKey);
       if (ownerId && row) await upsertRows('schedules', [scheduleRow(row, ownerId)]);
     });
   });
-  db.routines.hook('creating', (_key, obj) => {
+  db.routines.hook('creating', (_key, obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('routines', [routineRow(obj, ownerId)]); });
+    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await upsertRows('routines', [routineRow(obj, ownerId)]); });
   });
-  db.routines.hook('updating', (_mods, primKey) => {
+  db.routines.hook('updating', (_mods, primKey, _obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => {
+    whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.routines.get(primKey);
       if (ownerId && row) await upsertRows('routines', [routineRow(row, ownerId)]);
     });
   });
-  db.profiles.hook('creating', (_key, obj) => {
+  db.profiles.hook('creating', (_key, obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => { const ownerId = await currentUserId(); if (ownerId) await pushProfile(obj, ownerId); });
+    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushProfile(obj, ownerId); });
   });
-  db.profiles.hook('updating', (_mods, primKey) => {
+  db.profiles.hook('updating', (_mods, primKey, _obj, trans) => {
     if (applyingRemote) return;
-    afterCommit(async () => {
+    whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.profiles.get(primKey);
       if (ownerId && row) await pushProfile(row, ownerId);

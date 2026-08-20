@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { isSupabaseConfigured, supabase } from '../lib/supabase';
+import { isSupabaseConfigured, supabase, authRedirectTo } from '../lib/supabase';
 import { authErrorMessage, PasswordField, TextField } from './authUi';
 
 type AuthView = 'login' | 'signup' | 'forgot-email' | 'forgot-code' | 'forgot-new';
@@ -34,7 +34,9 @@ export function AuthPanel({ onSuccess }: { onSuccess: () => void }) {
     setIsSubmitting(true);
     setError(null);
     try {
-      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim());
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+        redirectTo: authRedirectTo(),
+      });
       if (resetError) throw resetError;
       setCode('');
       setView('forgot-code');
@@ -63,7 +65,11 @@ export function AuthPanel({ onSuccess }: { onSuccess: () => void }) {
       if (view === 'signup') {
         if (password.length < 6) throw new Error('비밀번호는 6자 이상이어야 합니다.');
         if (password !== passwordConfirm) throw new Error('비밀번호 확인이 일치하지 않습니다.');
-        const { data, error: signUpError } = await supabase.auth.signUp({ email: email.trim(), password });
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email: email.trim(),
+          password,
+          options: { emailRedirectTo: authRedirectTo() },
+        });
         if (signUpError) throw signUpError;
         if (data.user && !data.session) {
           setError('가입되었습니다. 이메일 인증 후 로그인하세요.');

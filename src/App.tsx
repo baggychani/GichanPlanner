@@ -28,14 +28,12 @@ import { ProfileModal } from './components/ProfileModal';
 import { Overlay, hasEscapeOverlay } from './components/Overlay';
 import { RecoveryPasswordDialog } from './components/AuthScreen';
 import { AuthProvider, useAuth } from './hooks/useAuth';
-import { useObservable } from 'dexie-react-hooks';
 import { migrateLegacyTaskImages } from './lib/imageAttachment';
 
 // Typography principle: small text is readable at normal weight. Reserve bold for page titles and primary actions only.
 // 빠른 만들기·일별 메뉴는 바깥을 눌러도 닫히지 않게 둔다. 달력 클릭과 메뉴 조작이 겹치지 않게 하려는 의도다.
 function PlannerApp() {
-  const cloudUser = useObservable(db.cloud.currentUser);
-  const { session, isPasswordRecovery, clearPasswordRecovery } = useAuth();
+  const { session, isPasswordRecovery, clearPasswordRecovery, isSyncing, syncError, retrySync } = useAuth();
   const isLoggedIn = Boolean(session);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -312,6 +310,18 @@ function PlannerApp() {
 
   return (
     <div className="min-h-screen flex justify-center px-6 py-7 gap-10 bg-bgPrimary pl-24 max-[1560px]:pl-6 max-[1560px]:gap-6 max-[1200px]:gap-3 max-[1200px]:px-3 max-[1200px]:py-4 max-[900px]:flex-col max-[900px]:items-center max-[900px]:gap-5 max-[900px]:px-4 max-[900px]:py-5">
+      {isLoggedIn && (isSyncing || syncError) && (
+        <div className="fixed left-1/2 top-4 z-[90] -translate-x-1/2 rounded-full border border-line bg-surface px-4 py-2 text-sm shadow-lg">
+          {syncError ? (
+            <span className="flex items-center gap-3">
+              <span className="text-red-600 dark:text-red-400">계정 데이터와 맞추지 못했습니다.</span>
+              <button type="button" onClick={retrySync} className="font-semibold text-fg underline-offset-2 hover:underline">다시 시도</button>
+            </span>
+          ) : (
+            <span className="text-fg-muted">계정 데이터를 불러오는 중…</span>
+          )}
+        </div>
+      )}
       <CalendarBoard
         currentDate={currentDate}
         selectedDate={selectedDate}
@@ -551,7 +561,7 @@ function PlannerApp() {
       {isCategoryModalOpen && (
         <CategoryModal categories={categories} onClose={() => setIsCategoryModalOpen(false)} />
       )}
-      {isProfileOpen && <ProfileModal user={cloudUser} onClose={() => setIsProfileOpen(false)} />}
+      {isProfileOpen && <ProfileModal onClose={() => setIsProfileOpen(false)} />}
       {isPasswordRecovery && (
         <Overlay zClassName="z-[80]" onEscape={clearPasswordRecovery}>
           <section className="w-full max-w-[400px] rounded-3xl border border-line bg-surface p-6 shadow-2xl">

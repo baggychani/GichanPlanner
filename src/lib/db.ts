@@ -1,5 +1,4 @@
 import Dexie, { type EntityTable } from 'dexie';
-import dexieCloud from 'dexie-cloud-addon';
 
 export interface Task {
   id: string;
@@ -93,8 +92,6 @@ export interface Deadline {
   reminder_days: number | null;
 }
 
-// `#profile` is a Dexie Cloud private singleton: one profile per account,
-// while remaining a normal exportable record for a later backend migration.
 export interface Profile {
   id: '#profile';
   nickname: string;
@@ -107,7 +104,7 @@ export interface Profile {
   updated_at: string;
 }
 
-const db = new Dexie('GichanPlanDB', { addons: [dexieCloud] }) as Dexie & {
+const db = new Dexie('GichanPlanDB') as Dexie & {
   tasks: EntityTable<Task, 'id'>;
   schedules: EntityTable<Schedule, 'id'>;
   routines: EntityTable<Routine, 'id'>;
@@ -197,18 +194,5 @@ db.version(11).stores({
     if (profile.birthday_day === undefined) profile.birthday_day = null;
   });
 });
-
-const dexieCloudUrl = import.meta.env.VITE_DEXIE_CLOUD_URL;
-if (dexieCloudUrl) {
-  db.cloud.configure({
-    databaseUrl: dexieCloudUrl,
-    // Login stays opt-in so existing local data can be inspected and imported deliberately.
-    requireAuth: false,
-    socialAuth: true,
-    blobMode: 'lazy',
-  });
-}
-
-export const isDexieCloudConfigured = Boolean(dexieCloudUrl);
 
 export { db };

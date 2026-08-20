@@ -1,11 +1,15 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { syncPlannerWithCloud } from '../lib/supabaseSync';
+import { subscribePlannerSync, syncPlannerWithCloud } from '../lib/supabaseSync';
+import { authErrorMessage } from '../components/authUi';
 
 type AuthValue = {
   session: Session | null;
   isLoading: boolean;
+  isSyncing: boolean;
+  syncError: string | null;
+  retrySync: () => void;
   isPasswordRecovery: boolean;
   clearPasswordRecovery: () => void;
 };
@@ -13,6 +17,9 @@ type AuthValue = {
 const AuthContext = createContext<AuthValue>({
   session: null,
   isLoading: Boolean(supabase),
+  isSyncing: false,
+  syncError: null,
+  retrySync: () => {},
   isPasswordRecovery: false,
   clearPasswordRecovery: () => {},
 });
@@ -20,6 +27,8 @@ const AuthContext = createContext<AuthValue>({
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState(Boolean(supabase));
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
 
   useEffect(() => {
@@ -39,16 +48,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return () => listener.subscription.unsubscribe();
   }, []);
 
+  useEffect(() => subscribePlannerSync(error => {
+    setSyncError(error ? authErrorMessage(error) : null);
+  }), []);
+
   useEffect(() => {
-    if (!session) return;
-    void syncPlannerWithCloud();
-    const onVisible = () => {
-      if (document.visibilityState === 'visible') void syncPlannerWithCloud();
+    if (!session) {
+      setIsSyncing(false);
+      return;
+    }
+    let cancelled = false;
+    const run = () => {
+      setIsSyncing(true);
+      void syncPlannerWithCloud()
+        .catch(() => {})
+        .finally(() => { if (!cancelled) setIsSyncing(false); });
     };
-    const onOnline = () => { void syncPlannerWithCloud(); };
+    run();
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') run();
+    };
+    const onOnline = () => { run(); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
     return () => {
+      cancelled = true;
       document.removeEventListener('visibilitychange', onVisible);
       window.removeEventListener('online', onOnline);
     };
@@ -59,6 +83,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       value={{
         session,
         isLoading,
+        isSyncing,
+        syncError,
+        retrySync: () => { void syncPlannerWithCloud().catch(() => {}); },
         isPasswordRecovery,
         clearPasswordRecovery: () => setIsPasswordRecovery(false),
       }}
