@@ -285,31 +285,26 @@ export function CalendarBoard({
             <Settings size={22} />
           </button>
           <ThemeToggle className="max-[560px]:hidden" />
-          <div className="relative z-40 grid place-items-center">
-            {!isLoggedIn && (
-              <>
-                <span className="login-nudge-halo" aria-hidden />
-                <span className="login-nudge-halo login-nudge-halo-soft" aria-hidden />
-              </>
+          <button
+            onClick={onOpenProfile}
+            aria-label={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}
+            title={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}
+            className={clsx(
+              'rounded-full transition-colors hover:bg-surface-hover',
+              isLoggedIn ? 'p-0.5' : 'p-2 text-fg-muted',
             )}
-            <button
-              onClick={onOpenProfile}
-              aria-label={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}
-              title={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}
-              className={clsx(
-                'relative z-[1] rounded-full transition-colors hover:bg-surface-hover',
-                isLoggedIn ? 'p-0.5' : 'p-2 text-fg-muted',
-              )}
-            >
-              {isLoggedIn ? (
-                <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
-                  {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserRound size={16} />}
-                </span>
-              ) : (
-                <UserRound size={21} />
-              )}
-            </button>
-          </div>
+          >
+            {isLoggedIn ? (
+              <span className="grid h-8 w-8 place-items-center overflow-hidden rounded-full bg-indigo-100 text-indigo-700 dark:bg-indigo-950 dark:text-indigo-300">
+                {avatarUrl ? <img src={avatarUrl} alt="" className="h-full w-full object-cover" /> : <UserRound size={16} />}
+              </span>
+            ) : (
+              <span className="relative block h-[21px] w-[21px]">
+                <UserRound size={21} aria-hidden className="login-icon-glow pointer-events-none absolute left-0 top-0" />
+                <UserRound size={21} className="relative" />
+              </span>
+            )}
+          </button>
           <div className="w-px h-6 bg-line-strong mx-1" />
           <button onClick={onPrevMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
             <ChevronLeft size={24} />
