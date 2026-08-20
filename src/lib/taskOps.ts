@@ -27,6 +27,30 @@ export function createBlankTask(targetDate: string): Task {
   };
 }
 
+export async function toggleTaskCompleted(taskId: string) {
+  return runPlannerWrite(async () => {
+    const current = await db.tasks.get(taskId);
+    if (!current || current.deleted_at !== null) return;
+    await db.tasks.update(taskId, {
+      is_completed: !current.is_completed,
+      updated_at: new Date().toISOString(),
+      version: current.version + 1,
+    });
+  });
+}
+
+export async function toggleGoalCompleted(goalId: string) {
+  return runPlannerWrite(async () => {
+    const current = await db.goals.get(goalId);
+    if (!current || current.deleted_at !== null) return;
+    await db.goals.update(goalId, {
+      is_completed: !current.is_completed,
+      updated_at: new Date().toISOString(),
+      version: current.version + 1,
+    });
+  });
+}
+
 export function taskMatchesCategory(task: Task, categoryId: string | null, activeCategoryIds: Set<string>) {
   if (categoryId === null) return task.domain_id === null || !activeCategoryIds.has(task.domain_id);
   return task.domain_id === categoryId;

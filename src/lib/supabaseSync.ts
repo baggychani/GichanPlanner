@@ -15,7 +15,6 @@ import { supabase } from './supabase';
 
 const OWNER_KEY = 'gichanplan-sync-owner';
 
-let applyingRemote = false;
 let hooksInstalled = false;
 let syncChain: Promise<void> = Promise.resolve();
 let lastError: unknown = null;
@@ -141,8 +140,12 @@ function preserveDomainIfCleared(winner: Task, loser: Task, domains: Domain[]): 
   return { ...winner, domain_id: loser.domain_id };
 }
 
-function skipCloudPush() {
-  return applyingRemote;
+function markApplyingRemote(trans: Transaction) {
+  (trans as Transaction & { applyingRemote?: boolean }).applyingRemote = true;
+}
+
+function skipCloudPush(trans: Transaction) {
+  return Boolean((trans as Transaction & { applyingRemote?: boolean }).applyingRemote);
 }
 
 async function repairTasksInDeletedCategories() {
@@ -223,9 +226,8 @@ async function pushProfile(profile: Profile, ownerId: string, mode: 'user' | 'bu
     payload.avatar_path = null;
     await removeStorageObjects('profile-images', avatarPaths(ownerId));
   }
-  const { data, error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' }).select('id').maybeSingle();
+  const { error } = await supabase.from('profiles').upsert(payload, { onConflict: 'id' });
   if (error) throw error;
-  if (!data) throw new Error('프로필을 계정에 저장하지 못했습니다.');
 }
 
 async function pushAllLocal(ownerId: string) {
@@ -321,35 +323,27 @@ async function pullRemote(ownerId: string, email: string | null) {
       updated_at: new Date().toISOString(),
     };
 
-  applyingRemote = true;
-  try {
-    await db.transaction('rw', [...plannerWriteTables()], async () => {
-      const liveTasks = keepNewerLocal(mergedTasks, await db.tasks.toArray());
-      if (liveTasks.length) await db.tasks.bulkPut(liveTasks);
-      for (const spec of simple) {
-        const merged = simpleMerged.get(spec.name) ?? [];
-        const live = keepNewerLocal(merged, await spec.table.toArray() as Array<{ id: string; updated_at: string; version?: number }>);
-        if (live.length) await (spec.table as { bulkPut: (rows: unknown[]) => Promise<unknown> }).bulkPut(live);
-      }
-      const liveProfile = await db.profiles.get('#profile');
-      const nextProfile = liveProfile && isNewer(liveProfile, profile) ? liveProfile : profile;
-      await db.profiles.put(nextProfile.email === email || !email ? nextProfile : { ...nextProfile, email });
-    });
+  await db.transaction('rw', [...plannerWriteTables()], async trans => {
+    markApplyingRemote(trans);
+    const liveTasks = keepNewerLocal(mergedTasks, await db.tasks.toArray());
+    if (liveTasks.length) await db.tasks.bulkPut(liveTasks);
+    for (const spec of simple) {
+      const merged = simpleMerged.get(spec.name) ?? [];
+      const live = keepNewerLocal(merged, await spec.table.toArray() as Array<{ id: string; updated_at: string; version?: number }>);
+      if (live.length) await (spec.table as { bulkPut: (rows: unknown[]) => Promise<unknown> }).bulkPut(live);
+    }
+    const liveProfile = await db.profiles.get('#profile');
+    const nextProfile = liveProfile && isNewer(liveProfile, profile) ? liveProfile : profile;
+    await db.profiles.put(nextProfile.email === email || !email ? nextProfile : { ...nextProfile, email });
     await repairTasksInDeletedCategories();
-  } finally {
-    applyingRemote = false;
-  }
+  });
 }
 
 async function clearLocalPlanner() {
-  applyingRemote = true;
-  try {
-    await db.transaction('rw', [...plannerWriteTables()], async () => {
-      await Promise.all([...plannerWriteTables()].map(table => table.clear()));
-    });
-  } finally {
-    applyingRemote = false;
-  }
+  await db.transaction('rw', [...plannerWriteTables()], async trans => {
+    markApplyingRemote(trans);
+    await Promise.all([...plannerWriteTables()].map(table => table.clear()));
+  });
 }
 
 export function localAccountNeedsReset(userId: string) {
@@ -395,12 +389,16 @@ export function installPlannerSync() {
   if (hooksInstalled) return;
   hooksInstalled = true;
 
-  db.tasks.hook('creating', (_key, obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushTask(obj, ownerId, 'user'); });
+  db.tasks.hook('creating', (_key, _obj, trans) => {
+    if (skipCloudPush(trans)) return;
+    whenCommitted(trans, async () => {
+      const ownerId = await currentUserId();
+      const row = await db.tasks.get(_key);
+      if (ownerId && row) await pushTask(row, ownerId, 'user');
+    });
   });
   db.tasks.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (skipCloudPush()) return;
+    if (skipCloudPush(trans)) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.tasks.get(primKey);
@@ -408,15 +406,16 @@ export function installPlannerSync() {
     });
   });
   for (const spec of SIMPLE_SYNC_TABLES) {
-    spec.table.hook('creating', (_key, obj, trans) => {
-      if (skipCloudPush()) return;
+    spec.table.hook('creating', (_key, _obj, trans) => {
+      if (skipCloudPush(trans)) return;
       whenCommitted(trans, async () => {
         const ownerId = await currentUserId();
-                if (ownerId) await upsertRows(spec.name, [spec.toRow(obj as never, ownerId)]);
+        const row = await spec.table.get(_key);
+        if (ownerId && row) await upsertRows(spec.name, [spec.toRow(row as never, ownerId)]);
       });
     });
     spec.table.hook('updating', (_mods, primKey, _obj, trans) => {
-      if (skipCloudPush()) return;
+      if (skipCloudPush(trans)) return;
       whenCommitted(trans, async () => {
         const ownerId = await currentUserId();
         const row = await spec.table.get(primKey);
@@ -424,12 +423,16 @@ export function installPlannerSync() {
       });
     });
   }
-  db.profiles.hook('creating', (_key, obj, trans) => {
-    if (skipCloudPush()) return;
-    whenCommitted(trans, async () => { const ownerId = await currentUserId(); if (ownerId) await pushProfile(obj, ownerId, 'user'); });
+  db.profiles.hook('creating', (_key, _obj, trans) => {
+    if (skipCloudPush(trans)) return;
+    whenCommitted(trans, async () => {
+      const ownerId = await currentUserId();
+      const row = await db.profiles.get(_key);
+      if (ownerId && row) await pushProfile(row, ownerId, 'user');
+    });
   });
   db.profiles.hook('updating', (_mods, primKey, _obj, trans) => {
-    if (skipCloudPush()) return;
+    if (skipCloudPush(trans)) return;
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.profiles.get(primKey);

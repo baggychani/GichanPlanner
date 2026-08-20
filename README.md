@@ -32,6 +32,7 @@ SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합
 5. `20260820140000_projects.sql` ← 프로젝트 묶음
 6. `20260820150000_deadline_project.sql` ← 데드라인에 프로젝트 연결
 7. `20260820160000_planner_backups.sql` ← 계정 사본 저장. 없으면 설정에 사본 목록이 안 보입니다.
+8. `20260820170000_keep_newer_rows.sql` ← 더 옛 저장이 최근 완료·수정을 덮지 않게 합니다.
 
 Authentication → URL Configuration:
 

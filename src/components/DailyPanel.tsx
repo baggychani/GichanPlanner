@@ -2,9 +2,8 @@ import { format } from 'date-fns';
 import { Plus } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable, type DropResult } from '@hello-pangea/dnd';
-import { db, type Domain, type Project, type Task } from '../lib/db';
-import { runPlannerWrite } from '../lib/supabaseSync';
-import { taskMatchesCategory } from '../lib/taskOps';
+import { type Domain, type Project, type Task } from '../lib/db';
+import { taskMatchesCategory, toggleTaskCompleted } from '../lib/taskOps';
 import { ClearMark } from './ClearMark';
 import { CountBubble } from './CountBubble';
 import { EmojiIcon } from './EmojiIcon';
@@ -106,9 +105,7 @@ export function DailyPanel({
                       snapshot={snapshot}
                       isDropped={justDroppedTaskId === task.id}
                       isGrabbing={draggedTaskId === task.id}
-                      onToggleComplete={() => {
-                        void runPlannerWrite(() => db.tasks.update(task.id, { is_completed: !task.is_completed, updated_at: new Date().toISOString(), version: task.version + 1 }));
-                      }}
+                      onToggleComplete={() => { void toggleTaskCompleted(task.id); }}
                       onOpen={() => onOpenTask(task)}
                       onOpenProject={onOpenProject}
                       onViewImage={onViewImage}

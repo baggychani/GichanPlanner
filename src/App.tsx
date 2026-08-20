@@ -271,14 +271,27 @@ function PlannerApp() {
       closeTaskEditor();
       return;
     }
-    const { id, ...changes } = editingTask;
-    await runPlannerWrite(() => db.tasks.update(id, {
-      ...changes,
-      title: editingTask.title.trim(),
-      memo: editingTask.memo.trim(),
-      updated_at: now,
-      version: editingTask.version + 1,
-    }));
+    await runPlannerWrite(async () => {
+      const current = await db.tasks.get(editingTask.id);
+      if (!current || current.deleted_at !== null) return;
+      const savedAt = new Date().toISOString();
+      await db.tasks.put({
+        ...current,
+        title: editingTask.title.trim(),
+        memo: editingTask.memo.trim(),
+        target_date: editingTask.target_date,
+        deadline: editingTask.deadline,
+        scheduled_time: editingTask.scheduled_time,
+        domain_id: editingTask.domain_id,
+        goal_id: editingTask.goal_id,
+        project_id: editingTask.project_id,
+        is_important: editingTask.is_important,
+        image_blob: editingTask.image_blob ?? null,
+        image_data: editingTask.image_data ?? null,
+        updated_at: savedAt,
+        version: current.version + 1,
+      });
+    });
     closeTaskEditor();
   };
 
@@ -557,7 +570,11 @@ function PlannerApp() {
           onOpenTimePicker={() => openTimePicker('task')}
           onDelete={async () => {
             const now = new Date().toISOString();
-            await runPlannerWrite(() => db.tasks.update(editingTask.id, { deleted_at: now, updated_at: now, version: editingTask.version + 1 }));
+            await runPlannerWrite(async () => {
+              const current = await db.tasks.get(editingTask.id);
+              if (!current || current.deleted_at !== null) return;
+              await db.tasks.update(current.id, { deleted_at: now, updated_at: now, version: current.version + 1 });
+            });
             closeTaskEditor();
           }}
           onSave={() => { void saveEditingTask(); }}

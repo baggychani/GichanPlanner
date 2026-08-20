@@ -3,6 +3,7 @@ import { Check, Pencil, Plus, Target, Trash2 } from 'lucide-react';
 import clsx from 'clsx';
 import { db, type Goal } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
+import { toggleGoalCompleted } from '../lib/taskOps';
 import { ClearMark } from './ClearMark';
 
 type WeeklyPanelProps = {
@@ -71,7 +72,7 @@ export function WeeklyPanel({
         {weekGoals.map(goal => (
           <div key={goal.id} className={clsx('flex items-center gap-3 p-3 rounded-2xl bg-surface border shadow-sm group transition-colors', goal.is_completed ? 'border-line bg-surface-muted' : 'border-line-strong')}>
             <button
-              onClick={() => { void runPlannerWrite(() => db.goals.update(goal.id, { is_completed: !goal.is_completed, updated_at: new Date().toISOString(), version: goal.version + 1 })); }}
+              onClick={() => { void toggleGoalCompleted(goal.id); }}
               aria-label={goal.is_completed ? `${goal.title} 완료 취소` : `${goal.title} 완료`}
               className={clsx('w-5 h-5 shrink-0 rounded-full border-2 flex items-center justify-center transition-colors', goal.is_completed ? 'bg-primary border-primary text-fg' : 'border-line-strong hover:border-primary')}
             >
@@ -83,7 +84,11 @@ export function WeeklyPanel({
                 onSubmit={async (event) => {
                   event.preventDefault();
                   if (!editingGoalTitle.trim()) return;
-                  await runPlannerWrite(() => db.goals.update(goal.id, { title: editingGoalTitle.trim(), updated_at: new Date().toISOString(), version: goal.version + 1 }));
+                  await runPlannerWrite(async () => {
+                    const current = await db.goals.get(goal.id);
+                    if (!current || current.deleted_at !== null) return;
+                    await db.goals.update(current.id, { title: editingGoalTitle.trim(), updated_at: new Date().toISOString(), version: current.version + 1 });
+                  });
                   onEditingGoalIdChange(null);
                 }}
               >
@@ -97,7 +102,12 @@ export function WeeklyPanel({
             {editingGoalId !== goal.id && (
               <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                 <button onClick={() => { onEditingGoalIdChange(goal.id); onEditingGoalTitleChange(goal.title); }} aria-label={`${goal.title} 수정`} className="p-2 text-fg-faint hover:text-fg hover:bg-surface-hover rounded-lg transition-colors"><Pencil size={16} /></button>
-                <button onClick={() => { void runPlannerWrite(() => db.goals.update(goal.id, { deleted_at: new Date().toISOString(), updated_at: new Date().toISOString(), version: goal.version + 1 })); }} aria-label={`${goal.title} 삭제`} className="p-2 text-fg-faint hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"><Trash2 size={16} /></button>
+                <button onClick={() => { void runPlannerWrite(async () => {
+                  const current = await db.goals.get(goal.id);
+                  if (!current || current.deleted_at !== null) return;
+                  const now = new Date().toISOString();
+                  await db.goals.update(current.id, { deleted_at: now, updated_at: now, version: current.version + 1 });
+                }); }} aria-label={`${goal.title} 삭제`} className="p-2 text-fg-faint hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-lg transition-colors"><Trash2 size={16} /></button>
               </div>
             )}
           </div>
