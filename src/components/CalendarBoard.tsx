@@ -169,7 +169,7 @@ export function CalendarBoard({
             </span>
             {hasDeadline && <AlertCircle className="calendar-deadline-icon shrink-0 text-red-500 drop-shadow-sm" strokeWidth={2.5} aria-label={`${dayDeadlines.length}개의 데드라인`} />}
           </div>
-          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden gap-[var(--cal-gap)] mt-[var(--cal-gap)]">
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden gap-[var(--cal-gap)] mt-[var(--cal-gap)] -translate-y-[calc(var(--cal-bubble)*0.22)]">
             {dayCleared ? (
               <>
                 {dayCounts.completedImportant > 0 && <CountBubble count={0} tone="important" size="calendar" />}
