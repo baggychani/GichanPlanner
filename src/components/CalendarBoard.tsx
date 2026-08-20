@@ -9,6 +9,7 @@ import type { Deadline, Goal } from '../lib/db';
 import { db } from '../lib/db';
 import { EMPTY_DAY_COUNTS, isDayCleared, type DayTaskCounts } from '../lib/taskCounts';
 import { CountBubble } from './CountBubble';
+import { ClearMark } from './ClearMark';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '../hooks/useAuth';
 import { useCalendarCellMetrics } from '../hooks/useCalendarCellMetrics';
@@ -171,10 +172,7 @@ export function CalendarBoard({
           </div>
           <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden gap-[var(--cal-gap)] mt-[var(--cal-gap)] -translate-y-[calc(var(--cal-bubble)*0.22)]">
             {dayCleared ? (
-              <>
-                {dayCounts.completedImportant > 0 && <CountBubble count={0} tone="important" size="calendar" />}
-                {dayCounts.completedActive > 0 && <CountBubble count={0} tone="plain" size="calendar" />}
-              </>
+              <ClearMark size="calendar" />
             ) : (
               <>
                 {dayCounts.important > 0 && <CountBubble count={dayCounts.important} tone="important" size="calendar" />}
