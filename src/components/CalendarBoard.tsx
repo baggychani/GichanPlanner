@@ -227,7 +227,7 @@ export function CalendarBoard({
   }
 
   return (
-    <div ref={rootRef} className="calendar-metrics relative flex h-full min-h-0 min-w-0 w-full max-w-[calc(760px+var(--cal-week-gutter))] flex-1 flex-col pl-[var(--cal-week-gutter)] max-[900px]:h-auto max-[900px]:max-w-[760px] max-[900px]:flex-none max-[900px]:pl-0">
+    <div ref={rootRef} className="calendar-metrics relative flex h-full min-h-0 min-w-0 w-full max-w-[calc(728px+var(--cal-week-gutter))] flex-1 flex-col pl-[var(--cal-week-gutter)] max-[900px]:h-auto max-[900px]:max-w-[728px] max-[900px]:flex-none max-[900px]:pl-0">
       <div className="relative mb-4 flex min-w-0 shrink-0 items-center justify-between pl-4">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold leading-tight">

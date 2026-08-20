@@ -57,7 +57,7 @@ export function PlannerPanel({
       : '주간 목표';
 
   return (
-    <div className="flex h-full min-h-0 w-[658px] max-w-[min(658px,46%)] min-w-0 shrink flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:w-full max-[900px]:max-w-[760px] max-[900px]:shrink-0">
+    <div className="flex h-full min-h-0 w-[658px] max-w-[min(658px,46%)] min-w-0 shrink flex-col overflow-hidden rounded-3xl border border-line bg-surface shadow-sm max-[900px]:h-[min(720px,calc(100vh-2.5rem))] max-[900px]:w-full max-[900px]:max-w-[728px] max-[900px]:shrink-0">
       <div className="mb-6 flex shrink-0 items-center justify-between px-8 pt-8 max-[1200px]:px-6 max-[1200px]:pt-6">
         <h2 className="flex h-10 min-w-0 items-center gap-3.5 text-2xl font-bold leading-none">
           <span className="flex min-w-0 items-center gap-2">
