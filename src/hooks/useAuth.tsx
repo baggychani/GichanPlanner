@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
 import { localAccountNeedsReset, prepareLocalAccount, subscribePlannerSync, syncPlannerWithCloud } from '../lib/supabaseSync';
@@ -33,6 +33,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [isPasswordRecovery, setIsPasswordRecovery] = useState(false);
+  const sawInitialSession = useRef(false);
+  const pendingLoginSync = useRef(false);
 
   useEffect(() => {
     if (!supabase) {
@@ -47,6 +49,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(nextSession);
       setIsLoading(false);
       if (event === 'PASSWORD_RECOVERY') setIsPasswordRecovery(true);
+      if (event === 'INITIAL_SESSION') sawInitialSession.current = true;
+      if (event === 'SIGNED_IN' && sawInitialSession.current) pendingLoginSync.current = true;
+      if (event === 'SIGNED_OUT') pendingLoginSync.current = false;
     });
     return () => listener.subscription.unsubscribe();
   }, []);
@@ -62,24 +67,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
     let cancelled = false;
-    if (localAccountNeedsReset(session.user.id)) setAccountReady(false);
+    const switchingAccount = localAccountNeedsReset(session.user.id);
+    const announce = switchingAccount || pendingLoginSync.current;
+    pendingLoginSync.current = false;
+    if (switchingAccount) setAccountReady(false);
     else setAccountReady(true);
 
-    const run = () => {
-      setIsSyncing(true);
+    const run = (showStatus: boolean) => {
+      if (showStatus) setIsSyncing(true);
       void prepareLocalAccount(session.user.id)
         .then(() => {
           if (!cancelled) setAccountReady(true);
           return syncPlannerWithCloud();
         })
         .catch(() => {})
-        .finally(() => { if (!cancelled) setIsSyncing(false); });
+        .finally(() => { if (!cancelled && showStatus) setIsSyncing(false); });
     };
-    run();
+    run(announce);
     const onVisible = () => {
-      if (document.visibilityState === 'visible') run();
+      if (document.visibilityState === 'visible') void syncPlannerWithCloud().catch(() => {});
     };
-    const onOnline = () => { run(); };
+    const onOnline = () => { void syncPlannerWithCloud().catch(() => {}); };
     document.addEventListener('visibilitychange', onVisible);
     window.addEventListener('online', onOnline);
     return () => {
