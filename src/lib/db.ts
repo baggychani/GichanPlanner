@@ -21,6 +21,8 @@ export interface Task {
   // New uploads are compressed Blobs. `image_data` remains only for upgrading old local records.
   image_blob?: Blob | null;
   image_data?: string | null;
+  // null = 사진을 지움. undefined = 아직 계정 경로를 모름.
+  image_path?: string | null;
 }
 
 export interface Schedule {
@@ -112,12 +114,20 @@ export interface Profile {
   id: '#profile';
   nickname: string;
   avatar: Blob | null;
+  avatar_path?: string | null;
   legacy_dexie_user_id: string | null;
   email: string | null;
   birthday_month: number | null;
   birthday_day: number | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface CloudShadow {
+  id: string;
+  updated_at: string;
+  version: number;
+  body: string;
 }
 
 const db = new Dexie('GichanPlanDB') as Dexie & {
@@ -129,6 +139,7 @@ const db = new Dexie('GichanPlanDB') as Dexie & {
   deadlines: EntityTable<Deadline, 'id'>;
   projects: EntityTable<Project, 'id'>;
   profiles: EntityTable<Profile, 'id'>;
+  cloudShadows: EntityTable<CloudShadow, 'id'>;
 };
 
 db.version(5).stores({
@@ -240,6 +251,18 @@ db.version(13).stores({
   await transaction.table('deadlines').toCollection().modify((deadline: Deadline) => {
     if (deadline.project_id === undefined) deadline.project_id = null;
   });
+});
+
+db.version(14).stores({
+  tasks: 'id, target_date, is_completed, is_important, deleted_at, domain_id, project_id, order',
+  schedules: 'id, target_date, start_time, deleted_at',
+  routines: 'id, start_date, deleted_at',
+  domains: 'id, deleted_at, order',
+  goals: 'id, time_frame, start_date, deleted_at',
+  deadlines: 'id, due_date, deleted_at, project_id',
+  projects: 'id, deleted_at, order',
+  profiles: 'id',
+  cloudShadows: 'id',
 });
 
 export { db };

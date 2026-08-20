@@ -55,6 +55,7 @@ export async function importPortablePlannerExport(archive: PortablePlannerExport
     project_id: task.project_id ?? null,
     image_blob: taskBlobs.get(task.id) ?? null,
     image_data: null,
+    image_path: taskBlobs.has(task.id) ? null : (task.image_path ?? null),
   }));
   const schedules: Schedule[] = archive.schedules ?? [];
   const routines: Routine[] = archive.routines ?? [];
@@ -85,6 +86,7 @@ export async function importPortablePlannerExport(archive: PortablePlannerExport
         ...archive.profile,
         email: current?.email ?? archive.profile.email ?? user.email ?? null,
         avatar: profileAvatar,
+        avatar_path: profileAvatar ? null : (archive.profile.avatar_path ?? null),
       };
       await db.profiles.put(profile);
     }

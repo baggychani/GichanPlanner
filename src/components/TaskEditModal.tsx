@@ -18,7 +18,7 @@ function taskDraftKey(task: Task) {
     is_important: task.is_important,
     target_date: task.target_date,
     scheduled_time: task.scheduled_time,
-    hasImage: Boolean(task.image_blob || task.image_data),
+    hasImage: Boolean(task.image_blob || task.image_data || task.image_path),
     imageSize: task.image_blob?.size ?? 0,
   });
 }
@@ -53,7 +53,7 @@ export function TaskEditModal({
   const [discardOpen, setDiscardOpen] = useState(false);
   const initialDraft = useRef(taskDraftKey(task));
   const imageUrl = useObjectUrl(task.image_blob ?? null) ?? task.image_data ?? null;
-  const hasImage = Boolean(task.image_blob || task.image_data);
+  const hasImage = Boolean(task.image_blob || task.image_data || task.image_path);
 
   const requestClose = () => {
     if (taskDraftKey(task) !== initialDraft.current) setDiscardOpen(true);
@@ -161,7 +161,7 @@ export function TaskEditModal({
                     <input type="file" accept="image/*" className="hidden" onChange={(event) => handleImageUpload(event.target.files?.[0] ?? null)} />
                   </label>
                   <button
-                    onClick={() => onChange({ ...task, image_blob: null, image_data: null })}
+                    onClick={() => onChange({ ...task, image_blob: null, image_data: null, image_path: null })}
                     className="px-3 py-1.5 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/70 rounded-lg text-sm font-medium text-red-500 transition-colors flex items-center gap-1.5"
                   >
                     <Trash2 size={14} />

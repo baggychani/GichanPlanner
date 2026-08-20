@@ -78,6 +78,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
       id: '#profile',
       nickname: nickname.trim(),
       avatar,
+      avatar_path: avatar ? profile?.avatar_path : null,
       legacy_dexie_user_id: profile?.legacy_dexie_user_id ?? null,
       email: accountEmail || profile?.email || null,
       birthday_month: birthdayMonth,

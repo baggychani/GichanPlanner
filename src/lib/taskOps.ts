@@ -24,6 +24,7 @@ export function createBlankTask(targetDate: string): Task {
     order: 0,
     image_blob: null,
     image_data: null,
+    image_path: null,
   };
 }
 
@@ -115,6 +116,7 @@ export async function copyAllTasksToDate(sourceDate: string, destinationDate: st
         scheduled_time: deadlineOnDate(task.scheduled_time, destinationDate),
         is_completed: false,
         order,
+        image_path: null,
       };
     });
     if (copies.length > 0) await db.tasks.bulkPut(copies);

@@ -81,6 +81,7 @@ export function taskFromRemote(row: RemoteTask, imageBlob: Blob | null): Task {
     order: row.order ?? 0,
     image_blob: imageBlob,
     image_data: null,
+    image_path: row.image_path ?? null,
   };
 }
 
@@ -195,7 +196,7 @@ export function routineFromRemote(row: RemoteStamp & Routine): Routine {
   };
 }
 
-type CloudExtras = 'owner_id' | 'revision' | 'image_path' | 'avatar_path';
+type CloudExtras = 'owner_id' | 'revision';
 type SyncedLocal<T> = Exclude<keyof T, 'version' | 'image_blob' | 'image_data' | 'avatar' | 'legacy_dexie_user_id' | 'email'>;
 type MissingFromCloud<T, Cloud> = Exclude<SyncedLocal<T>, Exclude<keyof Cloud, CloudExtras>>;
 
@@ -236,5 +237,5 @@ const _allTables: AssertCovered<Exclude<PlannerSyncTable, CoveredTables> | Exclu
 void _allTables;
 
 export function plannerWriteTables() {
-  return [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.projects, db.profiles] as const;
+  return [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.projects, db.profiles, db.cloudShadows] as const;
 }

@@ -288,6 +288,7 @@ function PlannerApp() {
         is_important: editingTask.is_important,
         image_blob: editingTask.image_blob ?? null,
         image_data: editingTask.image_data ?? null,
+        image_path: editingTask.image_path,
         updated_at: savedAt,
         version: current.version + 1,
       });
