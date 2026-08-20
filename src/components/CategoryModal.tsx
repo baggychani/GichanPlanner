@@ -10,10 +10,23 @@ import { EmojiPickerOverlay } from './EmojiPickerOverlay';
 import { Overlay } from './Overlay';
 import { ProjectSettingsPanel } from './ProjectSettingsPanel';
 import { downloadPortablePlannerExport, parsePortablePlannerExport, type PortablePlannerExport } from '../lib/portablePlannerExport';
+import {
+  downloadPlannerCloudSnapshot,
+  listPlannerCloudSnapshots,
+  readPlannerCloudSnapshot,
+  savePlannerCloudSnapshot,
+  type PlannerCloudSnapshot,
+} from '../lib/plannerBackupSnapshots';
 import { importPortablePlannerExport } from '../lib/supabasePlannerImport';
 import { authErrorMessage } from './authUi';
 
 type SettingsSection = 'categories' | 'projects' | 'data';
+
+function snapshotLabel(iso: string) {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return date.toLocaleString('ko-KR', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
 
 export function CategoryModal({
   categories,
@@ -46,13 +59,35 @@ export function CategoryModal({
   const [isRestoringBackup, setIsRestoringBackup] = useState(false);
   const [backupStatus, setBackupStatus] = useState<string | null>(null);
   const [pendingBackup, setPendingBackup] = useState<{ fileName: string; archive: PortablePlannerExport } | null>(null);
+  const [cloudSnapshots, setCloudSnapshots] = useState<PlannerCloudSnapshot[]>([]);
+  const [cloudSnapshotsAvailable, setCloudSnapshotsAvailable] = useState<boolean | null>(null);
+  const [isSavingSnapshot, setIsSavingSnapshot] = useState(false);
+  const [snapshotNonce, setSnapshotNonce] = useState(0);
   const backupFileInputRef = useRef<HTMLInputElement>(null);
+  const backupBusy = isDownloadingBackup || isRestoringBackup || isSavingSnapshot;
 
   useEffect(() => {
     if (!backupStatus) return;
     const timer = window.setTimeout(() => setBackupStatus(null), 2200);
     return () => window.clearTimeout(timer);
   }, [backupStatus]);
+
+  useEffect(() => {
+    if (section !== 'data') return;
+    let cancelled = false;
+    void listPlannerCloudSnapshots()
+      .then(result => {
+        if (cancelled) return;
+        setCloudSnapshots(result.snapshots);
+        setCloudSnapshotsAvailable(result.available);
+      })
+      .catch(caught => {
+        if (cancelled) return;
+        setCloudSnapshotsAvailable(false);
+        setBackupStatus(authErrorMessage(caught));
+      });
+    return () => { cancelled = true; };
+  }, [section, snapshotNonce]);
 
   const sectionTitle = section === 'categories' ? '카테고리 관리' : section === 'projects' ? '프로젝트 관리' : '데이터';
 
@@ -138,7 +173,7 @@ export function CategoryModal({
                 />
                 <button
                   type="button"
-                  disabled={isDownloadingBackup || isRestoringBackup}
+                  disabled={backupBusy}
                   onClick={() => {
                     setIsDownloadingBackup(true);
                     void downloadPortablePlannerExport()
@@ -153,7 +188,7 @@ export function CategoryModal({
                 </button>
                 <button
                   type="button"
-                  disabled={isDownloadingBackup || isRestoringBackup}
+                  disabled={backupBusy}
                   onClick={() => backupFileInputRef.current?.click()}
                   className="mt-2 flex w-full items-center justify-center gap-2 rounded-xl border border-line-strong bg-surface py-3 text-sm font-semibold text-fg hover:bg-surface-hover disabled:opacity-40"
                 >
@@ -161,8 +196,71 @@ export function CategoryModal({
                   데이터 넣기
                 </button>
                 <p className="mt-3 text-xs leading-5 text-fg-subtle">
-                  넣을 때는 같은 항목은 더 최근 것만 남기고, 파일에 없는 할 일은 지우지 않습니다.
+                  넣을 때는 같은 항목은 더 최근 것만 남기고, 파일에 없는 할 일은 지우지 않습니다. 로그인하면 하루에 한 번 계정에도 사본을 남기고, 최근 7개만 둡니다.
                 </p>
+                <div className="mt-5 min-h-0 flex-1 overflow-y-auto">
+                  <p className="text-xs font-medium text-fg-subtle">계정 사본</p>
+                  {cloudSnapshotsAvailable === false && (
+                    <p className="mt-2 text-xs leading-5 text-fg-subtle">사본 저장소를 아직 안 넣었습니다. Supabase에 ADD_MISSING.sql을 한 번 실행하면 보입니다.</p>
+                  )}
+                  {cloudSnapshotsAvailable && cloudSnapshots.length === 0 && (
+                    <p className="mt-2 text-xs leading-5 text-fg-subtle">아직 사본이 없습니다. 아래 버튼으로 지금 남기거나, 다음에 로그인하면 자동으로 남깁니다.</p>
+                  )}
+                  {cloudSnapshots.length > 0 && (
+                    <ul className="mt-2 space-y-1.5">
+                      {cloudSnapshots.map(snapshot => (
+                        <li key={snapshot.path} className="flex items-center gap-2 rounded-xl border border-line px-3 py-2">
+                          <span className="min-w-0 flex-1 truncate text-sm text-fg">{snapshotLabel(snapshot.createdAt)}</span>
+                          <button
+                            type="button"
+                            disabled={backupBusy}
+                            onClick={() => {
+                              setIsDownloadingBackup(true);
+                              void downloadPlannerCloudSnapshot(snapshot.path)
+                                .then(() => setBackupStatus('데이터를 받았습니다.'))
+                                .catch(caught => setBackupStatus(authErrorMessage(caught)))
+                                .finally(() => setIsDownloadingBackup(false));
+                            }}
+                            className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-fg-muted hover:bg-surface-hover hover:text-fg disabled:opacity-40"
+                          >
+                            받기
+                          </button>
+                          <button
+                            type="button"
+                            disabled={backupBusy}
+                            onClick={() => {
+                              void readPlannerCloudSnapshot(snapshot.path)
+                                .then(archive => setPendingBackup({ fileName: snapshotLabel(snapshot.createdAt), archive }))
+                                .catch(caught => setBackupStatus(authErrorMessage(caught)));
+                            }}
+                            className="shrink-0 rounded-lg px-2 py-1 text-xs font-medium text-fg-muted hover:bg-surface-hover hover:text-fg disabled:opacity-40"
+                          >
+                            넣기
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                  {cloudSnapshotsAvailable && (
+                    <button
+                      type="button"
+                      disabled={backupBusy}
+                      onClick={() => {
+                        setIsSavingSnapshot(true);
+                        void savePlannerCloudSnapshot()
+                          .then(() => {
+                            setSnapshotNonce(value => value + 1);
+                            setBackupStatus('계정에 사본을 남겼습니다.');
+                          })
+                          .catch(caught => setBackupStatus(authErrorMessage(caught)))
+                          .finally(() => setIsSavingSnapshot(false));
+                      }}
+                      className="mt-3 w-full rounded-xl border border-line-strong py-2.5 text-sm font-medium text-fg hover:bg-surface-hover disabled:opacity-40"
+                    >
+                      {isSavingSnapshot ? '남기는 중…' : '지금 사본 남기기'}
+                    </button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex min-h-0 flex-1 flex-col">

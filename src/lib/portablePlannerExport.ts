@@ -13,7 +13,7 @@ export type PortableAttachment = {
 
 export type PortablePlannerExport = {
   format: 'gichanplan-portable';
-  version: typeof EXPORT_VERSION;
+  version: number;
   exportedAt: string;
   owner: {
     dexieUserId: string | null;
@@ -68,7 +68,11 @@ export async function createPortablePlannerExport(): Promise<PortablePlannerExpo
 export function validatePortablePlannerExport(value: unknown): value is PortablePlannerExport {
   if (!value || typeof value !== 'object') return false;
   const candidate = value as Partial<PortablePlannerExport>;
-  return candidate.format === 'gichanplan-portable' && candidate.version === EXPORT_VERSION
+  return candidate.format === 'gichanplan-portable'
+    && typeof candidate.version === 'number'
+    && Number.isInteger(candidate.version)
+    && candidate.version >= 1
+    && candidate.version <= EXPORT_VERSION
     && Array.isArray(candidate.tasks) && Array.isArray(candidate.attachments);
 }
 

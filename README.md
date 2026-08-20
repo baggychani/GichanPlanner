@@ -12,16 +12,26 @@
 
 로그아웃하면 달력은 보이고, 할 일·데드라인 내용은 숨깁니다.
 
+설정 → 데이터에서 JSON으로 받을 수 있고, 파일을 다시 넣을 수 있습니다. 넣을 때는 같은 항목은 더 최근 것만 남기고, 파일에 없는 할 일은 지우지 않습니다. 로그인한 뒤에는 하루에 한 번 계정에도 사본을 남기며, 최근 7개만 보관합니다.
+
+## 데이터·SQL 규칙
+
+- **라이브에서는 칸을 추가만 합니다.** 이미 있는 열을 지우거나 이름을 바꾸지 않습니다. 기능을 그만 보여 줘도 저장 칸은 남깁니다.
+- **배포는 SQL 먼저, 사이트 나중**입니다. 사이트가 새 칸을 보내기 전에 Supabase에 그 칸이 있어야 합니다.
+- 라이브에는 `supabase/migrations/`를 **이름 순서대로**, 이미 넣은 파일은 건너뛰고 없는 것만 넣습니다. 빠진 것만 한 번에 맞추려면 `supabase/ADD_MISSING.sql`입니다.
+- `supabase/RESET.sql`은 실행하지 마세요. 예전에는 데이터를 전부 지웠고, 지금은 안내만 합니다. 개발용으로 표를 처음부터 다시 만들 때만 `supabase/DEV_RESET_WIPES_ALL.sql`을 씁니다.
+
 ## Supabase에서 해야 하는 것
 
-SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합니다. 이미 넣은 파일은 건너뛰고, 없는 것만 넣으면 됩니다.
+SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합니다. 이미 넣은 파일은 건너뛰고, 없는 것만 넣으면 됩니다. 이미 쓰는 프로젝트면 `supabase/ADD_MISSING.sql` 한 번으로도 됩니다.
 
 1. `20260820000000_initial_schema.sql`
 2. `20260820010000_deadline_due_time.sql`
 3. `20260820020000_profile_birthday.sql`
 4. `20260820030000_profile_insert.sql` ← 닉네임 저장에 필요
-5. `20260820140000_projects.sql` ← 프로젝트 묶음. 이미 쓰는 프로젝트면 `supabase/ADD_MISSING.sql` 한 번으로도 됩니다.
-6. `20260820150000_deadline_project.sql` ← 데드라인에 프로젝트 연결.
+5. `20260820140000_projects.sql` ← 프로젝트 묶음
+6. `20260820150000_deadline_project.sql` ← 데드라인에 프로젝트 연결
+7. `20260820160000_planner_backups.sql` ← 계정 사본 저장. 없으면 설정에 사본 목록이 안 보입니다.
 
 Authentication → URL Configuration:
 
@@ -34,7 +44,7 @@ Authentication → URL Configuration:
 
 Authentication → Providers → Email이 켜져 있으면 됩니다. 이메일 인증을 강제 중이면 가입 후 메일 링크를 눌러야 로그인됩니다. 개인용으로 바로 쓰려면 Confirm email을 꺼도 됩니다.
 
-Storage에 `profile-images`, `task-images` 버킷이 있어야 합니다. 초기 스키마 SQL을 실행했다면 이미 있습니다.
+Storage에 `profile-images`, `task-images`, `planner-backups` 버킷이 있어야 합니다. 초기 스키마와 이후 마이그레이션을 순서대로 실행했거나 `ADD_MISSING.sql`을 넣었다면 있습니다.
 
 ## 실행
 

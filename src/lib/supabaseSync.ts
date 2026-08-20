@@ -10,6 +10,7 @@ import {
   type RemoteStamp,
   type RemoteTask,
 } from './plannerSyncSchema';
+import { maybeSavePlannerCloudSnapshot } from './plannerBackupSnapshots';
 import { supabase } from './supabase';
 
 const OWNER_KEY = 'gichanplan-sync-owner';
@@ -371,6 +372,9 @@ async function syncNow() {
     await prepareLocalAccount(user.id);
     await pullRemote(user.id, user.email ?? null);
     await pushAllLocal(user.id);
+    void maybeSavePlannerCloudSnapshot().catch(error => {
+      console.warn('[gichanplanner] 계정 사본을 남기지 못했습니다', error);
+    });
   } finally {
     syncInFlight = false;
   }

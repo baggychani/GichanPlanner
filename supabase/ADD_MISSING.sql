@@ -1,4 +1,5 @@
 -- 기존 테이블은 그대로 두고, 앱이 필요로 하는 것만 추가합니다.
+-- 라이브에서 쓰는 파일입니다. RESET.sql 은 실행하지 마세요.
 -- SQL Editor에 이 파일 전체를 붙여 넣고 Run 한 번이면 됩니다.
 -- 이미 있는 컬럼/정책이면 그냥 넘어갑니다.
 
@@ -48,3 +49,13 @@ grant select, insert, update, delete on table
   public.projects,
   public.legacy_dexie_identities
 to authenticated;
+
+insert into storage.buckets (id, name, public)
+values ('planner-backups', 'planner-backups', false)
+on conflict (id) do nothing;
+
+drop policy if exists "planner backup access" on storage.objects;
+create policy "planner backup access" on storage.objects for all
+  using (bucket_id = 'planner-backups' and (storage.foldername(name))[1] = (select auth.uid()::text))
+  with check (bucket_id = 'planner-backups' and (storage.foldername(name))[1] = (select auth.uid()::text));
+
