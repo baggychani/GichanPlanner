@@ -1,20 +1,45 @@
-import { useState } from 'react';
-import { Check, FolderKanban, GripVertical, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { format } from 'date-fns';
+import { Check, ChevronRight, FolderKanban, Pencil, Plus, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
-import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { db, type Project } from '../lib/db';
+import { db, type Project, type Task } from '../lib/db';
 import { PROJECT_ICONS } from '../lib/projectIcons';
+import { parseDay } from '../lib/datetime';
 import { runPlannerWrite } from '../lib/supabaseSync';
-import { deleteProject, reorderProjects } from '../lib/taskOps';
+import { deleteProject } from '../lib/taskOps';
 import { EmojiIcon } from './EmojiIcon';
 
-export function ProjectSettingsPanel({ projects }: { projects: Project[] }) {
+export function ProjectSettingsPanel({
+  projects,
+  tasks,
+  onOpenTask,
+}: {
+  projects: Project[];
+  tasks: Task[];
+  onOpenTask: (task: Task) => void;
+}) {
+  const [openId, setOpenId] = useState<string | null | undefined>(undefined);
+  const activeId = openId === undefined ? projects[0]?.id ?? null : openId;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingIcon, setEditingIcon] = useState('📁');
   const [newTitle, setNewTitle] = useState('');
   const [newIcon, setNewIcon] = useState('📁');
   const [iconPicker, setIconPicker] = useState<'new' | 'edit' | null>(null);
+
+  const tasksByProject = useMemo(() => {
+    const grouped = new Map<string, Task[]>();
+    for (const task of tasks) {
+      if (!task.project_id) continue;
+      const list = grouped.get(task.project_id) ?? [];
+      list.push(task);
+      grouped.set(task.project_id, list);
+    }
+    for (const list of grouped.values()) {
+      list.sort((a, b) => a.target_date.localeCompare(b.target_date) || a.order - b.order || a.created_at.localeCompare(b.created_at));
+    }
+    return grouped;
+  }, [tasks]);
 
   const closeEdit = () => {
     setEditingId(null);
@@ -24,122 +49,141 @@ export function ProjectSettingsPanel({ projects }: { projects: Project[] }) {
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="mb-4 min-h-0 flex-1 overflow-y-scroll [scrollbar-gutter:stable]">
-        <DragDropContext onDragEnd={(result) => { void reorderProjects(projects, result); }}>
-          <Droppable droppableId="projects">
-            {(provided) => (
-              <div {...provided.droppableProps} ref={provided.innerRef} className="space-y-2">
-                {projects.map((project, index) => (
-                  <Draggable key={project.id} draggableId={project.id} index={index}>
-                    {(provided, snapshot) => (
-                      <div
-                        ref={provided.innerRef}
-                        {...provided.draggableProps}
-                        className={clsx(
-                          'rounded-xl border px-3 py-2.5 transition-all',
-                          snapshot.isDragging ? 'border-line-strong bg-surface shadow-lg' : 'border-line bg-surface-muted',
-                        )}
-                        style={provided.draggableProps.style}
+        <div className="space-y-2">
+          {projects.map(project => {
+            const projectTasks = tasksByProject.get(project.id) ?? [];
+            const completed = projectTasks.filter(task => task.is_completed).length;
+            const total = projectTasks.length;
+            const isOpen = activeId === project.id;
+            const isEditing = editingId === project.id;
+            return (
+              <section
+                key={project.id}
+                className={clsx('overflow-hidden rounded-2xl border', isOpen ? 'border-line-strong bg-surface' : 'border-line bg-surface-muted')}
+              >
+                <div className="flex items-center gap-1 pr-1">
+                  <button
+                    type="button"
+                    onClick={() => { setOpenId(isOpen ? null : project.id); closeEdit(); }}
+                    className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-left"
+                    aria-expanded={isOpen}
+                  >
+                    <ChevronRight size={16} className={clsx('shrink-0 text-fg-subtle transition-transform', isOpen && 'rotate-90')} />
+                    <EmojiIcon emoji={project.icon} className="h-5 w-6 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate font-medium text-fg">{project.title}</span>
+                    <span className="shrink-0 text-xs font-medium text-fg-subtle">{total === 0 ? '할 일 없음' : `${completed}/${total}`}</span>
+                  </button>
+                  {isEditing ? (
+                    <div className="flex shrink-0 items-center gap-0.5 pr-1">
+                      <button
+                        type="button"
+                        onClick={async () => {
+                          if (!editingTitle.trim()) return;
+                          const now = new Date().toISOString();
+                          await runPlannerWrite(() => db.projects.put({
+                            ...project,
+                            title: editingTitle.trim(),
+                            icon: editingIcon,
+                            updated_at: now,
+                            version: project.version + 1,
+                          }));
+                          closeEdit();
+                        }}
+                        aria-label={`${project.title} 저장`}
+                        className="rounded-lg p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg"
                       >
-                        <div className="flex items-center justify-between">
-                          <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                            <div {...provided.dragHandleProps} className="cursor-grab p-0.5 text-fg-subtle hover:text-fg active:cursor-grabbing">
-                              <GripVertical size={16} />
-                            </div>
-                            {editingId === project.id ? (
-                              <>
-                                <button
-                                  type="button"
-                                  onClick={() => setIconPicker(open => open === 'edit' ? null : 'edit')}
-                                  className="inline-flex items-center rounded-lg p-1 hover:bg-surface"
-                                  aria-label="프로젝트 아이콘 변경"
-                                >
-                                  <EmojiIcon emoji={editingIcon} className="h-5 w-6" />
-                                </button>
-                                <input
-                                  autoFocus
-                                  value={editingTitle}
-                                  onChange={event => setEditingTitle(event.target.value)}
-                                  className="min-w-0 flex-1 rounded-lg bg-surface px-2 py-1 font-medium text-fg outline-none ring-1 ring-line-strong focus:ring-fg-subtle"
-                                />
-                              </>
-                            ) : (
-                              <>
-                                <span className="inline-flex items-center"><EmojiIcon emoji={project.icon} className="h-5 w-6" /></span>
-                                <span className="truncate font-medium text-fg">{project.title}</span>
-                              </>
-                            )}
-                          </div>
-                          {editingId === project.id ? (
-                            <div className="flex shrink-0 items-center gap-0.5">
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (!editingTitle.trim()) return;
-                                  const now = new Date().toISOString();
-                                  await runPlannerWrite(() => db.projects.put({
-                                    ...project,
-                                    title: editingTitle.trim(),
-                                    icon: editingIcon,
-                                    updated_at: now,
-                                    version: project.version + 1,
-                                  }));
-                                  closeEdit();
-                                }}
-                                aria-label={`${project.title} 저장`}
-                                className="rounded-lg p-1.5 text-fg-subtle transition-colors hover:bg-surface hover:text-fg"
-                              >
-                                <Check size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={closeEdit}
-                                aria-label="프로젝트 수정 취소"
-                                className="rounded-lg p-1.5 text-fg-subtle transition-colors hover:bg-surface hover:text-fg"
-                              >
-                                <X size={16} />
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex shrink-0 items-center gap-0.5">
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setEditingId(project.id);
-                                  setEditingTitle(project.title);
-                                  setEditingIcon(project.icon);
-                                  setIconPicker(null);
-                                }}
-                                aria-label={`${project.title} 수정`}
-                                className="rounded-lg p-1.5 text-fg-subtle transition-colors hover:bg-surface hover:text-fg"
-                              >
-                                <Pencil size={16} />
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  if (editingId === project.id) closeEdit();
-                                  void deleteProject(project.id);
-                                }}
-                                aria-label={`${project.title} 삭제`}
-                                className="rounded-lg p-1.5 text-fg-subtle transition-colors hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/40"
-                              >
-                                <Trash2 size={16} />
-                              </button>
-                            </div>
-                          )}
-                        </div>
-                        {editingId === project.id && iconPicker === 'edit' && (
-                          <IconGrid selected={editingIcon} onSelect={(icon) => { setEditingIcon(icon); setIconPicker(null); }} />
-                        )}
+                        <Check size={16} />
+                      </button>
+                      <button type="button" onClick={closeEdit} aria-label="프로젝트 수정 취소" className="rounded-lg p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg">
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex shrink-0 items-center gap-0.5 pr-1">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOpenId(project.id);
+                          setEditingId(project.id);
+                          setEditingTitle(project.title);
+                          setEditingIcon(project.icon);
+                          setIconPicker(null);
+                        }}
+                        aria-label={`${project.title} 이름 수정`}
+                        className="rounded-lg p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { void deleteProject(project.id); }}
+                        aria-label={`${project.title} 삭제`}
+                        className="rounded-lg p-1.5 text-fg-subtle hover:bg-red-50 hover:text-red-500 dark:hover:bg-red-950/40"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                {isEditing && (
+                  <div className="space-y-2 border-t border-line px-3 py-3">
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIconPicker(open => open === 'edit' ? null : 'edit')}
+                        className="inline-flex items-center rounded-lg p-1 hover:bg-surface-muted"
+                        aria-label="프로젝트 아이콘 변경"
+                      >
+                        <EmojiIcon emoji={editingIcon} className="h-5 w-6" />
+                      </button>
+                      <input
+                        autoFocus
+                        value={editingTitle}
+                        onChange={event => setEditingTitle(event.target.value)}
+                        className="min-w-0 flex-1 rounded-lg bg-surface-muted px-2 py-1 font-medium text-fg outline-none ring-1 ring-line-strong"
+                      />
+                    </div>
+                    {iconPicker === 'edit' && (
+                      <IconGrid selected={editingIcon} onSelect={(icon) => { setEditingIcon(icon); setIconPicker(null); }} />
+                    )}
+                  </div>
+                )}
+
+                {isOpen && !isEditing && (
+                  <div className="border-t border-line px-3 pb-3 pt-2">
+                    {total > 0 && (
+                      <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-surface-hover">
+                        <div className="h-full rounded-full bg-primary" style={{ width: `${Math.round((completed / total) * 100)}%` }} />
                       </div>
                     )}
-                  </Draggable>
-                ))}
-                {provided.placeholder}
-              </div>
-            )}
-          </Droppable>
-        </DragDropContext>
+                    {projectTasks.length === 0 ? (
+                      <p className="px-1 py-3 text-sm text-fg-subtle">아직 묶인 할 일이 없습니다. 할 일 상세에서 이 프로젝트를 고르면 여기 모입니다.</p>
+                    ) : (
+                      <ul className="space-y-0.5">
+                        {projectTasks.map(task => (
+                          <li key={task.id}>
+                            <button
+                              type="button"
+                              onClick={() => onOpenTask(task)}
+                              className="flex w-full items-center gap-2 rounded-xl px-2 py-1.5 text-left hover:bg-surface-muted"
+                            >
+                              <span className={clsx('grid h-4 w-4 shrink-0 place-items-center rounded-full border-2', task.is_completed ? 'border-primary bg-primary' : 'border-line-strong')}>
+                                {task.is_completed && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
+                              </span>
+                              <span className="w-10 shrink-0 text-xs text-fg-subtle">{format(parseDay(task.target_date), 'M/d')}</span>
+                              <span className={clsx('min-w-0 flex-1 truncate text-sm', task.is_completed ? 'text-fg-subtle line-through' : 'text-fg')}>{task.title}</span>
+                            </button>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                )}
+              </section>
+            );
+          })}
+        </div>
 
         {projects.length === 0 && (
           <div className="flex flex-col items-center gap-2 py-8 text-center text-sm text-fg-subtle">
@@ -155,8 +199,9 @@ export function ProjectSettingsPanel({ projects }: { projects: Project[] }) {
             event.preventDefault();
             if (!newTitle.trim()) return;
             const now = new Date().toISOString();
+            const id = crypto.randomUUID();
             await runPlannerWrite(() => db.projects.add({
-              id: crypto.randomUUID(),
+              id,
               version: 1,
               created_at: now,
               updated_at: now,
@@ -170,6 +215,7 @@ export function ProjectSettingsPanel({ projects }: { projects: Project[] }) {
             setNewTitle('');
             setNewIcon('📁');
             setIconPicker(null);
+            setOpenId(id);
           }}
         >
           <div className="flex gap-2">

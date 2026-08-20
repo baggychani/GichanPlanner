@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { Check, FolderKanban, GripVertical, Pencil, Plus, Tags, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { db, type Domain, type Project } from '../lib/db';
+import { db, type Domain, type Project, type Task } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { emojiCategories, flagNameByEmoji } from '../lib/emojis';
 import { deleteCategory, reorderCategories } from '../lib/taskOps';
@@ -13,11 +13,15 @@ import { ProjectSettingsPanel } from './ProjectSettingsPanel';
 export function CategoryModal({
   categories,
   projects,
+  tasks,
   onClose,
+  onOpenTask,
 }: {
   categories: Domain[];
   projects: Project[];
+  tasks: Task[];
   onClose: () => void;
+  onOpenTask: (task: Task) => void;
 }) {
   const [section, setSection] = useState<'categories' | 'projects'>('categories');
   const [editingCategoryId, setEditingCategoryId] = useState<string | null>(null);
@@ -73,7 +77,7 @@ export function CategoryModal({
           </div>
 
           {section === 'projects' ? (
-            <ProjectSettingsPanel projects={projects} />
+            <ProjectSettingsPanel projects={projects} tasks={tasks} onOpenTask={onOpenTask} />
           ) : (
           <div className="flex min-h-0 flex-1 flex-col">
 

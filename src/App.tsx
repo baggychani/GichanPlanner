@@ -575,7 +575,17 @@ function PlannerApp() {
       )}
 
       {isCategoryModalOpen && (
-        <CategoryModal categories={categories} projects={projects} onClose={() => setIsCategoryModalOpen(false)} />
+        <CategoryModal
+          categories={categories}
+          projects={projects}
+          tasks={tasks}
+          onClose={() => setIsCategoryModalOpen(false)}
+          onOpenTask={(task) => {
+            setIsCategoryModalOpen(false);
+            setIsCreatingTask(false);
+            setEditingTask(task);
+          }}
+        />
       )}
       {isProfileOpen && <ProfileModal onClose={() => setIsProfileOpen(false)} />}
       {isPasswordRecovery && (

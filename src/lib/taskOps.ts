@@ -1,5 +1,5 @@
 import type { DropResult } from '@hello-pangea/dnd';
-import { db, type Domain, type Project, type Task } from './db';
+import { db, type Domain, type Task } from './db';
 import { deadlineOnDate } from './datetime';
 import { runPlannerWrite } from './supabaseSync';
 
@@ -230,23 +230,6 @@ export async function deleteCategory(categoryId: string) {
     const category = await db.domains.get(categoryId);
     if (category) await db.domains.put({ ...category, deleted_at: now, updated_at: now, version: category.version + 1 });
   });
-  });
-}
-
-export async function reorderProjects(projects: Project[], result: DropResult) {
-  const { destination, source } = result;
-  if (!destination || destination.index === source.index) return;
-  return runPlannerWrite(async () => {
-  const items = Array.from(projects);
-  const [reorderedItem] = items.splice(source.index, 1);
-  items.splice(destination.index, 0, reorderedItem);
-  const now = new Date().toISOString();
-  await db.projects.bulkPut(items.map((project, index) => ({
-    ...project,
-    order: index,
-    updated_at: now,
-    version: project.version + 1,
-  })));
   });
 }
 

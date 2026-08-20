@@ -53,6 +53,7 @@ export function TaskEditModal({
   const [discardOpen, setDiscardOpen] = useState(false);
   const initialDraft = useRef(taskDraftKey(task));
   const imageUrl = useObjectUrl(task.image_blob ?? null) ?? task.image_data ?? null;
+  const hasImage = Boolean(task.image_blob || task.image_data);
 
   const requestClose = () => {
     if (taskDraftKey(task) !== initialDraft.current) setDiscardOpen(true);
@@ -146,9 +147,13 @@ export function TaskEditModal({
 
           <div>
             <label className="block text-xs font-medium text-fg-subtle mb-1">이미지 첨부</label>
-            {imageUrl ? (
+            {hasImage ? (
               <div className="w-full bg-surface-muted rounded-xl border border-line-strong overflow-hidden">
-                <img src={imageUrl} alt="첨부" className="w-full object-contain max-h-[300px] bg-surface-hover" />
+                {imageUrl ? (
+                  <img src={imageUrl} alt="" className="w-full object-contain max-h-[300px] bg-surface-hover" />
+                ) : (
+                  <div className="flex h-40 items-center justify-center bg-surface-hover text-sm text-fg-subtle">사진을 불러오는 중…</div>
+                )}
                 <div className="p-2 flex justify-end gap-2 bg-surface border-t border-line-strong">
                   <label className="px-3 py-1.5 bg-surface-hover rounded-lg text-sm font-medium cursor-pointer transition-colors text-fg flex items-center gap-1.5">
                     <Upload size={14} />
