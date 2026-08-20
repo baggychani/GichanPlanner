@@ -3,7 +3,6 @@ import { format } from 'date-fns';
 import { Check, ChevronRight, FolderKanban, Pencil, Plus, Trash2, X } from 'lucide-react';
 import clsx from 'clsx';
 import { db, type Project, type Task } from '../lib/db';
-import { PROJECT_ICONS } from '../lib/projectIcons';
 import { parseDay } from '../lib/datetime';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { deleteProject } from '../lib/taskOps';
@@ -12,20 +11,23 @@ import { EmojiIcon } from './EmojiIcon';
 export function ProjectSettingsPanel({
   projects,
   tasks,
+  initialOpenId = null,
   onOpenTask,
+  onPickIcon,
 }: {
   projects: Project[];
   tasks: Task[];
+  initialOpenId?: string | null;
   onOpenTask: (task: Task) => void;
+  onPickIcon: (onSelect: (emoji: string) => void) => void;
 }) {
-  const [openId, setOpenId] = useState<string | null | undefined>(undefined);
+  const [openId, setOpenId] = useState<string | null | undefined>(initialOpenId ?? undefined);
   const activeId = openId === undefined ? projects[0]?.id ?? null : openId;
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingIcon, setEditingIcon] = useState('📁');
   const [newTitle, setNewTitle] = useState('');
   const [newIcon, setNewIcon] = useState('📁');
-  const [iconPicker, setIconPicker] = useState<'new' | 'edit' | null>(null);
 
   const tasksByProject = useMemo(() => {
     const grouped = new Map<string, Task[]>();
@@ -41,10 +43,7 @@ export function ProjectSettingsPanel({
     return grouped;
   }, [tasks]);
 
-  const closeEdit = () => {
-    setEditingId(null);
-    setIconPicker(null);
-  };
+  const closeEdit = () => setEditingId(null);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
@@ -59,20 +58,46 @@ export function ProjectSettingsPanel({
             return (
               <section
                 key={project.id}
-                className={clsx('overflow-hidden rounded-2xl border', isOpen ? 'border-line-strong bg-surface' : 'border-line bg-surface-muted')}
+                className={clsx('rounded-2xl border', isOpen ? 'border-line-strong bg-surface' : 'border-line bg-surface-muted')}
               >
                 <div className="flex items-center gap-1 pr-1">
                   <button
                     type="button"
-                    onClick={() => { setOpenId(isOpen ? null : project.id); closeEdit(); }}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 px-3 py-2.5 text-left"
+                    onClick={() => { setOpenId(isOpen ? null : project.id); if (isEditing) closeEdit(); }}
+                    className="grid h-10 w-10 shrink-0 place-items-center text-fg-subtle hover:text-fg"
                     aria-expanded={isOpen}
+                    aria-label={isOpen ? `${project.title} 접기` : `${project.title} 펼치기`}
                   >
-                    <ChevronRight size={16} className={clsx('shrink-0 text-fg-subtle transition-transform', isOpen && 'rotate-90')} />
-                    <EmojiIcon emoji={project.icon} className="h-5 w-6 shrink-0" />
-                    <span className="min-w-0 flex-1 truncate font-medium text-fg">{project.title}</span>
-                    <span className="shrink-0 text-xs font-medium text-fg-subtle">{total === 0 ? '할 일 없음' : `${completed}/${total}`}</span>
+                    <ChevronRight size={16} className={clsx('transition-transform', isOpen && 'rotate-90')} />
                   </button>
+                  {isEditing ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onPickIcon(setEditingIcon)}
+                        className="inline-flex shrink-0 items-center rounded-lg p-1 hover:bg-surface-muted"
+                        aria-label="프로젝트 아이콘 변경"
+                      >
+                        <EmojiIcon emoji={editingIcon} className="h-5 w-6" />
+                      </button>
+                      <input
+                        autoFocus
+                        value={editingTitle}
+                        onChange={event => setEditingTitle(event.target.value)}
+                        className="min-w-0 flex-1 rounded-lg bg-surface-muted px-2 py-1 font-medium text-fg outline-none ring-1 ring-line-strong"
+                      />
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setOpenId(isOpen ? null : project.id)}
+                      className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pr-2 text-left"
+                    >
+                      <EmojiIcon emoji={project.icon} className="h-5 w-6 shrink-0" />
+                      <span className="min-w-0 flex-1 truncate font-medium text-fg">{project.title}</span>
+                    </button>
+                  )}
+                  <span className="shrink-0 text-xs font-medium text-fg-subtle">{total === 0 ? '할 일 없음' : `${completed}/${total}`}</span>
                   {isEditing ? (
                     <div className="flex shrink-0 items-center gap-0.5 pr-1">
                       <button
@@ -107,7 +132,6 @@ export function ProjectSettingsPanel({
                           setEditingId(project.id);
                           setEditingTitle(project.title);
                           setEditingIcon(project.icon);
-                          setIconPicker(null);
                         }}
                         aria-label={`${project.title} 이름 수정`}
                         className="rounded-lg p-1.5 text-fg-subtle hover:bg-surface-hover hover:text-fg"
@@ -126,31 +150,7 @@ export function ProjectSettingsPanel({
                   )}
                 </div>
 
-                {isEditing && (
-                  <div className="space-y-2 border-t border-line px-3 py-3">
-                    <div className="flex items-center gap-2">
-                      <button
-                        type="button"
-                        onClick={() => setIconPicker(open => open === 'edit' ? null : 'edit')}
-                        className="inline-flex items-center rounded-lg p-1 hover:bg-surface-muted"
-                        aria-label="프로젝트 아이콘 변경"
-                      >
-                        <EmojiIcon emoji={editingIcon} className="h-5 w-6" />
-                      </button>
-                      <input
-                        autoFocus
-                        value={editingTitle}
-                        onChange={event => setEditingTitle(event.target.value)}
-                        className="min-w-0 flex-1 rounded-lg bg-surface-muted px-2 py-1 font-medium text-fg outline-none ring-1 ring-line-strong"
-                      />
-                    </div>
-                    {iconPicker === 'edit' && (
-                      <IconGrid selected={editingIcon} onSelect={(icon) => { setEditingIcon(icon); setIconPicker(null); }} />
-                    )}
-                  </div>
-                )}
-
-                {isOpen && !isEditing && (
+                {isOpen && (
                   <div className="border-t border-line px-3 pb-3 pt-2">
                     {total > 0 && (
                       <div className="mb-2 h-1.5 overflow-hidden rounded-full bg-surface-hover">
@@ -171,7 +171,7 @@ export function ProjectSettingsPanel({
                               <span className={clsx('grid h-4 w-4 shrink-0 place-items-center rounded-full border-2', task.is_completed ? 'border-primary bg-primary' : 'border-line-strong')}>
                                 {task.is_completed && <span className="h-1.5 w-1.5 rounded-full bg-white" />}
                               </span>
-                              <span className="w-10 shrink-0 text-xs text-fg-subtle">{format(parseDay(task.target_date), 'M/d')}</span>
+                              <span className="w-10 shrink-0 text-xs text-fg-subtle">{format(parseDay(task.target_date), 'M.d')}</span>
                               <span className={clsx('min-w-0 flex-1 truncate text-sm', task.is_completed ? 'text-fg-subtle line-through' : 'text-fg')}>{task.title}</span>
                             </button>
                           </li>
@@ -214,14 +214,13 @@ export function ProjectSettingsPanel({
             }));
             setNewTitle('');
             setNewIcon('📁');
-            setIconPicker(null);
             setOpenId(id);
           }}
         >
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setIconPicker(open => open === 'new' ? null : 'new')}
+              onClick={() => onPickIcon(setNewIcon)}
               className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line-strong bg-surface-muted text-2xl transition-colors hover:bg-surface-hover"
               aria-label="새 프로젝트 아이콘"
             >
@@ -238,30 +237,8 @@ export function ProjectSettingsPanel({
               <Plus size={20} />
             </button>
           </div>
-          {iconPicker === 'new' && (
-            <IconGrid selected={newIcon} onSelect={(icon) => { setNewIcon(icon); setIconPicker(null); }} />
-          )}
         </form>
       </div>
-    </div>
-  );
-}
-
-function IconGrid({ selected, onSelect }: { selected: string; onSelect: (icon: string) => void }) {
-  return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
-      {PROJECT_ICONS.map(candidate => (
-        <button
-          key={candidate}
-          type="button"
-          onClick={() => onSelect(candidate)}
-          aria-pressed={selected === candidate}
-          aria-label={`${candidate} 아이콘`}
-          className={selected === candidate ? 'grid h-10 w-10 place-items-center rounded-xl bg-primary/30' : 'grid h-10 w-10 place-items-center rounded-xl bg-surface hover:bg-surface-hover'}
-        >
-          <EmojiIcon emoji={candidate} className="h-5 w-5" />
-        </button>
-      ))}
     </div>
   );
 }

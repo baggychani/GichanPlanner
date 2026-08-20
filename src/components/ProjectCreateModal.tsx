@@ -3,7 +3,7 @@ import { FolderKanban, X } from 'lucide-react';
 import { db } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { Overlay } from './Overlay';
-import { PROJECT_ICONS } from '../lib/projectIcons';
+import { EmojiPickerOverlay } from './EmojiPickerOverlay';
 import { EmojiIcon } from './EmojiIcon';
 
 type ProjectCreateModalProps = {
@@ -15,6 +15,7 @@ type ProjectCreateModalProps = {
 export function ProjectCreateModal({ nextOrder, onClose, onCreated }: ProjectCreateModalProps) {
   const [title, setTitle] = useState('');
   const [icon, setIcon] = useState('📁');
+  const [pickingIcon, setPickingIcon] = useState(false);
 
   const save = async () => {
     if (!title.trim()) return;
@@ -35,7 +36,8 @@ export function ProjectCreateModal({ nextOrder, onClose, onCreated }: ProjectCre
   };
 
   return (
-    <Overlay onEscape={onClose}>
+    <>
+    <Overlay onEscape={pickingIcon ? undefined : onClose}>
       <div className="flex w-[420px] max-w-full flex-col rounded-3xl bg-surface shadow-xl">
         <div className="flex items-center justify-between p-6 pb-4">
           <div className="flex items-center gap-2 text-fg">
@@ -65,20 +67,14 @@ export function ProjectCreateModal({ nextOrder, onClose, onCreated }: ProjectCre
           </div>
           <div>
             <label className="mb-1.5 block text-xs font-medium text-fg-subtle">아이콘</label>
-            <div className="flex flex-wrap gap-1.5">
-              {PROJECT_ICONS.map(candidate => (
-                <button
-                  key={candidate}
-                  type="button"
-                  onClick={() => setIcon(candidate)}
-                  aria-pressed={icon === candidate}
-                  aria-label={`${candidate} 아이콘`}
-                  className={icon === candidate ? 'grid h-11 w-11 place-items-center rounded-xl bg-primary/30' : 'grid h-11 w-11 place-items-center rounded-xl bg-surface-muted hover:bg-surface-hover'}
-                >
-                  <EmojiIcon emoji={candidate} className="h-6 w-6" />
-                </button>
-              ))}
-            </div>
+            <button
+              type="button"
+              onClick={() => setPickingIcon(true)}
+              className="flex h-12 w-12 items-center justify-center rounded-xl border border-line-strong bg-surface-muted hover:bg-surface-hover"
+              aria-label="프로젝트 아이콘 선택"
+            >
+              <EmojiIcon emoji={icon} className="h-7 w-7" />
+            </button>
           </div>
         </div>
         <div className="flex justify-end gap-3 border-t border-line px-6 py-4">
@@ -96,5 +92,12 @@ export function ProjectCreateModal({ nextOrder, onClose, onCreated }: ProjectCre
         </div>
       </div>
     </Overlay>
+    {pickingIcon && (
+      <EmojiPickerOverlay
+        onClose={() => setPickingIcon(false)}
+        onSelect={(emoji) => { setIcon(emoji); setPickingIcon(false); }}
+      />
+    )}
+    </>
   );
 }

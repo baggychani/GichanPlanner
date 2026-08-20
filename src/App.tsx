@@ -50,6 +50,9 @@ function PlannerApp() {
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [editingDeadline, setEditingDeadline] = useState<Deadline | null>(null);
   const [isCategoryModalOpen, setIsCategoryModalOpen] = useState(false);
+  const [settingsSection, setSettingsSection] = useState<'categories' | 'projects'>('categories');
+  const [settingsProjectId, setSettingsProjectId] = useState<string | null>(null);
+  const [taskFromSettings, setTaskFromSettings] = useState(false);
   const [isQuickCreateMenuOpen, setIsQuickCreateMenuOpen] = useState(false);
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
@@ -140,6 +143,9 @@ function PlannerApp() {
     setIsCategoryModalOpen(false);
     setIsDeadlineModalOpen(false);
     setIsProjectModalOpen(false);
+    setTaskFromSettings(false);
+    setSettingsSection('categories');
+    setSettingsProjectId(null);
     setEditingTask(null);
     setIsCreatingTask(false);
     setEditingDeadline(null);
@@ -151,6 +157,10 @@ function PlannerApp() {
     setEditingTask(null);
     setIsCreatingTask(false);
     setIsTimePickerOpen(false);
+    if (taskFromSettings) {
+      setIsCategoryModalOpen(true);
+      setTaskFromSettings(false);
+    }
   };
 
   const openTimePicker = (kind: 'task' | 'deadline') => {
@@ -257,7 +267,7 @@ function PlannerApp() {
       updated_at: now,
       version: editingTask.version + 1,
     }));
-    setEditingTask(null);
+    closeTaskEditor();
   };
 
   const handleCellClick = async (day: Date) => {
@@ -347,6 +357,7 @@ function PlannerApp() {
         }}
         onCreateTask={() => {
           if (!requireLogin()) return;
+          setTaskFromSettings(false);
           setIsCreatingTask(true);
           setEditingTask(createBlankTask(format(selectedDate, 'yyyy-MM-dd')));
           setIsQuickCreateMenuOpen(false);
@@ -365,6 +376,8 @@ function PlannerApp() {
         }}
         onOpenCategories={() => {
           if (!requireLogin()) return;
+          setSettingsSection('categories');
+          setSettingsProjectId(null);
           setIsCategoryModalOpen(true);
         }}
         onOpenProfile={() => setIsProfileOpen(true)}
@@ -454,7 +467,7 @@ function PlannerApp() {
               if (!requireLogin()) return;
               void saveQuickAdd(categoryId, true);
             }}
-            onOpenTask={(task) => { setIsCreatingTask(false); setEditingTask(task); }}
+            onOpenTask={(task) => { setTaskFromSettings(false); setIsCreatingTask(false); setEditingTask(task); }}
             onViewImage={setViewingImage}
           />
           ) : null
@@ -522,7 +535,7 @@ function PlannerApp() {
           onDelete={async () => {
             const now = new Date().toISOString();
             await runPlannerWrite(() => db.tasks.update(editingTask.id, { deleted_at: now, updated_at: now, version: editingTask.version + 1 }));
-            setEditingTask(null);
+            closeTaskEditor();
           }}
           onSave={() => { void saveEditingTask(); }}
         />
@@ -579,8 +592,13 @@ function PlannerApp() {
           categories={categories}
           projects={projects}
           tasks={tasks}
+          initialSection={settingsSection}
+          initialProjectId={settingsProjectId}
           onClose={() => setIsCategoryModalOpen(false)}
           onOpenTask={(task) => {
+            setTaskFromSettings(true);
+            setSettingsSection('projects');
+            setSettingsProjectId(task.project_id);
             setIsCategoryModalOpen(false);
             setIsCreatingTask(false);
             setEditingTask(task);
