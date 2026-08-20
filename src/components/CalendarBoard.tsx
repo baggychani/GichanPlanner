@@ -1,6 +1,6 @@
 import {
   format, addDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek,
-  isSameMonth, isSameDay, isToday,
+  isSameMonth, isSameDay, isToday, differenceInCalendarDays,
 } from 'date-fns';
 import { AlertCircle, CalendarDays, ChevronLeft, ChevronRight, Plus, Repeat2, Settings, Target, ListTodo, UserRound } from 'lucide-react';
 import clsx from 'clsx';
@@ -11,6 +11,7 @@ import { EMPTY_DAY_COUNTS, isDayCleared, type DayTaskCounts } from '../lib/taskC
 import { CountBubble } from './CountBubble';
 import { ThemeToggle } from './ThemeToggle';
 import { useAuth } from '../hooks/useAuth';
+import { useCalendarCellMetrics } from '../hooks/useCalendarCellMetrics';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 
 export type CalendarSelectionKind = 'deadline' | 'copy' | 'move' | null;
@@ -108,6 +109,8 @@ export function CalendarBoard({
   const monthEnd = endOfMonth(monthStart);
   const startDate = startOfWeek(monthStart, { weekStartsOn: 1 });
   const endDate = endOfWeek(monthEnd, { weekStartsOn: 1 });
+  const weekCount = Math.ceil((differenceInCalendarDays(endDate, startDate) + 1) / 7);
+  const { rootRef, bodyRef } = useCalendarCellMetrics(weekCount);
   const rows = [];
   let days = [];
   let day = startDate;
@@ -130,7 +133,7 @@ export function CalendarBoard({
           key={day.toString()}
           onClick={() => onCellClick(cloneDay)}
           className={clsx(
-            'relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden p-1.5 border-line transition-[filter] duration-150 cursor-pointer group',
+            'relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden border-line transition-[filter] duration-150 cursor-pointer group p-[var(--cal-pad)]',
             isSelecting ? 'hover:bg-primary/20' : 'hover:brightness-95',
             isWeekend && !isSelecting ? (i === 6 ? 'bg-red-50/30 dark:bg-red-950/25' : 'bg-blue-50/30 dark:bg-blue-950/25') : 'bg-surface',
             !isSameMonth(day, monthStart) ? 'opacity-40' : '',
@@ -144,25 +147,25 @@ export function CalendarBoard({
         >
           <div className="flex shrink-0 justify-between items-start">
             <span className={clsx(
-              'flex items-center justify-center w-8 h-8 rounded-full text-base font-semibold',
+              'flex items-center justify-center rounded-full font-semibold h-[var(--cal-date)] w-[var(--cal-date)] text-[length:var(--cal-date-font)]',
               isToday(day) ? 'bg-primary text-on-primary' :
               i === 5 ? 'text-blue-500' :
               i === 6 ? 'text-red-500' : '',
             )}>
               {format(day, 'd')}
             </span>
-            {hasDeadline && <AlertCircle size={18} strokeWidth={2.5} className="text-red-500 drop-shadow-sm" aria-label={`${dayDeadlines.length}개의 데드라인`} />}
+            {hasDeadline && <AlertCircle className="calendar-deadline-icon shrink-0 text-red-500 drop-shadow-sm" strokeWidth={2.5} aria-label={`${dayDeadlines.length}개의 데드라인`} />}
           </div>
-          <div className="mt-1.5 flex min-h-0 flex-1 items-center justify-center gap-1 overflow-hidden">
+          <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden gap-[var(--cal-gap)] mt-[var(--cal-gap)]">
             {dayCleared ? (
               <>
-                {dayCounts.completedImportant > 0 && <CountBubble count={0} tone="important" size="md" />}
-                {dayCounts.completedActive > 0 && <CountBubble count={0} tone="plain" size="md" />}
+                {dayCounts.completedImportant > 0 && <CountBubble count={0} tone="important" size="calendar" />}
+                {dayCounts.completedActive > 0 && <CountBubble count={0} tone="plain" size="calendar" />}
               </>
             ) : (
               <>
-                {dayCounts.important > 0 && <CountBubble count={dayCounts.important} tone="important" size="md" />}
-                {dayCounts.active > 0 && <CountBubble count={dayCounts.active} tone="plain" size="md" />}
+                {dayCounts.important > 0 && <CountBubble count={dayCounts.important} tone="important" size="calendar" />}
+                {dayCounts.active > 0 && <CountBubble count={dayCounts.active} tone="plain" size="calendar" />}
               </>
             )}
           </div>
@@ -203,7 +206,7 @@ export function CalendarBoard({
   }
 
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 w-full max-w-[calc(760px+4rem)] flex-1 flex-col pl-16 max-[900px]:h-auto max-[900px]:max-w-[760px] max-[900px]:flex-none max-[900px]:pl-0">
+    <div ref={rootRef} className="calendar-metrics relative flex h-full min-h-0 min-w-0 w-full max-w-[calc(760px+4rem)] flex-1 flex-col pl-16 max-[900px]:h-auto max-[900px]:max-w-[760px] max-[900px]:flex-none max-[900px]:pl-0">
       <div className="relative mb-4 flex min-w-0 shrink-0 items-center justify-between pl-4">
         <div className="flex items-center gap-4">
           <h1 className="text-3xl font-bold leading-tight">
@@ -285,7 +288,7 @@ export function CalendarBoard({
             </div>
           ))}
         </div>
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface rounded-b-3xl">{rows}</div>
+        <div ref={bodyRef} className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface rounded-b-3xl">{rows}</div>
       </div>
     </div>
   );

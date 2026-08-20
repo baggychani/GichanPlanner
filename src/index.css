@@ -91,8 +91,20 @@ body {
   100% { box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1); }
 }
 
-.task-drop-feedback {
-  animation: task-drop-feedback 420ms ease-out;
+.calendar-metrics {
+  --cal-date: 32px;
+  --cal-date-font: 16px;
+  --cal-bubble: 28px;
+  --cal-bubble-font: 14px;
+  --cal-bubble-px: 8px;
+  --cal-pad: 6px;
+  --cal-gap: 6px;
+  --cal-icon: 18px;
+}
+
+.calendar-deadline-icon {
+  width: var(--cal-icon);
+  height: var(--cal-icon);
 }
 
 @keyframes clear-shimmer {
