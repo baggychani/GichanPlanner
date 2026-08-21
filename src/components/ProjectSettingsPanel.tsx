@@ -25,8 +25,7 @@ export function ProjectSettingsPanel({
   onOpenDeadline: (deadline: Deadline) => void;
   onPickIcon: (onSelect: (emoji: string) => void) => void;
 }) {
-  const [openId, setOpenId] = useState<string | null | undefined>(initialOpenId ?? undefined);
-  const activeId = openId === undefined ? projects[0]?.id ?? null : openId;
+  const [openIds, setOpenIds] = useState<Set<string>>(() => new Set(initialOpenId ? [initialOpenId] : []));
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState('');
   const [editingIcon, setEditingIcon] = useState('📁');
@@ -63,6 +62,24 @@ export function ProjectSettingsPanel({
 
   const closeEdit = () => setEditingId(null);
 
+  const toggleOpen = (projectId: string) => {
+    setOpenIds(current => {
+      const next = new Set(current);
+      if (next.has(projectId)) next.delete(projectId);
+      else next.add(projectId);
+      return next;
+    });
+  };
+
+  const keepOpen = (projectId: string) => {
+    setOpenIds(current => {
+      if (current.has(projectId)) return current;
+      const next = new Set(current);
+      next.add(projectId);
+      return next;
+    });
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="settings-scroll mb-4">
@@ -72,7 +89,7 @@ export function ProjectSettingsPanel({
             const projectDeadlines = deadlinesByProject.get(project.id) ?? [];
             const completed = projectTasks.filter(task => task.is_completed).length;
             const total = projectTasks.length;
-            const isOpen = activeId === project.id;
+            const isOpen = openIds.has(project.id);
             const isEditing = editingId === project.id;
             return (
               <section
@@ -82,7 +99,7 @@ export function ProjectSettingsPanel({
                 <div className="flex items-center gap-1 pr-1">
                   <button
                     type="button"
-                    onClick={() => { setOpenId(isOpen ? null : project.id); if (isEditing) closeEdit(); }}
+                    onClick={() => { toggleOpen(project.id); if (isEditing) closeEdit(); }}
                     className="grid h-10 w-10 shrink-0 place-items-center text-fg-subtle hover:text-fg"
                     aria-expanded={isOpen}
                     aria-label={isOpen ? `${project.title} 접기` : `${project.title} 펼치기`}
@@ -109,7 +126,7 @@ export function ProjectSettingsPanel({
                   ) : (
                     <button
                       type="button"
-                      onClick={() => setOpenId(isOpen ? null : project.id)}
+                      onClick={() => toggleOpen(project.id)}
                       className="flex min-w-0 flex-1 items-center gap-2 py-2.5 pr-2 text-left"
                     >
                       <EmojiIcon emoji={project.icon} className="h-5 w-6 shrink-0" />
@@ -147,7 +164,7 @@ export function ProjectSettingsPanel({
                       <button
                         type="button"
                         onClick={() => {
-                          setOpenId(project.id);
+                          keepOpen(project.id);
                           setEditingId(project.id);
                           setEditingTitle(project.title);
                           setEditingIcon(project.icon);
@@ -250,7 +267,7 @@ export function ProjectSettingsPanel({
             }));
             setNewTitle('');
             setNewIcon('📁');
-            setOpenId(id);
+            keepOpen(id);
           }}
         >
           <div className="flex gap-2">

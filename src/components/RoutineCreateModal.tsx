@@ -1,6 +1,6 @@
 import { format, getISODay } from 'date-fns';
 import { ko } from 'date-fns/locale';
-import { Calendar as CalendarIcon, Repeat2, X } from 'lucide-react';
+import { Calendar as CalendarIcon, Repeat2, Star, X } from 'lucide-react';
 import clsx from 'clsx';
 import type { Domain } from '../lib/db';
 import { formatScheduledTime, parseDay } from '../lib/datetime';
@@ -11,18 +11,19 @@ type RoutineCreateModalProps = {
   title: string;
   domainId: string | null;
   startDate: string;
-  endDate: string | null;
+  endDate: string;
   freq: RecurrenceFreq;
   weekdays: number[];
   scheduledTime: string | null;
+  isImportant: boolean;
   categories: Domain[];
   onTitleChange: (value: string) => void;
   onDomainChange: (domainId: string | null) => void;
+  onImportantChange: (value: boolean) => void;
   onFreqChange: (freq: RecurrenceFreq) => void;
   onWeekdaysChange: (weekdays: number[]) => void;
   onPickStartDate: () => void;
   onPickEndDate: () => void;
-  onClearEndDate: () => void;
   onOpenTimePicker: () => void;
   onClose: () => void;
   onSave: () => void;
@@ -36,14 +37,15 @@ export function RoutineCreateModal({
   freq,
   weekdays,
   scheduledTime,
+  isImportant,
   categories,
   onTitleChange,
   onDomainChange,
+  onImportantChange,
   onFreqChange,
   onWeekdaysChange,
   onPickStartDate,
   onPickEndDate,
-  onClearEndDate,
   onOpenTimePicker,
   onClose,
   onSave,
@@ -85,16 +87,31 @@ export function RoutineCreateModal({
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-fg-subtle">카테고리</label>
-            <select
-              value={domainId ?? ''}
-              onChange={event => onDomainChange(event.target.value || null)}
-              className="w-full rounded-xl border border-transparent bg-surface-muted p-3 text-sm outline-none focus:border-line-strong"
-            >
-              <option value="">미분류</option>
-              {categories.map(category => (
-                <option key={category.id} value={category.id}>{category.name}</option>
-              ))}
-            </select>
+            <div className="flex gap-2">
+              <select
+                value={domainId ?? ''}
+                onChange={event => onDomainChange(event.target.value || null)}
+                className="min-w-0 flex-1 rounded-xl border border-transparent bg-surface-muted p-3 text-sm outline-none focus:border-line-strong"
+              >
+                <option value="">미분류</option>
+                {categories.map(category => (
+                  <option key={category.id} value={category.id}>{category.name}</option>
+                ))}
+              </select>
+              <button
+                type="button"
+                onClick={() => onImportantChange(!isImportant)}
+                aria-pressed={isImportant}
+                aria-label="중요 할 일"
+                className={clsx(
+                  'flex shrink-0 items-center gap-1.5 rounded-xl px-3.5 text-sm font-medium transition-colors',
+                  isImportant ? 'bg-primary text-on-primary' : 'bg-surface-muted text-fg-muted hover:bg-surface-hover',
+                )}
+              >
+                <Star size={16} fill={isImportant ? 'currentColor' : 'none'} />
+                중요
+              </button>
+            </div>
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-fg-subtle">시작 날짜</label>
@@ -108,19 +125,10 @@ export function RoutineCreateModal({
           <div>
             <label className="mb-1 block text-xs font-medium text-fg-subtle">종료 날짜</label>
             <div className="flex items-center justify-between rounded-xl bg-surface-muted p-3">
-              <span className="text-sm text-fg-muted">
-                {endDate ? format(parseDay(endDate), 'yyyy년 MM월 dd일 (E)', { locale: ko }) : '없음'}
-              </span>
-              <div className="flex items-center gap-1.5">
-                {endDate && (
-                  <button type="button" onClick={onClearEndDate} className="rounded-lg px-2.5 py-1.5 text-sm font-medium text-fg-muted hover:bg-surface-hover">
-                    없음
-                  </button>
-                )}
-                <button type="button" onClick={onPickEndDate} className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover">
-                  <CalendarIcon size={14} /> 날짜 선택
-                </button>
-              </div>
+              <span className="text-sm text-fg">{format(parseDay(endDate), 'yyyy년 MM월 dd일 (E)', { locale: ko })}</span>
+              <button type="button" onClick={onPickEndDate} className="flex items-center gap-1.5 rounded-lg border border-line-strong bg-surface px-3 py-1.5 text-sm font-medium text-fg shadow-sm hover:bg-surface-hover">
+                <CalendarIcon size={14} /> 날짜 선택
+              </button>
             </div>
           </div>
           <div>
@@ -179,7 +187,7 @@ export function RoutineCreateModal({
           <button
             type="button"
             onClick={onSave}
-            disabled={!title.trim()}
+            disabled={!title.trim() || !endDate}
             className="rounded-xl bg-ink px-4 py-2.5 text-sm font-medium text-on-ink hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-40"
           >
             루틴 만들기

@@ -57,7 +57,7 @@ create table public.routines (
   id uuid primary key, owner_id uuid not null references auth.users(id) on delete cascade, revision bigint not null default 1,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(), deleted_at timestamptz,
   title text not null, domain_id uuid, recurrence_rule text not null, start_date date not null,
-  end_date date, scheduled_time timestamptz
+  end_date date, scheduled_time timestamptz, is_important boolean not null default false
 );
 create table public.domains (
   id uuid primary key, owner_id uuid not null references auth.users(id) on delete cascade, revision bigint not null default 1,

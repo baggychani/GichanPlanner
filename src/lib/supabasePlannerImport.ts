@@ -63,6 +63,7 @@ export async function importPortablePlannerExport(archive: PortablePlannerExport
     ...routine,
     end_date: routine.end_date ?? null,
     scheduled_time: routine.scheduled_time ?? null,
+    is_important: routine.is_important ?? false,
   }));
   const domains: Domain[] = archive.domains ?? [];
   const goals: Goal[] = archive.goals ?? [];

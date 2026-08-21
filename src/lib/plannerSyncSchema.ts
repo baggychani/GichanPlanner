@@ -191,6 +191,7 @@ export function routineRow(routine: Routine, ownerId: string) {
     start_date: routine.start_date,
     end_date: routine.end_date ?? null,
     scheduled_time: routine.scheduled_time ?? null,
+    is_important: routine.is_important ?? false,
   };
 }
 
@@ -198,7 +199,7 @@ export function routineFromRemote(row: RemoteStamp & Routine): Routine {
   return {
     id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
     title: row.title, domain_id: row.domain_id, recurrence_rule: row.recurrence_rule, start_date: row.start_date,
-    end_date: row.end_date ?? null, scheduled_time: row.scheduled_time ?? null,
+    end_date: row.end_date ?? null, scheduled_time: row.scheduled_time ?? null, is_important: row.is_important ?? false,
   };
 }
 

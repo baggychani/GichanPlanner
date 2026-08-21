@@ -25,6 +25,9 @@ alter table public.routines
 alter table public.routines
   add column if not exists scheduled_time timestamptz;
 
+alter table public.routines
+  add column if not exists is_important boolean not null default false;
+
 create table if not exists public.projects (
   id uuid primary key,
   owner_id uuid not null references auth.users(id) on delete cascade,

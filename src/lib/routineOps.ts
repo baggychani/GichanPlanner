@@ -9,10 +9,11 @@ export type RoutineDraft = {
   title: string;
   domain_id: string | null;
   start_date: string;
-  end_date: string | null;
+  end_date: string;
   freq: RecurrenceRule['freq'];
   weekdays: number[];
   scheduled_time: string | null;
+  is_important: boolean;
 };
 
 function ymd(date: Date) {
@@ -45,6 +46,7 @@ export async function createRoutine(draft: RoutineDraft) {
     start_date: draft.start_date,
     end_date: draft.end_date,
     scheduled_time: draft.scheduled_time,
+    is_important: draft.is_important,
   };
   await runPlannerWrite(async () => {
     await db.routines.add(routine);
@@ -89,6 +91,7 @@ async function fillRoutineTasks(routines: Routine[], viewedMonth: Date) {
         domain_id: routine.domain_id,
         scheduled_time: deadlineOnDate(routine.scheduled_time, date),
         routine_id: routine.id,
+        is_important: routine.is_important ?? false,
         order,
       };
       toAdd.push(task);

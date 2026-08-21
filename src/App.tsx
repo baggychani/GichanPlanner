@@ -35,6 +35,10 @@ import { AuthProvider, useAuth } from './hooks/useAuth';
 import { migrateLegacyTaskImages } from './lib/imageAttachment';
 import { runPlannerWrite } from './lib/supabaseSync';
 
+function weekAfter(start: string) {
+  return format(addDays(parseDay(start), 7), 'yyyy-MM-dd');
+}
+
 // Typography principle: small text is readable at normal weight. Reserve bold for page titles and primary actions only.
 // 빠른 만들기·일별 메뉴는 바깥을 눌러도 닫히지 않게 둔다. 달력 클릭과 메뉴 조작이 겹치지 않게 하려는 의도다.
 function PlannerApp() {
@@ -74,10 +78,11 @@ function PlannerApp() {
   const [routineTitle, setRoutineTitle] = useState('');
   const [routineDomainId, setRoutineDomainId] = useState<string | null>(null);
   const [routineStartDate, setRoutineStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
-  const [routineEndDate, setRoutineEndDate] = useState<string | null>(null);
+  const [routineEndDate, setRoutineEndDate] = useState(weekAfter(format(new Date(), 'yyyy-MM-dd')));
   const [routineFreq, setRoutineFreq] = useState<RecurrenceFreq>('daily');
   const [routineWeekdays, setRoutineWeekdays] = useState<number[]>([]);
   const [routineScheduledTime, setRoutineScheduledTime] = useState<string | null>(null);
+  const [routineImportant, setRoutineImportant] = useState(false);
 
   const [quickAddCategoryId, setQuickAddCategoryId] = useState<string | null>(null);
   const [quickAddTitle, setQuickAddTitle] = useState('');
@@ -241,7 +246,7 @@ function PlannerApp() {
 
   const saveRoutine = async () => {
     if (!routineTitle.trim()) return;
-    const endDate = routineEndDate && routineEndDate < routineStartDate ? routineStartDate : routineEndDate;
+    const endDate = routineEndDate < routineStartDate ? weekAfter(routineStartDate) : routineEndDate;
     await createRoutine({
       title: routineTitle,
       domain_id: routineDomainId,
@@ -250,11 +255,13 @@ function PlannerApp() {
       freq: routineFreq,
       weekdays: routineWeekdays,
       scheduled_time: routineScheduledTime,
+      is_important: routineImportant,
     });
     setRoutineTitle('');
     setRoutineDomainId(null);
+    setRoutineImportant(false);
     setRoutineStartDate(format(selectedDate, 'yyyy-MM-dd'));
-    setRoutineEndDate(null);
+    setRoutineEndDate(weekAfter(format(selectedDate, 'yyyy-MM-dd')));
     setRoutineFreq('daily');
     setRoutineWeekdays([]);
     setRoutineScheduledTime(null);
@@ -404,7 +411,7 @@ function PlannerApp() {
     if (isSelectingRoutineStart) {
       setRoutineStartDate(destinationDate);
       setRoutineScheduledTime(current => deadlineOnDate(current, destinationDate));
-      setRoutineEndDate(current => (current && current < destinationDate ? destinationDate : current));
+      setRoutineEndDate(current => (current < destinationDate ? weekAfter(destinationDate) : current));
       setIsSelectingRoutineStart(false);
       setIsRoutineModalOpen(true);
     } else if (isSelectingRoutineEnd) {
@@ -511,10 +518,12 @@ function PlannerApp() {
         }}
         onCreateRoutine={() => {
           if (!requireLogin()) return;
+          const start = format(selectedDate, 'yyyy-MM-dd');
           setRoutineTitle('');
           setRoutineDomainId(null);
-          setRoutineStartDate(format(selectedDate, 'yyyy-MM-dd'));
-          setRoutineEndDate(null);
+          setRoutineImportant(false);
+          setRoutineStartDate(start);
+          setRoutineEndDate(weekAfter(start));
           setRoutineFreq('daily');
           setRoutineWeekdays([]);
           setRoutineScheduledTime(null);
@@ -702,14 +711,15 @@ function PlannerApp() {
           freq={routineFreq}
           weekdays={routineWeekdays}
           scheduledTime={routineScheduledTime}
+          isImportant={routineImportant}
           categories={categories}
           onTitleChange={setRoutineTitle}
           onDomainChange={setRoutineDomainId}
+          onImportantChange={setRoutineImportant}
           onFreqChange={changeRoutineFreq}
           onWeekdaysChange={setRoutineWeekdays}
           onPickStartDate={() => { setIsTimePickerOpen(false); setIsRoutineModalOpen(false); setIsSelectingRoutineStart(true); }}
           onPickEndDate={() => { setIsTimePickerOpen(false); setIsRoutineModalOpen(false); setIsSelectingRoutineEnd(true); }}
-          onClearEndDate={() => setRoutineEndDate(null)}
           onOpenTimePicker={() => openTimePicker('routine')}
           onClose={closeRoutineEditor}
           onSave={() => { void saveRoutine(); }}
