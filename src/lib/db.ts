@@ -14,6 +14,7 @@ export interface Task {
   domain_id: string | null;
   goal_id: string | null;
   project_id: string | null;
+  routine_id: string | null;
   is_important: boolean;
   is_completed: boolean;
   memo: string;
@@ -50,6 +51,8 @@ export interface Routine {
   domain_id: string | null;
   recurrence_rule: string;
   start_date: string;
+  end_date: string | null;
+  scheduled_time: string | null;
 }
 
 export interface Domain {
@@ -263,6 +266,26 @@ db.version(14).stores({
   projects: 'id, deleted_at, order',
   profiles: 'id',
   cloudShadows: 'id',
+});
+
+db.version(15).stores({
+  tasks: 'id, target_date, is_completed, is_important, deleted_at, domain_id, project_id, routine_id, order',
+  schedules: 'id, target_date, start_time, deleted_at',
+  routines: 'id, start_date, deleted_at',
+  domains: 'id, deleted_at, order',
+  goals: 'id, time_frame, start_date, deleted_at',
+  deadlines: 'id, due_date, deleted_at, project_id',
+  projects: 'id, deleted_at, order',
+  profiles: 'id',
+  cloudShadows: 'id',
+}).upgrade(async (transaction) => {
+  await transaction.table('tasks').toCollection().modify((task: Task) => {
+    if (task.routine_id === undefined) task.routine_id = null;
+  });
+  await transaction.table('routines').toCollection().modify((routine: Routine) => {
+    if (routine.end_date === undefined) routine.end_date = null;
+    if (routine.scheduled_time === undefined) routine.scheduled_time = null;
+  });
 });
 
 export { db };

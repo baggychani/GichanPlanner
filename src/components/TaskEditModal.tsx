@@ -33,6 +33,7 @@ type TaskEditModalProps = {
   onPickDate: () => void;
   onOpenTimePicker: () => void;
   onDelete: () => void;
+  onStopRoutine?: () => void;
   onSave: () => void;
 };
 
@@ -46,11 +47,13 @@ export function TaskEditModal({
   onPickDate,
   onOpenTimePicker,
   onDelete,
+  onStopRoutine,
   onSave,
 }: TaskEditModalProps) {
   const [isFileHover, setIsFileHover] = useState(false);
   const [imageError, setImageError] = useState<string | null>(null);
   const [discardOpen, setDiscardOpen] = useState(false);
+  const [routineStopped, setRoutineStopped] = useState(false);
   const initialDraft = useRef(taskDraftKey(task));
   const imageUrl = useObjectUrl(task.image_blob ?? null) ?? task.image_data ?? null;
   const hasImage = Boolean(task.image_blob || task.image_data || task.image_path);
@@ -222,9 +225,23 @@ export function TaskEditModal({
               취소
             </button>
           ) : (
-            <button onClick={onDelete} className="px-4 py-3 text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/70 rounded-xl transition-colors font-bold flex items-center justify-center">
-              삭제
-            </button>
+            <div className="flex gap-2">
+              <button onClick={onDelete} className="px-4 py-3 text-red-500 bg-red-50 hover:bg-red-100 dark:bg-red-950/40 dark:hover:bg-red-950/70 rounded-xl transition-colors font-bold flex items-center justify-center">
+                삭제
+              </button>
+              {task.routine_id && onStopRoutine && !routineStopped && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onStopRoutine();
+                    setRoutineStopped(true);
+                  }}
+                  className="px-4 py-3 text-fg-muted bg-surface-hover hover:bg-line-strong rounded-xl transition-colors font-bold flex items-center justify-center"
+                >
+                  루틴 중지
+                </button>
+              )}
+            </div>
           )}
           <button
             onClick={onSave}

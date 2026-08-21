@@ -51,7 +51,7 @@ export function threeWayMerge<T extends MergeRow>(
 
 export const TASK_MERGE_KEYS = [
   'title', 'target_date', 'deadline', 'scheduled_time', 'domain_id', 'goal_id', 'project_id',
-  'is_important', 'is_completed', 'memo', 'order', 'deleted_at', 'image_path',
+  'routine_id', 'is_important', 'is_completed', 'memo', 'order', 'deleted_at', 'image_path',
 ] as const satisfies readonly (keyof Task)[];
 
 export const DOMAIN_MERGE_KEYS = ['name', 'icon', 'color', 'order', 'is_archived', 'deleted_at'] as const satisfies readonly (keyof Domain)[];
@@ -59,7 +59,7 @@ export const PROJECT_MERGE_KEYS = ['title', 'icon', 'domain_id', 'due_date', 'or
 export const GOAL_MERGE_KEYS = ['domain_id', 'time_frame', 'start_date', 'end_date', 'title', 'is_completed', 'deleted_at'] as const satisfies readonly (keyof Goal)[];
 export const DEADLINE_MERGE_KEYS = ['title', 'memo', 'due_date', 'due_time', 'reminder_days', 'project_id', 'deleted_at'] as const satisfies readonly (keyof Deadline)[];
 export const SCHEDULE_MERGE_KEYS = ['title', 'target_date', 'start_time', 'end_time', 'domain_id', 'deleted_at'] as const satisfies readonly (keyof Schedule)[];
-export const ROUTINE_MERGE_KEYS = ['title', 'domain_id', 'recurrence_rule', 'start_date', 'deleted_at'] as const satisfies readonly (keyof Routine)[];
+export const ROUTINE_MERGE_KEYS = ['title', 'domain_id', 'recurrence_rule', 'start_date', 'end_date', 'scheduled_time', 'deleted_at'] as const satisfies readonly (keyof Routine)[];
 export const PROFILE_MERGE_KEYS = ['nickname', 'birthday_month', 'birthday_day', 'avatar_path'] as const satisfies readonly (keyof Profile)[];
 
 export const SIMPLE_MERGE_KEYS = {

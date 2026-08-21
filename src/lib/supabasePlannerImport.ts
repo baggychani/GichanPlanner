@@ -53,12 +53,17 @@ export async function importPortablePlannerExport(archive: PortablePlannerExport
   const tasks: Task[] = archive.tasks.map(task => ({
     ...task,
     project_id: task.project_id ?? null,
+    routine_id: task.routine_id ?? null,
     image_blob: taskBlobs.get(task.id) ?? null,
     image_data: null,
     image_path: taskBlobs.has(task.id) ? null : (task.image_path ?? null),
   }));
   const schedules: Schedule[] = archive.schedules ?? [];
-  const routines: Routine[] = archive.routines ?? [];
+  const routines: Routine[] = (archive.routines ?? []).map(routine => ({
+    ...routine,
+    end_date: routine.end_date ?? null,
+    scheduled_time: routine.scheduled_time ?? null,
+  }));
   const domains: Domain[] = archive.domains ?? [];
   const goals: Goal[] = archive.goals ?? [];
   const deadlines: Deadline[] = (archive.deadlines ?? []).map(deadline => ({

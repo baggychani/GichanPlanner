@@ -19,6 +19,7 @@ export function createBlankTask(targetDate: string): Task {
     domain_id: null,
     goal_id: null,
     project_id: null,
+    routine_id: null,
     is_important: false,
     is_completed: false,
     order: 0,
@@ -72,11 +73,27 @@ export async function moveIncompleteTasksToDate(sourceDate: string, destinationD
     for (const task of destinationTasks.filter(task => task.deleted_at === null)) {
       nextOrderByDomain.set(task.domain_id, Math.max(nextOrderByDomain.get(task.domain_id) ?? -1, task.order));
     }
-    const moved = movingTasks.map(task => {
+    const moved: Task[] = [];
+    const tombstones: Task[] = [];
+    for (const task of movingTasks) {
       const order = (nextOrderByDomain.get(task.domain_id) ?? -1) + 1;
       nextOrderByDomain.set(task.domain_id, order);
-      return { ...task, target_date: destinationDate, deadline: deadlineOnDate(task.deadline, destinationDate), scheduled_time: deadlineOnDate(task.scheduled_time, destinationDate), order, updated_at: now, version: task.version + 1 };
-    });
+      if (task.routine_id) {
+        const split = splitRoutineMove(task, destinationDate, order, now);
+        tombstones.push(split.tombstone);
+        moved.push(split.detached);
+      } else {
+        moved.push({
+          ...task,
+          target_date: destinationDate,
+          deadline: deadlineOnDate(task.deadline, destinationDate),
+          scheduled_time: deadlineOnDate(task.scheduled_time, destinationDate),
+          order,
+          updated_at: now,
+          version: task.version + 1,
+        });
+      }
+    }
     const remaining = sourceTasks.filter(task => task.deleted_at === null && task.is_completed);
     const normalizedRemaining = remaining
       .sort((a, b) => a.domain_id === b.domain_id ? a.order - b.order : String(a.domain_id).localeCompare(String(b.domain_id)))
@@ -84,7 +101,7 @@ export async function moveIncompleteTasksToDate(sourceDate: string, destinationD
         const order = all.slice(0, index).filter(previous => previous.domain_id === task.domain_id).length;
         return task.order === order ? task : { ...task, order, updated_at: now, version: task.version + 1 };
       });
-    await db.tasks.bulkPut([...moved, ...normalizedRemaining]);
+    await db.tasks.bulkPut([...moved, ...tombstones, ...normalizedRemaining]);
   });
   });
 }
@@ -115,6 +132,7 @@ export async function copyAllTasksToDate(sourceDate: string, destinationDate: st
         deadline: deadlineOnDate(task.deadline, destinationDate),
         scheduled_time: deadlineOnDate(task.scheduled_time, destinationDate),
         is_completed: false,
+        routine_id: null,
         order,
         image_path: null,
       };
@@ -150,14 +168,21 @@ export async function moveTaskToDate(taskId: string, destinationDate: string) {
       candidate.deleted_at === null && candidate.domain_id === task.domain_id
     ).length;
     const now = new Date().toISOString();
+    const remainingPuts = remainingSourceTasks.map((candidate, order) => ({
+      ...candidate,
+      order,
+      updated_at: candidate.order === order ? candidate.updated_at : now,
+      version: candidate.order === order ? candidate.version : candidate.version + 1,
+    }));
+
+    if (task.routine_id) {
+      const split = splitRoutineMove(task, destinationDate, destinationOrder, now);
+      await db.tasks.bulkPut([...remainingPuts, split.tombstone, split.detached]);
+      return;
+    }
 
     await db.tasks.bulkPut([
-      ...remainingSourceTasks.map((candidate, order) => ({
-        ...candidate,
-        order,
-        updated_at: candidate.order === order ? candidate.updated_at : now,
-        version: candidate.order === order ? candidate.version : candidate.version + 1,
-      })),
+      ...remainingPuts,
       {
         ...task,
         target_date: destinationDate,
@@ -293,4 +318,28 @@ export function nextOrderFor(tasks: Task[], dateStr: string, domainId: string | 
   return tasks
     .filter(task => task.target_date === dateStr && task.domain_id === domainId)
     .reduce((maximum, task) => Math.max(maximum, task.order), -1) + 1;
+}
+
+export function splitRoutineMove(task: Task, destinationDate: string, order: number, now: string) {
+  return {
+    tombstone: {
+      ...task,
+      deleted_at: now,
+      updated_at: now,
+      version: task.version + 1,
+    },
+    detached: {
+      ...task,
+      id: crypto.randomUUID(),
+      version: 1,
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+      target_date: destinationDate,
+      deadline: deadlineOnDate(task.deadline, destinationDate),
+      scheduled_time: deadlineOnDate(task.scheduled_time, destinationDate),
+      routine_id: null,
+      order,
+    },
+  };
 }

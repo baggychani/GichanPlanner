@@ -174,7 +174,8 @@ function sameTaskCore(a: Task, b: Task) {
     && a.deadline === b.deadline
     && a.scheduled_time === b.scheduled_time
     && a.goal_id === b.goal_id
-    && a.project_id === b.project_id;
+    && a.project_id === b.project_id
+    && a.routine_id === b.routine_id;
 }
 
 // 할 일만 먼저 도착해 카테고리가 비어 보일 때, 분류만 지운 쪽을 다른 기기의 분류로 되돌린다.

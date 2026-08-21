@@ -38,6 +38,7 @@ export function taskRow(task: Task, ownerId: string, imagePath: string | null) {
     domain_id: task.domain_id,
     goal_id: task.goal_id,
     project_id: task.project_id ?? null,
+    routine_id: task.routine_id ?? null,
     is_important: task.is_important,
     is_completed: task.is_completed,
     memo: task.memo,
@@ -54,6 +55,7 @@ export type RemoteTask = RemoteStamp & {
   domain_id: string | null;
   goal_id: string | null;
   project_id: string | null;
+  routine_id: string | null;
   is_important: boolean;
   is_completed: boolean;
   memo: string;
@@ -75,6 +77,7 @@ export function taskFromRemote(row: RemoteTask, imageBlob: Blob | null): Task {
     domain_id: row.domain_id,
     goal_id: row.goal_id,
     project_id: row.project_id ?? null,
+    routine_id: row.routine_id ?? null,
     is_important: row.is_important,
     is_completed: row.is_completed,
     memo: row.memo ?? '',
@@ -186,6 +189,8 @@ export function routineRow(routine: Routine, ownerId: string) {
     domain_id: routine.domain_id,
     recurrence_rule: routine.recurrence_rule,
     start_date: routine.start_date,
+    end_date: routine.end_date ?? null,
+    scheduled_time: routine.scheduled_time ?? null,
   };
 }
 
@@ -193,6 +198,7 @@ export function routineFromRemote(row: RemoteStamp & Routine): Routine {
   return {
     id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
     title: row.title, domain_id: row.domain_id, recurrence_rule: row.recurrence_rule, start_date: row.start_date,
+    end_date: row.end_date ?? null, scheduled_time: row.scheduled_time ?? null,
   };
 }
 

@@ -16,6 +16,15 @@ alter table public.profiles
 alter table public.tasks
   add column if not exists project_id uuid;
 
+alter table public.tasks
+  add column if not exists routine_id uuid;
+
+alter table public.routines
+  add column if not exists end_date date;
+
+alter table public.routines
+  add column if not exists scheduled_time timestamptz;
+
 create table if not exists public.projects (
   id uuid primary key,
   owner_id uuid not null references auth.users(id) on delete cascade,

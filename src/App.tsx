@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { addDays, addMonths, differenceInCalendarDays, format, parseISO, subMonths } from 'date-fns';
+import { addDays, addMonths, differenceInCalendarDays, format, getISODay, parseISO, subMonths } from 'date-fns';
 import { ko } from 'date-fns/locale';
 import type { DropResult } from '@hello-pangea/dnd';
 import { db, type Deadline, type Task } from './lib/db';
@@ -14,6 +14,8 @@ import {
   nextOrderFor,
   persistTaskReorder,
 } from './lib/taskOps';
+import { createRoutine, materializeRoutines, stopRoutine } from './lib/routineOps';
+import type { RecurrenceFreq } from './lib/recurrence';
 import { usePlannerData } from './hooks/usePlannerData';
 import { CalendarBoard, type CalendarSelectionKind } from './components/CalendarBoard';
 import { CategoryModal, type SettingsSection } from './components/CategoryModal';
@@ -22,6 +24,7 @@ import { DailyPanel } from './components/DailyPanel';
 import { DeadlineCreateModal, DeadlineEditModal } from './components/DeadlineModals';
 import { PlannerPanel } from './components/PlannerPanel';
 import { ProjectCreateModal } from './components/ProjectCreateModal';
+import { RoutineCreateModal } from './components/RoutineCreateModal';
 import { TaskEditModal } from './components/TaskEditModal';
 import { TimePickerModal } from './components/TimePickerModal';
 import { WeeklyPanel } from './components/WeeklyPanel';
@@ -56,7 +59,10 @@ function PlannerApp() {
   const [isQuickCreateMenuOpen, setIsQuickCreateMenuOpen] = useState(false);
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
+  const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
   const [isSelectingDeadlineDate, setIsSelectingDeadlineDate] = useState(false);
+  const [isSelectingRoutineStart, setIsSelectingRoutineStart] = useState(false);
+  const [isSelectingRoutineEnd, setIsSelectingRoutineEnd] = useState(false);
   const [selectingDateForDeadline, setSelectingDateForDeadline] = useState<string | null>(null);
   const [deadlineTitle, setDeadlineTitle] = useState('');
   const [deadlineMemo, setDeadlineMemo] = useState('');
@@ -64,7 +70,14 @@ function PlannerApp() {
   const [deadlineDueTime, setDeadlineDueTime] = useState<string | null>(null);
   const [deadlineReminderDays, setDeadlineReminderDays] = useState<number | null>(null);
   const [deadlineProjectId, setDeadlineProjectId] = useState<string | null>(null);
-  const [timePickerKind, setTimePickerKind] = useState<'task' | 'deadline'>('task');
+  const [timePickerKind, setTimePickerKind] = useState<'task' | 'deadline' | 'routine'>('task');
+  const [routineTitle, setRoutineTitle] = useState('');
+  const [routineDomainId, setRoutineDomainId] = useState<string | null>(null);
+  const [routineStartDate, setRoutineStartDate] = useState(format(new Date(), 'yyyy-MM-dd'));
+  const [routineEndDate, setRoutineEndDate] = useState<string | null>(null);
+  const [routineFreq, setRoutineFreq] = useState<RecurrenceFreq>('daily');
+  const [routineWeekdays, setRoutineWeekdays] = useState<number[]>([]);
+  const [routineScheduledTime, setRoutineScheduledTime] = useState<string | null>(null);
 
   const [quickAddCategoryId, setQuickAddCategoryId] = useState<string | null>(null);
   const [quickAddTitle, setQuickAddTitle] = useState('');
@@ -102,13 +115,17 @@ function PlannerApp() {
     [deadlines, selectedDate],
   );
 
-  const selectionKind: CalendarSelectionKind = isSelectingDeadlineDate || selectingDateForDeadline
-    ? 'deadline'
-    : dateSelectionMode === 'COPY_ALL'
-      ? 'copy'
-      : selectingDateForTask || dateSelectionMode === 'MOVE_INCOMPLETE'
-        ? 'move'
-        : null;
+  const selectionKind: CalendarSelectionKind = isSelectingRoutineStart
+    ? 'routine-start'
+    : isSelectingRoutineEnd
+      ? 'routine-end'
+      : isSelectingDeadlineDate || selectingDateForDeadline
+        ? 'deadline'
+        : dateSelectionMode === 'COPY_ALL'
+          ? 'copy'
+          : selectingDateForTask || dateSelectionMode === 'MOVE_INCOMPLETE'
+            ? 'move'
+            : null;
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -120,6 +137,8 @@ function PlannerApp() {
         fn();
       };
       if (isQuickCreateMenuOpen) consume(() => setIsQuickCreateMenuOpen(false));
+      else if (isSelectingRoutineStart) consume(() => { setIsSelectingRoutineStart(false); setIsRoutineModalOpen(true); });
+      else if (isSelectingRoutineEnd) consume(() => { setIsSelectingRoutineEnd(false); setIsRoutineModalOpen(true); });
       else if (isSelectingDeadlineDate) consume(() => { setIsSelectingDeadlineDate(false); setIsDeadlineModalOpen(true); });
       else if (isDailyMenuOpen) consume(() => setIsDailyMenuOpen(false));
       else if (selectingDateForDeadline) consume(() => setSelectingDateForDeadline(null));
@@ -128,7 +147,7 @@ function PlannerApp() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isQuickCreateMenuOpen, isSelectingDeadlineDate, isDailyMenuOpen, selectingDateForDeadline, selectingDateForTask, dateSelectionMode]);
+  }, [isQuickCreateMenuOpen, isSelectingRoutineStart, isSelectingRoutineEnd, isSelectingDeadlineDate, isDailyMenuOpen, selectingDateForDeadline, selectingDateForTask, dateSelectionMode]);
 
   useEffect(() => () => {
     if (dropFeedbackTimer.current !== null) window.clearTimeout(dropFeedbackTimer.current);
@@ -136,6 +155,11 @@ function PlannerApp() {
   }, []);
 
   useEffect(() => { void migrateLegacyTaskImages(); }, []);
+
+  useEffect(() => {
+    if (!showPlanner) return;
+    void materializeRoutines(currentDate);
+  }, [showPlanner, currentDate]);
 
   useEffect(() => {
     setIsDailyMenuOpen(false);
@@ -148,6 +172,9 @@ function PlannerApp() {
     setIsCategoryModalOpen(false);
     setIsDeadlineModalOpen(false);
     setIsProjectModalOpen(false);
+    setIsRoutineModalOpen(false);
+    setIsSelectingRoutineStart(false);
+    setIsSelectingRoutineEnd(false);
     setTaskFromSettings(false);
     setSettingsSection('categories');
     setSettingsProjectId(null);
@@ -177,13 +204,24 @@ function PlannerApp() {
     restoreSettingsAfterEditor();
   };
 
-  const openTimePicker = (kind: 'task' | 'deadline') => {
+  const closeRoutineEditor = () => {
+    setIsTimePickerOpen(false);
+    setIsRoutineModalOpen(false);
+    setIsSelectingRoutineStart(false);
+    setIsSelectingRoutineEnd(false);
+  };
+
+  const openTimePicker = (kind: 'task' | 'deadline' | 'routine') => {
     const dueDate = kind === 'task'
       ? editingTask?.target_date
-      : editingDeadline?.due_date ?? deadlineDueDate;
+      : kind === 'routine'
+        ? routineStartDate
+        : editingDeadline?.due_date ?? deadlineDueDate;
     const current = kind === 'task'
       ? editingTask?.scheduled_time
-      : editingDeadline?.due_time ?? deadlineDueTime;
+      : kind === 'routine'
+        ? routineScheduledTime
+        : editingDeadline?.due_time ?? deadlineDueTime;
     if (!dueDate) return;
     const date = current ? parseISO(current) : new Date(`${dueDate}T09:00:00`);
     const parts = timePartsFromDate(date);
@@ -192,6 +230,35 @@ function PlannerApp() {
     setTimeMinute(parts.minute);
     setTimePickerKind(kind);
     setIsTimePickerOpen(true);
+  };
+
+  const changeRoutineFreq = (freq: RecurrenceFreq) => {
+    setRoutineFreq(freq);
+    if ((freq === 'weekly' || freq === 'biweekly') && routineWeekdays.length === 0) {
+      setRoutineWeekdays([getISODay(parseDay(routineStartDate))]);
+    }
+  };
+
+  const saveRoutine = async () => {
+    if (!routineTitle.trim()) return;
+    const endDate = routineEndDate && routineEndDate < routineStartDate ? routineStartDate : routineEndDate;
+    await createRoutine({
+      title: routineTitle,
+      domain_id: routineDomainId,
+      start_date: routineStartDate,
+      end_date: endDate,
+      freq: routineFreq,
+      weekdays: routineWeekdays,
+      scheduled_time: routineScheduledTime,
+    });
+    setRoutineTitle('');
+    setRoutineDomainId(null);
+    setRoutineStartDate(format(selectedDate, 'yyyy-MM-dd'));
+    setRoutineEndDate(null);
+    setRoutineFreq('daily');
+    setRoutineWeekdays([]);
+    setRoutineScheduledTime(null);
+    closeRoutineEditor();
   };
 
   const saveQuickAdd = async (categoryId: string | null, closeAfterSave = false) => {
@@ -279,6 +346,37 @@ function PlannerApp() {
       const current = await db.tasks.get(editingTask.id);
       if (!current || current.deleted_at !== null) return;
       const savedAt = new Date().toISOString();
+      if (current.routine_id && current.target_date !== editingTask.target_date) {
+        const destinationTasks = (await db.tasks.where('target_date').equals(editingTask.target_date).toArray())
+          .filter(task => task.deleted_at === null);
+        const order = nextOrderFor(destinationTasks, editingTask.target_date, editingTask.domain_id);
+        await db.tasks.bulkPut([
+          { ...current, deleted_at: savedAt, updated_at: savedAt, version: current.version + 1 },
+          {
+            ...current,
+            id: crypto.randomUUID(),
+            version: 1,
+            created_at: savedAt,
+            updated_at: savedAt,
+            deleted_at: null,
+            title: editingTask.title.trim(),
+            memo: editingTask.memo.trim(),
+            target_date: editingTask.target_date,
+            deadline: editingTask.deadline,
+            scheduled_time: editingTask.scheduled_time,
+            domain_id: editingTask.domain_id,
+            goal_id: editingTask.goal_id,
+            project_id: editingTask.project_id,
+            routine_id: null,
+            is_important: editingTask.is_important,
+            image_blob: editingTask.image_blob ?? null,
+            image_data: editingTask.image_data ?? null,
+            image_path: editingTask.image_path,
+            order,
+          },
+        ]);
+        return;
+      }
       await db.tasks.put({
         ...current,
         title: editingTask.title.trim(),
@@ -289,6 +387,7 @@ function PlannerApp() {
         domain_id: editingTask.domain_id,
         goal_id: editingTask.goal_id,
         project_id: editingTask.project_id,
+        routine_id: editingTask.routine_id,
         is_important: editingTask.is_important,
         image_blob: editingTask.image_blob ?? null,
         image_data: editingTask.image_data ?? null,
@@ -302,7 +401,17 @@ function PlannerApp() {
 
   const handleCellClick = async (day: Date) => {
     const destinationDate = format(day, 'yyyy-MM-dd');
-    if (isSelectingDeadlineDate) {
+    if (isSelectingRoutineStart) {
+      setRoutineStartDate(destinationDate);
+      setRoutineScheduledTime(current => deadlineOnDate(current, destinationDate));
+      setRoutineEndDate(current => (current && current < destinationDate ? destinationDate : current));
+      setIsSelectingRoutineStart(false);
+      setIsRoutineModalOpen(true);
+    } else if (isSelectingRoutineEnd) {
+      setRoutineEndDate(destinationDate < routineStartDate ? routineStartDate : destinationDate);
+      setIsSelectingRoutineEnd(false);
+      setIsRoutineModalOpen(true);
+    } else if (isSelectingDeadlineDate) {
       setDeadlineDueDate(destinationDate);
       setDeadlineDueTime(current => deadlineOnDate(current, destinationDate));
       setIsSelectingDeadlineDate(false);
@@ -400,6 +509,18 @@ function PlannerApp() {
           setIsDeadlineModalOpen(true);
           setIsQuickCreateMenuOpen(false);
         }}
+        onCreateRoutine={() => {
+          if (!requireLogin()) return;
+          setRoutineTitle('');
+          setRoutineDomainId(null);
+          setRoutineStartDate(format(selectedDate, 'yyyy-MM-dd'));
+          setRoutineEndDate(null);
+          setRoutineFreq('daily');
+          setRoutineWeekdays([]);
+          setRoutineScheduledTime(null);
+          setIsRoutineModalOpen(true);
+          setIsQuickCreateMenuOpen(false);
+        }}
         onCreateProject={() => {
           if (!requireLogin()) return;
           setIsProjectModalOpen(true);
@@ -419,6 +540,11 @@ function PlannerApp() {
           if (isSelectingDeadlineDate) {
             setIsSelectingDeadlineDate(false);
             setIsDeadlineModalOpen(true);
+          }
+          if (isSelectingRoutineStart || isSelectingRoutineEnd) {
+            setIsSelectingRoutineStart(false);
+            setIsSelectingRoutineEnd(false);
+            setIsRoutineModalOpen(true);
           }
         }}
         onCellClick={(day) => { void handleCellClick(day); }}
@@ -567,6 +693,29 @@ function PlannerApp() {
         />
       )}
 
+      {isRoutineModalOpen && !isSelectingRoutineStart && !isSelectingRoutineEnd && (
+        <RoutineCreateModal
+          title={routineTitle}
+          domainId={routineDomainId}
+          startDate={routineStartDate}
+          endDate={routineEndDate}
+          freq={routineFreq}
+          weekdays={routineWeekdays}
+          scheduledTime={routineScheduledTime}
+          categories={categories}
+          onTitleChange={setRoutineTitle}
+          onDomainChange={setRoutineDomainId}
+          onFreqChange={changeRoutineFreq}
+          onWeekdaysChange={setRoutineWeekdays}
+          onPickStartDate={() => { setIsTimePickerOpen(false); setIsRoutineModalOpen(false); setIsSelectingRoutineStart(true); }}
+          onPickEndDate={() => { setIsTimePickerOpen(false); setIsRoutineModalOpen(false); setIsSelectingRoutineEnd(true); }}
+          onClearEndDate={() => setRoutineEndDate(null)}
+          onOpenTimePicker={() => openTimePicker('routine')}
+          onClose={closeRoutineEditor}
+          onSave={() => { void saveRoutine(); }}
+        />
+      )}
+
       {editingTask && !selectingDateForTask && (
         <TaskEditModal
           task={editingTask}
@@ -589,11 +738,21 @@ function PlannerApp() {
             });
             closeTaskEditor();
           }}
+          onStopRoutine={() => {
+            if (!editingTask.routine_id) return;
+            void stopRoutine(editingTask.routine_id);
+          }}
           onSave={() => { void saveEditingTask(); }}
         />
       )}
 
-      {isTimePickerOpen && (timePickerKind === 'task' ? editingTask && !selectingDateForTask : isDeadlineModalOpen || editingDeadline) && (
+      {isTimePickerOpen && (
+        timePickerKind === 'task'
+          ? editingTask && !selectingDateForTask
+          : timePickerKind === 'routine'
+            ? isRoutineModalOpen
+            : isDeadlineModalOpen || editingDeadline
+      ) && (
         <TimePickerModal
           meridiem={timeMeridiem}
           hour={timeHour}
@@ -604,6 +763,7 @@ function PlannerApp() {
           onClose={() => setIsTimePickerOpen(false)}
           onClear={() => {
             if (timePickerKind === 'task' && editingTask) setEditingTask({ ...editingTask, scheduled_time: null });
+            else if (timePickerKind === 'routine') setRoutineScheduledTime(null);
             else if (editingDeadline) setEditingDeadline({ ...editingDeadline, due_time: null });
             else setDeadlineDueTime(null);
             setIsTimePickerOpen(false);
@@ -611,10 +771,13 @@ function PlannerApp() {
           onConfirm={() => {
             const dueDate = timePickerKind === 'task'
               ? editingTask?.target_date
-              : editingDeadline?.due_date ?? deadlineDueDate;
+              : timePickerKind === 'routine'
+                ? routineStartDate
+                : editingDeadline?.due_date ?? deadlineDueDate;
             if (!dueDate) return;
             const next = isoFromTimeParts(dueDate, timeMeridiem, timeHour, timeMinute);
             if (timePickerKind === 'task' && editingTask) setEditingTask({ ...editingTask, scheduled_time: next });
+            else if (timePickerKind === 'routine') setRoutineScheduledTime(next);
             else if (editingDeadline) setEditingDeadline({ ...editingDeadline, due_time: next });
             else setDeadlineDueTime(next);
             setIsTimePickerOpen(false);

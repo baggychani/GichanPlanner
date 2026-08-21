@@ -15,7 +15,7 @@ import { useAuth } from '../hooks/useAuth';
 import { useCalendarCellMetrics } from '../hooks/useCalendarCellMetrics';
 import { useObjectUrl } from '../hooks/useObjectUrl';
 
-export type CalendarSelectionKind = 'deadline' | 'copy' | 'move' | null;
+export type CalendarSelectionKind = 'deadline' | 'copy' | 'move' | 'routine-start' | 'routine-end' | null;
 
 type CalendarBoardProps = {
   currentDate: Date;
@@ -33,6 +33,7 @@ type CalendarBoardProps = {
   onToggleQuickCreate: () => void;
   onCreateTask: () => void;
   onCreateDeadline: () => void;
+  onCreateRoutine: () => void;
   onCreateProject: () => void;
   onOpenCategories: () => void;
   onOpenProfile: () => void;
@@ -95,6 +96,7 @@ export function CalendarBoard({
   onToggleQuickCreate,
   onCreateTask,
   onCreateDeadline,
+  onCreateRoutine,
   onCreateProject,
   onOpenCategories,
   onOpenProfile,
@@ -109,7 +111,11 @@ export function CalendarBoard({
       ? '복사할 날짜를 달력에서 선택하세요'
       : selectionKind === 'move'
         ? '이동할 날짜를 달력에서 선택하세요'
-        : null;
+        : selectionKind === 'routine-start'
+          ? '루틴 시작 날짜를 달력에서 선택하세요'
+          : selectionKind === 'routine-end'
+            ? '루틴 종료 날짜를 달력에서 선택하세요'
+            : null;
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(monthStart);
@@ -272,7 +278,7 @@ export function CalendarBoard({
               <button onClick={onCreateDeadline} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-red-50 dark:hover:bg-red-950/40 hover:text-red-600 transition-colors">
                 <AlertCircle size={16} /> 데드라인 만들기
               </button>
-              <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
+              <button onClick={onCreateRoutine} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-surface-muted hover:text-fg transition-colors">
                 <Repeat2 size={16} /> 루틴 만들기
               </button>
               <button onClick={onCreateProject} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-surface-muted hover:text-fg transition-colors">

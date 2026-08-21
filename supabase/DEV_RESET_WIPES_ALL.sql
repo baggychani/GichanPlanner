@@ -44,7 +44,7 @@ create table public.tasks (
   revision bigint not null default 1,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(), deleted_at timestamptz,
   title text not null, target_date date not null, deadline timestamptz, scheduled_time timestamptz,
-  domain_id uuid, goal_id uuid, project_id uuid, is_important boolean not null default false, is_completed boolean not null default false,
+  domain_id uuid, goal_id uuid, project_id uuid, routine_id uuid, is_important boolean not null default false, is_completed boolean not null default false,
   memo text not null default '', "order" integer not null default 0, image_path text
 );
 
@@ -56,7 +56,8 @@ create table public.schedules (
 create table public.routines (
   id uuid primary key, owner_id uuid not null references auth.users(id) on delete cascade, revision bigint not null default 1,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(), deleted_at timestamptz,
-  title text not null, domain_id uuid, recurrence_rule text not null, start_date date not null
+  title text not null, domain_id uuid, recurrence_rule text not null, start_date date not null,
+  end_date date, scheduled_time timestamptz
 );
 create table public.domains (
   id uuid primary key, owner_id uuid not null references auth.users(id) on delete cascade, revision bigint not null default 1,
