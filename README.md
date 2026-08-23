@@ -23,7 +23,21 @@
 
 ## Supabase에서 해야 하는 것
 
-SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합니다. 이미 넣은 파일은 건너뛰고, 없는 것만 넣으면 됩니다. 이미 쓰는 프로젝트면 `supabase/ADD_MISSING.sql` 한 번으로도 됩니다.
+`main`에 푸시하면 GitHub Actions가 **먼저** `supabase/migrations/`에 있는 SQL을 Supabase에 넣고, 그다음 GitHub Pages를 배포합니다. SQL Editor에 직접 붙여 넣을 필요는 없습니다.
+
+저장소 Secrets에 아래를 넣어 두면 됩니다.
+
+| Secret | 어디서 |
+| --- | --- |
+| `SUPABASE_ACCESS_TOKEN` | [Supabase 대시보드 → Account → Access Tokens](https://supabase.com/dashboard/account/tokens) |
+| `SUPABASE_PROJECT_REF` | 프로젝트 Settings → General → Reference ID |
+| `SUPABASE_DB_PASSWORD` | 프로젝트 Settings → Database → Database password |
+| `VITE_SUPABASE_URL` | 프로젝트 Settings → API → Project URL (Pages 빌드용, 이미 있을 수 있음) |
+| `VITE_SUPABASE_ANON_KEY` | 프로젝트 Settings → API → anon key (Pages 빌드용, 이미 있을 수 있음) |
+
+Actions 탭에서 **Supabase Migrations** 워크플로를 수동으로 돌려 SQL만 따로 넣을 수도 있습니다.
+
+Secrets가 없거나 마이그레이션이 실패하면 Pages 배포도 멈춥니다. SQL을 손으로 넣어야 한다면 아래 순서대로 SQL Editor에서 실행합니다.
 
 1. `20260820000000_initial_schema.sql`
 2. `20260820010000_deadline_due_time.sql`
@@ -89,7 +103,7 @@ order by t.target_date, t.title;
 npm run build
 ```
 
-`main`에 푸시하면 GitHub Actions가 GitHub Pages로 배포합니다. `VITE_SUPABASE_URL`과 `VITE_SUPABASE_ANON_KEY`는 저장소 Secrets로 넣습니다.
+`main`에 푸시하면 GitHub Actions가 Supabase 마이그레이션을 적용한 뒤 GitHub Pages로 배포합니다. Secrets는 위 표를 참고하세요.
 
 ## 스택
 

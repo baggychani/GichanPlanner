@@ -57,26 +57,22 @@ export function AnniversaryCreateModal({
             </button>
           </div>
           <div className="space-y-4 overflow-y-auto px-6 pb-6">
-            <div>
-              <label className="mb-1 block text-xs font-medium text-fg-subtle">이름</label>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setPickingEmoji(true)}
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line-strong bg-surface-muted hover:bg-surface-hover"
+                aria-label="기념일 이모지 선택"
+              >
+                <EmojiIcon emoji={emoji} className="h-7 w-7" />
+              </button>
               <input
                 autoFocus
                 value={title}
                 onChange={event => onTitleChange(event.target.value)}
                 placeholder="기념일 이름을 적어주세요"
-                className="w-full rounded-xl border border-transparent bg-surface-muted p-3 text-base font-medium outline-none focus:border-line-strong"
+                className="min-w-0 flex-1 rounded-xl border border-transparent bg-surface-muted p-3 text-base font-medium outline-none focus:border-line-strong"
               />
-            </div>
-            <div>
-              <label className="mb-1.5 block text-xs font-medium text-fg-subtle">달력 표시</label>
-              <button
-                type="button"
-                onClick={() => setPickingEmoji(true)}
-                className="flex h-12 w-12 items-center justify-center rounded-xl border border-line-strong bg-surface-muted hover:bg-surface-hover"
-                aria-label="기념일 이모지 선택"
-              >
-                <EmojiIcon emoji={emoji} className="h-7 w-7" />
-              </button>
             </div>
             <div>
               <label className="mb-1 block text-xs font-medium text-fg-subtle">날짜</label>

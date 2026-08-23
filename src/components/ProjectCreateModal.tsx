@@ -48,9 +48,16 @@ export function ProjectCreateModal({ nextOrder, onClose, onCreated }: ProjectCre
             <X size={20} />
           </button>
         </div>
-        <div className="space-y-4 px-6 pb-6">
-          <div>
-            <label className="mb-1 block text-xs font-medium text-fg-subtle">제목</label>
+        <div className="px-6 pb-6">
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setPickingIcon(true)}
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-line-strong bg-surface-muted hover:bg-surface-hover"
+              aria-label="프로젝트 아이콘 선택"
+            >
+              <EmojiIcon emoji={icon} className="h-7 w-7" />
+            </button>
             <input
               autoFocus
               value={title}
@@ -62,19 +69,8 @@ export function ProjectCreateModal({ nextOrder, onClose, onCreated }: ProjectCre
                 }
               }}
               placeholder="프로젝트의 이름을 적어주세요"
-              className="w-full rounded-xl border border-transparent bg-surface-muted p-3 text-base font-medium outline-none focus:border-line-strong"
+              className="min-w-0 flex-1 rounded-xl border border-transparent bg-surface-muted p-3 text-base font-medium outline-none focus:border-line-strong"
             />
-          </div>
-          <div>
-            <label className="mb-1.5 block text-xs font-medium text-fg-subtle">아이콘</label>
-            <button
-              type="button"
-              onClick={() => setPickingIcon(true)}
-              className="flex h-12 w-12 items-center justify-center rounded-xl border border-line-strong bg-surface-muted hover:bg-surface-hover"
-              aria-label="프로젝트 아이콘 선택"
-            >
-              <EmojiIcon emoji={icon} className="h-7 w-7" />
-            </button>
           </div>
         </div>
         <div className="flex justify-end gap-3 border-t border-line px-6 py-4">

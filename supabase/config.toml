@@ -1,0 +1,5 @@
+# Supabase CLI config for remote migrations (GitHub Actions db push).
+project_id = "gichan-planner"
+
+[db]
+major_version = 15
