@@ -17,6 +17,12 @@ export function authErrorMessage(error: unknown) {
   if (/failed to fetch|networkerror|load failed/i.test(message)) {
     return '서버에 연결하지 못했습니다. 잠시 후 다시 시도하세요.';
   }
+  if (/column .* does not exist|Could not find the .* column|PGRST204/i.test(message)) {
+    return '저장소에 필요한 칸이 없습니다. Supabase SQL Editor에서 supabase/ADD_MISSING.sql을 실행한 뒤 다시 시도하세요.';
+  }
+  if (/relation .* does not exist|anniversaries|routines\.end_date|routine_id/i.test(message) && /does not exist/i.test(message)) {
+    return '저장소에 필요한 표가 없습니다. Supabase SQL Editor에서 supabase/ADD_MISSING.sql을 실행한 뒤 다시 시도하세요.';
+  }
   return message || '요청을 처리하지 못했습니다.';
 }
 

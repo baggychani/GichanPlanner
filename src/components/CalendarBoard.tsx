@@ -5,10 +5,11 @@ import {
 import { AlertCircle, CalendarDays, Cake, Check, ChevronLeft, ChevronRight, Flag, FolderKanban, Plus, Repeat2, Settings, Target, ListTodo, UserRound } from 'lucide-react';
 import clsx from 'clsx';
 import { useLiveQuery } from 'dexie-react-hooks';
-import type { Deadline, Goal } from '../lib/db';
+import type { Deadline, Goal, Anniversary } from '../lib/db';
 import { db } from '../lib/db';
 import { krHolidayNames } from '../lib/krHolidays';
 import { isSameBirthday } from '../lib/datetime';
+import { anniversariesOnDate } from '../lib/anniversaryDisplay';
 import { EMPTY_DAY_COUNTS, isDayCleared, type DayTaskCounts } from '../lib/taskCounts';
 import { CountBubble } from './CountBubble';
 import { useAuth } from '../hooks/useAuth';
@@ -25,6 +26,7 @@ type CalendarBoardProps = {
   countsByDate: Record<string, DayTaskCounts>;
   deadlines: Deadline[];
   goals: Goal[];
+  anniversaries: Anniversary[];
   selectionKind: CalendarSelectionKind;
   isQuickCreateOpen: boolean;
   onGoToToday: () => void;
@@ -34,6 +36,7 @@ type CalendarBoardProps = {
   onCreateTask: () => void;
   onCreateDeadline: () => void;
   onCreateRoutine: () => void;
+  onCreateAnniversary: () => void;
   onCreateProject: () => void;
   onOpenCategories: () => void;
   onOpenProfile: () => void;
@@ -88,6 +91,7 @@ export function CalendarBoard({
   countsByDate,
   deadlines,
   goals,
+  anniversaries,
   selectionKind,
   isQuickCreateOpen,
   onGoToToday,
@@ -97,6 +101,7 @@ export function CalendarBoard({
   onCreateTask,
   onCreateDeadline,
   onCreateRoutine,
+  onCreateAnniversary,
   onCreateProject,
   onOpenCategories,
   onOpenProfile,
@@ -148,6 +153,7 @@ export function CalendarBoard({
       const holidayNames = krHolidayNames(dateStr);
       const isRedDay = i === 6 || holidayNames !== null;
       const isBirthday = isSameBirthday(cloneDay, birthdayMonth, birthdayDay);
+      const dayAnniversaries = anniversariesOnDate(anniversaries, cloneDay);
 
       days.push(
         <div
@@ -183,6 +189,9 @@ export function CalendarBoard({
               {isBirthday && (
                 <span aria-label="생일" className="leading-none text-[length:var(--cal-date-font)]">🎂</span>
               )}
+              {dayAnniversaries.map(item => (
+                <span key={item.id} aria-label={item.title} className="leading-none text-[length:var(--cal-date-font)]">{item.emoji}</span>
+              ))}
             </span>
             {hasDeadline && <AlertCircle className="calendar-deadline-icon shrink-0 text-red-500 drop-shadow-sm" strokeWidth={2.5} aria-label={`${dayDeadlines.length}개의 데드라인`} />}
           </div>
@@ -287,7 +296,7 @@ export function CalendarBoard({
               <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
                 <Flag size={16} /> 디데이 만들기
               </button>
-              <button disabled className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-semibold text-fg-subtle cursor-not-allowed">
+              <button onClick={onCreateAnniversary} className="w-full flex items-center gap-2 rounded-xl px-3 py-2.5 text-left text-sm font-medium text-fg-muted hover:bg-surface-muted hover:text-fg transition-colors">
                 <Cake size={16} /> 기념일 만들기
               </button>
             </div>

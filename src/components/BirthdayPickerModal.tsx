@@ -8,6 +8,8 @@ export function daysInBirthdayMonth(month: number) {
 }
 
 type BirthdayPickerModalProps = {
+  title?: string;
+  clearLabel?: string;
   month: number;
   day: number;
   onMonthChange: (month: number) => void;
@@ -18,6 +20,8 @@ type BirthdayPickerModalProps = {
 };
 
 export function BirthdayPickerModal({
+  title = '생일 설정',
+  clearLabel = '생일 해제',
   month,
   day,
   onMonthChange,
@@ -32,7 +36,7 @@ export function BirthdayPickerModal({
     <Overlay zClassName="z-[80]" align="bottom" onEscape={onClose}>
       <div className="w-full max-w-[420px] rounded-3xl bg-surface p-5 shadow-2xl">
         <div className="mx-auto mb-4 h-1 w-10 rounded-full bg-line-strong" />
-        <h3 className="mb-4 text-center text-base font-medium text-fg">생일 설정</h3>
+        <h3 className="mb-4 text-center text-base font-medium text-fg">{title}</h3>
         <p className="mb-2 text-sm font-medium text-fg-muted">월</p>
         <div className="mb-4 grid grid-cols-6 gap-2.5">
           {Array.from({ length: 12 }, (_, index) => index + 1).map(value => (
@@ -68,7 +72,7 @@ export function BirthdayPickerModal({
           })}
         </div>
         <div className="grid grid-cols-2 gap-2">
-          <button onClick={onClear} className="rounded-xl bg-surface-hover py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40">생일 해제</button>
+          <button onClick={onClear} className="rounded-xl bg-surface-hover py-2.5 text-sm font-medium text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40">{clearLabel}</button>
           <button onClick={onConfirm} className="rounded-xl bg-ink py-2.5 text-sm font-medium text-on-ink hover:opacity-90">완료</button>
         </div>
       </div>

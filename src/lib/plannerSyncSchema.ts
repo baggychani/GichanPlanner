@@ -1,6 +1,6 @@
-import { db, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
+import { db, type Anniversary, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
 
-export const PLANNER_SYNC_TABLES = ['tasks', 'schedules', 'routines', 'domains', 'goals', 'deadlines', 'projects'] as const;
+export const PLANNER_SYNC_TABLES = ['tasks', 'schedules', 'routines', 'anniversaries', 'domains', 'goals', 'deadlines', 'projects'] as const;
 export type PlannerSyncTable = (typeof PLANNER_SYNC_TABLES)[number];
 
 type AssertCovered<T> = [T] extends [never] ? true : T;
@@ -203,6 +203,24 @@ export function routineFromRemote(row: RemoteStamp & Routine): Routine {
   };
 }
 
+export function anniversaryRow(anniversary: Anniversary, ownerId: string) {
+  return {
+    ...stampRow(anniversary, ownerId),
+    title: anniversary.title,
+    emoji: anniversary.emoji,
+    month: anniversary.month,
+    day: anniversary.day,
+    start_year: anniversary.start_year,
+  };
+}
+
+export function anniversaryFromRemote(row: RemoteStamp & Anniversary): Anniversary {
+  return {
+    id: row.id, version: versionFrom(row), created_at: row.created_at, updated_at: row.updated_at, deleted_at: row.deleted_at,
+    title: row.title, emoji: row.emoji, month: row.month, day: row.day, start_year: row.start_year ?? null,
+  };
+}
+
 type CloudExtras = 'owner_id' | 'revision';
 type SyncedLocal<T> = Exclude<keyof T, 'version' | 'image_blob' | 'image_data' | 'avatar' | 'legacy_dexie_user_id' | 'email'>;
 type MissingFromCloud<T, Cloud> = Exclude<SyncedLocal<T>, Exclude<keyof Cloud, CloudExtras>>;
@@ -214,8 +232,9 @@ const _goalCovered: AssertCovered<MissingFromCloud<Goal, ReturnType<typeof goalR
 const _deadlineCovered: AssertCovered<MissingFromCloud<Deadline, ReturnType<typeof deadlineRow>>> = true;
 const _scheduleCovered: AssertCovered<MissingFromCloud<Schedule, ReturnType<typeof scheduleRow>>> = true;
 const _routineCovered: AssertCovered<MissingFromCloud<Routine, ReturnType<typeof routineRow>>> = true;
+const _anniversaryCovered: AssertCovered<MissingFromCloud<Anniversary, ReturnType<typeof anniversaryRow>>> = true;
 void _taskCovered; void _domainCovered; void _projectCovered; void _goalCovered;
-void _deadlineCovered; void _scheduleCovered; void _routineCovered;
+void _deadlineCovered; void _scheduleCovered; void _routineCovered; void _anniversaryCovered;
 
 type ProfileCloud = {
   id: string;
@@ -236,6 +255,7 @@ export const SIMPLE_SYNC_TABLES = [
   { name: 'deadlines' as const, table: db.deadlines, toRow: deadlineRow, fromRemote: deadlineFromRemote },
   { name: 'schedules' as const, table: db.schedules, toRow: scheduleRow, fromRemote: scheduleFromRemote },
   { name: 'routines' as const, table: db.routines, toRow: routineRow, fromRemote: routineFromRemote },
+  { name: 'anniversaries' as const, table: db.anniversaries, toRow: anniversaryRow, fromRemote: anniversaryFromRemote },
 ];
 
 type SimpleName = (typeof SIMPLE_SYNC_TABLES)[number]['name'];
@@ -244,5 +264,5 @@ const _allTables: AssertCovered<Exclude<PlannerSyncTable, CoveredTables> | Exclu
 void _allTables;
 
 export function plannerWriteTables() {
-  return [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.projects, db.profiles, db.cloudShadows] as const;
+  return [db.tasks, db.domains, db.goals, db.deadlines, db.schedules, db.routines, db.anniversaries, db.projects, db.profiles, db.cloudShadows] as const;
 }

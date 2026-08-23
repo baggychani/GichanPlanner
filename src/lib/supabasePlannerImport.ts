@@ -1,10 +1,10 @@
-import { db, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
+import { db, type Anniversary, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
 import type { PortableAttachment, PortablePlannerExport } from './portablePlannerExport';
 import { supabase } from './supabase';
 import { syncPlannerWithCloud, waitForPlannerCloud } from './supabaseSync';
 
 export type SupabaseImportReport = {
-  imported: Record<'tasks' | 'schedules' | 'routines' | 'domains' | 'goals' | 'deadlines' | 'projects' | 'attachments', number>;
+  imported: Record<'tasks' | 'schedules' | 'routines' | 'anniversaries' | 'domains' | 'goals' | 'deadlines' | 'projects' | 'attachments', number>;
 };
 
 function attachmentToBlob(attachment: PortableAttachment) {
@@ -65,6 +65,10 @@ export async function importPortablePlannerExport(archive: PortablePlannerExport
     scheduled_time: routine.scheduled_time ?? null,
     is_important: routine.is_important ?? false,
   }));
+  const anniversaries: Anniversary[] = (archive.anniversaries ?? []).map(item => ({
+    ...item,
+    start_year: item.start_year ?? null,
+  }));
   const domains: Domain[] = archive.domains ?? [];
   const goals: Goal[] = archive.goals ?? [];
   const deadlines: Deadline[] = (archive.deadlines ?? []).map(deadline => ({
@@ -78,6 +82,7 @@ export async function importPortablePlannerExport(archive: PortablePlannerExport
     tasks: await takeNewer(id => db.tasks.get(id), rows => db.tasks.bulkPut(rows), tasks),
     schedules: await takeNewer(id => db.schedules.get(id), rows => db.schedules.bulkPut(rows), schedules),
     routines: await takeNewer(id => db.routines.get(id), rows => db.routines.bulkPut(rows), routines),
+    anniversaries: await takeNewer(id => db.anniversaries.get(id), rows => db.anniversaries.bulkPut(rows), anniversaries),
     domains: await takeNewer(id => db.domains.get(id), rows => db.domains.bulkPut(rows), domains),
     goals: await takeNewer(id => db.goals.get(id), rows => db.goals.bulkPut(rows), goals),
     deadlines: await takeNewer(id => db.deadlines.get(id), rows => db.deadlines.bulkPut(rows), deadlines),

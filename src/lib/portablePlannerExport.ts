@@ -1,4 +1,4 @@
-import { db, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
+import { db, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task, type Anniversary } from './db';
 import { dataUrlToBlob } from './imageAttachment';
 
 const EXPORT_VERSION = 1 as const;
@@ -24,6 +24,7 @@ export type PortablePlannerExport = {
   tasks: Array<Omit<Task, 'image_blob' | 'image_data'>>;
   schedules: Schedule[];
   routines: Routine[];
+  anniversaries?: Anniversary[];
   domains: Domain[];
   goals: Goal[];
   deadlines: Deadline[];
@@ -40,8 +41,8 @@ async function blobToBase64(blob: Blob) {
 }
 
 export async function createPortablePlannerExport(): Promise<PortablePlannerExport> {
-  const [tasks, schedules, routines, domains, goals, deadlines, projects, profile] = await Promise.all([
-    db.tasks.toArray(), db.schedules.toArray(), db.routines.toArray(), db.domains.toArray(),
+  const [tasks, schedules, routines, anniversaries, domains, goals, deadlines, projects, profile] = await Promise.all([
+    db.tasks.toArray(), db.schedules.toArray(), db.routines.toArray(), db.anniversaries.toArray(), db.domains.toArray(),
     db.goals.toArray(), db.deadlines.toArray(), db.projects.toArray(), db.profiles.get('#profile'),
   ]);
   const attachments: PortableAttachment[] = [];
@@ -61,7 +62,7 @@ export async function createPortablePlannerExport(): Promise<PortablePlannerExpo
     owner: { dexieUserId: profile?.legacy_dexie_user_id ?? null, email: profile?.email ?? null, nickname: profile?.nickname ?? null },
     profile: portableProfile,
     tasks: tasks.map(({ image_blob: _blob, image_data: _legacyImage, ...task }) => task),
-    schedules, routines, domains, goals, deadlines, projects, attachments,
+    schedules, routines, anniversaries, domains, goals, deadlines, projects, attachments,
   };
 }
 

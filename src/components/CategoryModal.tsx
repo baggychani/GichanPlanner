@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Check, Download, FolderKanban, GripVertical, Pencil, Plus, SunMoon, Tags, Trash2, Upload, X, type LucideIcon } from 'lucide-react';
+import { Check, Cake, Download, FolderKanban, GripVertical, Pencil, Plus, Repeat2, SunMoon, Tags, Trash2, Upload, X, type LucideIcon } from 'lucide-react';
 import clsx from 'clsx';
 import { DragDropContext, Droppable, Draggable } from '@hello-pangea/dnd';
-import { db, type Deadline, type Domain, type Project, type Task } from '../lib/db';
+import { db, type Anniversary, type Deadline, type Domain, type Project, type Routine, type Task } from '../lib/db';
 import { runPlannerWrite } from '../lib/supabaseSync';
 import { deleteCategory, reorderCategories } from '../lib/taskOps';
 import { EmojiIcon } from './EmojiIcon';
@@ -10,6 +10,8 @@ import { EmojiPickerOverlay } from './EmojiPickerOverlay';
 import { Overlay } from './Overlay';
 import { AppearanceSettings } from './AppearanceSettings';
 import { ProjectSettingsPanel } from './ProjectSettingsPanel';
+import { AnniversarySettingsPanel } from './AnniversarySettingsPanel';
+import { RoutineSettingsPanel } from './RoutineSettingsPanel';
 import { downloadPortablePlannerExport, parsePortablePlannerExport, type PortablePlannerExport } from '../lib/portablePlannerExport';
 import {
   downloadPlannerCloudSnapshot,
@@ -21,12 +23,14 @@ import {
 import { importPortablePlannerExport } from '../lib/supabasePlannerImport';
 import { authErrorMessage } from './authUi';
 
-export type SettingsSection = 'appearance' | 'categories' | 'projects' | 'data';
+export type SettingsSection = 'appearance' | 'categories' | 'projects' | 'anniversaries' | 'routines' | 'data';
 
 const SECTION_TITLE: Record<SettingsSection, string> = {
   appearance: '보기',
   categories: '카테고리 관리',
   projects: '프로젝트 관리',
+  anniversaries: '기념일 관리',
+  routines: '루틴 관리',
   data: '데이터',
 };
 
@@ -69,6 +73,8 @@ export function CategoryModal({
   projects,
   tasks,
   deadlines,
+  anniversaries,
+  routines,
   initialSection = 'categories',
   initialProjectId = null,
   onClose,
@@ -79,6 +85,8 @@ export function CategoryModal({
   projects: Project[];
   tasks: Task[];
   deadlines: Deadline[];
+  anniversaries: Anniversary[];
+  routines: Routine[];
   initialSection?: SettingsSection;
   initialProjectId?: string | null;
   onClose: () => void;
@@ -157,6 +165,18 @@ export function CategoryModal({
               label="프로젝트"
               onClick={() => { setSection('projects'); setEditingCategoryId(null); }}
             />
+            <SettingsNavButton
+              active={section === 'anniversaries'}
+              icon={Cake}
+              label="기념일"
+              onClick={() => { setSection('anniversaries'); setEditingCategoryId(null); }}
+            />
+            <SettingsNavButton
+              active={section === 'routines'}
+              icon={Repeat2}
+              label="루틴"
+              onClick={() => { setSection('routines'); setEditingCategoryId(null); }}
+            />
             {SHOW_DATA_SETTINGS && (
               <SettingsNavButton
                 active={section === 'data'}
@@ -184,6 +204,13 @@ export function CategoryModal({
                 onOpenDeadline={onOpenDeadline}
                 onPickIcon={(onSelect) => setIconPicker({ onSelect })}
               />
+            ) : section === 'anniversaries' ? (
+              <AnniversarySettingsPanel
+                anniversaries={anniversaries}
+                onPickIcon={(onSelect) => setIconPicker({ onSelect })}
+              />
+            ) : section === 'routines' ? (
+              <RoutineSettingsPanel routines={routines} categories={categories} />
             ) : section === 'data' ? (
               <div className="flex min-h-0 flex-1 flex-col">
                 <p className="text-sm leading-6 text-fg-muted">
@@ -491,6 +518,7 @@ export function CategoryModal({
                   void importPortablePlannerExport(archive)
                     .then(report => {
                       const written = report.imported.tasks + report.imported.schedules + report.imported.routines
+                        + report.imported.anniversaries
                         + report.imported.domains + report.imported.goals + report.imported.deadlines + report.imported.projects;
                       setPendingBackup(null);
                       setBackupStatus(written === 0 ? '넣을 더 새로운 항목이 없습니다.' : '데이터를 넣었습니다.');

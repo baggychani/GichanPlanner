@@ -1,4 +1,4 @@
-import { db, type CloudShadow, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
+import { db, type CloudShadow, type Anniversary, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
 import type { PlannerSyncTable } from './plannerSyncSchema';
 
 export type { CloudShadow };
@@ -60,6 +60,7 @@ export const GOAL_MERGE_KEYS = ['domain_id', 'time_frame', 'start_date', 'end_da
 export const DEADLINE_MERGE_KEYS = ['title', 'memo', 'due_date', 'due_time', 'reminder_days', 'project_id', 'deleted_at'] as const satisfies readonly (keyof Deadline)[];
 export const SCHEDULE_MERGE_KEYS = ['title', 'target_date', 'start_time', 'end_time', 'domain_id', 'deleted_at'] as const satisfies readonly (keyof Schedule)[];
 export const ROUTINE_MERGE_KEYS = ['title', 'domain_id', 'recurrence_rule', 'start_date', 'end_date', 'scheduled_time', 'is_important', 'deleted_at'] as const satisfies readonly (keyof Routine)[];
+export const ANNIVERSARY_MERGE_KEYS = ['title', 'emoji', 'month', 'day', 'start_year', 'deleted_at'] as const satisfies readonly (keyof Anniversary)[];
 export const PROFILE_MERGE_KEYS = ['nickname', 'birthday_month', 'birthday_day', 'avatar_path'] as const satisfies readonly (keyof Profile)[];
 
 export const SIMPLE_MERGE_KEYS = {
@@ -69,6 +70,7 @@ export const SIMPLE_MERGE_KEYS = {
   deadlines: DEADLINE_MERGE_KEYS,
   schedules: SCHEDULE_MERGE_KEYS,
   routines: ROUTINE_MERGE_KEYS,
+  anniversaries: ANNIVERSARY_MERGE_KEYS,
 } as const;
 
 export type ShadowTable = PlannerSyncTable | 'profiles';

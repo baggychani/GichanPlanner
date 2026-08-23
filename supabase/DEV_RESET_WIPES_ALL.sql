@@ -8,6 +8,7 @@ drop function if exists public.create_profile_for_user();
 drop table if exists public.legacy_dexie_identities cascade;
 drop table if exists public.tasks cascade;
 drop table if exists public.schedules cascade;
+drop table if exists public.anniversaries cascade;
 drop table if exists public.routines cascade;
 drop table if exists public.domains cascade;
 drop table if exists public.goals cascade;
@@ -59,6 +60,12 @@ create table public.routines (
   title text not null, domain_id uuid, recurrence_rule text not null, start_date date not null,
   end_date date, scheduled_time timestamptz, is_important boolean not null default false
 );
+create table public.anniversaries (
+  id uuid primary key, owner_id uuid not null references auth.users(id) on delete cascade, revision bigint not null default 1,
+  created_at timestamptz not null default now(), updated_at timestamptz not null default now(), deleted_at timestamptz,
+  title text not null, emoji text not null default '🎉', month smallint not null check (month between 1 and 12),
+  day smallint not null check (day between 1 and 31), start_year smallint
+);
 create table public.domains (
   id uuid primary key, owner_id uuid not null references auth.users(id) on delete cascade, revision bigint not null default 1,
   created_at timestamptz not null default now(), updated_at timestamptz not null default now(), deleted_at timestamptz,
@@ -95,6 +102,7 @@ alter table public.profiles enable row level security;
 alter table public.tasks enable row level security;
 alter table public.schedules enable row level security;
 alter table public.routines enable row level security;
+alter table public.anniversaries enable row level security;
 alter table public.domains enable row level security;
 alter table public.goals enable row level security;
 alter table public.deadlines enable row level security;
@@ -110,6 +118,7 @@ create policy "update own tasks" on public.tasks for update using ((select auth.
 create policy "delete own tasks" on public.tasks for delete using ((select auth.uid()) = owner_id);
 create policy "own schedules" on public.schedules for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
 create policy "own routines" on public.routines for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
+create policy "own anniversaries" on public.anniversaries for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
 create policy "own domains" on public.domains for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
 create policy "own goals" on public.goals for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
 create policy "own deadlines" on public.deadlines for all using ((select auth.uid()) = owner_id) with check ((select auth.uid()) = owner_id);
@@ -124,6 +133,7 @@ grant select, insert, update, delete on table
   public.tasks,
   public.schedules,
   public.routines,
+  public.anniversaries,
   public.domains,
   public.goals,
   public.deadlines,

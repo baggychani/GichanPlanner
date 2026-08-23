@@ -614,6 +614,17 @@ export function syncPlannerWithCloud(onHydrated?: () => void) {
   return enqueue(() => syncNow(onHydrated));
 }
 
+export function pushTasksBatch(tasks: Task[]) {
+  if (tasks.length === 0) return Promise.resolve();
+  return enqueue(async () => {
+    const ownerId = await currentUserId();
+    if (!ownerId) return;
+    for (const task of tasks) {
+      await pushTask(task, ownerId, 'user');
+    }
+  });
+}
+
 export function installPlannerSync() {
   if (hooksInstalled) return;
   hooksInstalled = true;

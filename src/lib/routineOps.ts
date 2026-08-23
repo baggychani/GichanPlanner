@@ -1,9 +1,9 @@
 import { addDays, endOfMonth, format, max as maxDate, min as minDate, startOfMonth, subDays } from 'date-fns';
-import { db, type Routine } from './db';
+import { db, type Routine, type Task } from './db';
 import { deadlineOnDate } from './datetime';
 import { encodeRecurrenceRule, parseRecurrenceRule, routineDatesInRange, type RecurrenceRule } from './recurrence';
 import { createBlankTask, nextOrderFor } from './taskOps';
-import { runPlannerWrite } from './supabaseSync';
+import { pushTasksBatch, runPlannerWrite } from './supabaseSync';
 
 export type RoutineDraft = {
   title: string;
@@ -50,17 +50,19 @@ export async function createRoutine(draft: RoutineDraft) {
   };
   await runPlannerWrite(async () => {
     await db.routines.add(routine);
-    await fillRoutineTasks([routine], new Date(draft.start_date + 'T00:00:00'));
+    const added = await fillRoutineTasks([routine], new Date(draft.start_date + 'T00:00:00'));
+    if (added.length > 0) void pushTasksBatch(added);
   });
 }
 
 export async function materializeRoutines(viewedMonth: Date) {
   const routines = await db.routines.filter(routine => routine.deleted_at === null).toArray();
   if (routines.length === 0) return;
-  await runPlannerWrite(() => fillRoutineTasks(routines, viewedMonth));
+  const added = await runPlannerWrite(() => fillRoutineTasks(routines, viewedMonth));
+  if (added.length > 0) void pushTasksBatch(added);
 }
 
-async function fillRoutineTasks(routines: Routine[], viewedMonth: Date) {
+async function fillRoutineTasks(routines: Routine[], viewedMonth: Date): Promise<Task[]> {
   const today = new Date();
   const rangeStart = ymd(minDate([subDays(today, 7), startOfMonth(viewedMonth)]));
   const rangeEnd = ymd(maxDate([addDays(today, 90), endOfMonth(viewedMonth)]));
@@ -97,14 +99,35 @@ async function fillRoutineTasks(routines: Routine[], viewedMonth: Date) {
       toAdd.push(task);
     }
   }
-  if (toAdd.length > 0) await db.tasks.bulkAdd(toAdd);
+  if (toAdd.length > 0) await db.tasks.bulkPut(toAdd);
+  return toAdd;
 }
 
-export async function stopRoutine(routineId: string) {
+export type RoutineRemovalScope = 'future' | 'all';
+
+export async function removeRoutine(routineId: string, scope: RoutineRemovalScope = 'future') {
+  const today = ymd(new Date());
   return runPlannerWrite(async () => {
     const routine = await db.routines.get(routineId);
     if (!routine || routine.deleted_at !== null) return;
     const now = new Date().toISOString();
     await db.routines.update(routineId, { deleted_at: now, updated_at: now, version: routine.version + 1 });
+    const linked = await db.tasks.filter(task => task.routine_id === routineId).toArray();
+    const targets = linked.filter(task => {
+      if (task.deleted_at !== null) return false;
+      return scope === 'all' || task.target_date >= today;
+    });
+    if (targets.length > 0) {
+      await db.tasks.bulkPut(targets.map(task => ({
+        ...task,
+        deleted_at: now,
+        updated_at: now,
+        version: task.version + 1,
+      })));
+    }
   });
+}
+
+export async function stopRoutine(routineId: string) {
+  return removeRoutine(routineId, 'future');
 }

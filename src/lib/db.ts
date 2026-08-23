@@ -56,6 +56,20 @@ export interface Routine {
   is_important: boolean;
 }
 
+export interface Anniversary {
+  id: string;
+  version: number;
+  updated_at: string;
+  created_at: string;
+  deleted_at: string | null;
+
+  title: string;
+  emoji: string;
+  month: number;
+  day: number;
+  start_year: number | null;
+}
+
 export interface Domain {
   id: string;
   version: number;
@@ -138,6 +152,7 @@ const db = new Dexie('GichanPlanDB') as Dexie & {
   tasks: EntityTable<Task, 'id'>;
   schedules: EntityTable<Schedule, 'id'>;
   routines: EntityTable<Routine, 'id'>;
+  anniversaries: EntityTable<Anniversary, 'id'>;
   domains: EntityTable<Domain, 'id'>;
   goals: EntityTable<Goal, 'id'>;
   deadlines: EntityTable<Deadline, 'id'>;
@@ -303,6 +318,19 @@ db.version(16).stores({
   await transaction.table('routines').toCollection().modify((routine: Routine) => {
     if (routine.is_important === undefined) routine.is_important = false;
   });
+});
+
+db.version(17).stores({
+  tasks: 'id, target_date, is_completed, is_important, deleted_at, domain_id, project_id, routine_id, order',
+  schedules: 'id, target_date, start_time, deleted_at',
+  routines: 'id, start_date, deleted_at',
+  anniversaries: 'id, deleted_at, month, day',
+  domains: 'id, deleted_at, order',
+  goals: 'id, time_frame, start_date, deleted_at',
+  deadlines: 'id, due_date, deleted_at, project_id',
+  projects: 'id, deleted_at, order',
+  profiles: 'id',
+  cloudShadows: 'id',
 });
 
 export { db };

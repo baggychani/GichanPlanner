@@ -25,6 +25,7 @@ import { DeadlineCreateModal, DeadlineEditModal } from './components/DeadlineMod
 import { PlannerPanel } from './components/PlannerPanel';
 import { ProjectCreateModal } from './components/ProjectCreateModal';
 import { RoutineCreateModal } from './components/RoutineCreateModal';
+import { AnniversaryCreateModal } from './components/AnniversaryCreateModal';
 import { TaskEditModal } from './components/TaskEditModal';
 import { TimePickerModal } from './components/TimePickerModal';
 import { WeeklyPanel } from './components/WeeklyPanel';
@@ -64,6 +65,7 @@ function PlannerApp() {
   const [isDeadlineModalOpen, setIsDeadlineModalOpen] = useState(false);
   const [isProjectModalOpen, setIsProjectModalOpen] = useState(false);
   const [isRoutineModalOpen, setIsRoutineModalOpen] = useState(false);
+  const [isAnniversaryModalOpen, setIsAnniversaryModalOpen] = useState(false);
   const [isSelectingDeadlineDate, setIsSelectingDeadlineDate] = useState(false);
   const [isSelectingRoutineStart, setIsSelectingRoutineStart] = useState(false);
   const [isSelectingRoutineEnd, setIsSelectingRoutineEnd] = useState(false);
@@ -83,6 +85,12 @@ function PlannerApp() {
   const [routineWeekdays, setRoutineWeekdays] = useState<number[]>([]);
   const [routineScheduledTime, setRoutineScheduledTime] = useState<string | null>(null);
   const [routineImportant, setRoutineImportant] = useState(false);
+  const [anniversaryTitle, setAnniversaryTitle] = useState('');
+  const [anniversaryEmoji, setAnniversaryEmoji] = useState('🎉');
+  const [anniversaryMonth, setAnniversaryMonth] = useState(new Date().getMonth() + 1);
+  const [anniversaryDay, setAnniversaryDay] = useState(new Date().getDate());
+  const [anniversaryUseStartYear, setAnniversaryUseStartYear] = useState(false);
+  const [anniversaryStartYear, setAnniversaryStartYear] = useState<number | null>(null);
 
   const [quickAddCategoryId, setQuickAddCategoryId] = useState<string | null>(null);
   const [quickAddTitle, setQuickAddTitle] = useState('');
@@ -108,6 +116,8 @@ function PlannerApp() {
   const goals = showPlanner ? planner.goals : [];
   const deadlines = showPlanner ? planner.deadlines : [];
   const projects = showPlanner ? planner.projects : [];
+  const anniversaries = showPlanner ? planner.anniversaries : [];
+  const routines = showPlanner ? planner.routines : [];
   const calendarTaskCountByDate = showPlanner ? planner.calendarTaskCountByDate : {};
   const selectedDateString = format(selectedDate, 'yyyy-MM-dd');
   const selectedDateLabel = format(selectedDate, 'yyyy-MM-dd EEEE', { locale: ko });
@@ -178,6 +188,7 @@ function PlannerApp() {
     setIsDeadlineModalOpen(false);
     setIsProjectModalOpen(false);
     setIsRoutineModalOpen(false);
+    setIsAnniversaryModalOpen(false);
     setIsSelectingRoutineStart(false);
     setIsSelectingRoutineEnd(false);
     setTaskFromSettings(false);
@@ -235,6 +246,42 @@ function PlannerApp() {
     setTimeMinute(parts.minute);
     setTimePickerKind(kind);
     setIsTimePickerOpen(true);
+  };
+
+  const closeAnniversaryEditor = () => {
+    setIsAnniversaryModalOpen(false);
+  };
+
+  const saveAnniversary = async () => {
+    if (!anniversaryTitle.trim()) return;
+    const now = new Date().toISOString();
+    await runPlannerWrite(() => db.anniversaries.add({
+      id: crypto.randomUUID(),
+      version: 1,
+      created_at: now,
+      updated_at: now,
+      deleted_at: null,
+      title: anniversaryTitle.trim(),
+      emoji: anniversaryEmoji,
+      month: anniversaryMonth,
+      day: anniversaryDay,
+      start_year: anniversaryUseStartYear ? anniversaryStartYear : null,
+    }));
+    setAnniversaryTitle('');
+    setAnniversaryEmoji('🎉');
+    setAnniversaryUseStartYear(false);
+    setAnniversaryStartYear(null);
+    closeAnniversaryEditor();
+  };
+
+  const openAnniversaryCreate = () => {
+    setAnniversaryTitle('');
+    setAnniversaryEmoji('🎉');
+    setAnniversaryMonth(selectedDate.getMonth() + 1);
+    setAnniversaryDay(selectedDate.getDate());
+    setAnniversaryUseStartYear(false);
+    setAnniversaryStartYear(null);
+    setIsAnniversaryModalOpen(true);
   };
 
   const changeRoutineFreq = (freq: RecurrenceFreq) => {
@@ -488,6 +535,7 @@ function PlannerApp() {
         countsByDate={calendarTaskCountByDate}
         deadlines={deadlines}
         goals={goals}
+        anniversaries={anniversaries}
         selectionKind={selectionKind}
         isQuickCreateOpen={isQuickCreateMenuOpen}
         onGoToToday={() => {
@@ -530,6 +578,11 @@ function PlannerApp() {
           setIsRoutineModalOpen(true);
           setIsQuickCreateMenuOpen(false);
         }}
+        onCreateAnniversary={() => {
+          if (!requireLogin()) return;
+          openAnniversaryCreate();
+          setIsQuickCreateMenuOpen(false);
+        }}
         onCreateProject={() => {
           if (!requireLogin()) return;
           setIsProjectModalOpen(true);
@@ -570,6 +623,7 @@ function PlannerApp() {
         isDailyMenuOpen={isDailyMenuOpen}
         deadlineNotices={deadlineNotices}
         projects={projects}
+        anniversaries={anniversaries}
         onToggleDailyMenu={() => {
           if (!requireLogin()) return;
           setIsDailyMenuOpen(open => !open);
@@ -726,6 +780,25 @@ function PlannerApp() {
         />
       )}
 
+      {isAnniversaryModalOpen && (
+        <AnniversaryCreateModal
+          title={anniversaryTitle}
+          emoji={anniversaryEmoji}
+          month={anniversaryMonth}
+          day={anniversaryDay}
+          useStartYear={anniversaryUseStartYear}
+          startYear={anniversaryStartYear}
+          onTitleChange={setAnniversaryTitle}
+          onEmojiChange={setAnniversaryEmoji}
+          onMonthChange={setAnniversaryMonth}
+          onDayChange={setAnniversaryDay}
+          onUseStartYearChange={setAnniversaryUseStartYear}
+          onStartYearChange={setAnniversaryStartYear}
+          onClose={closeAnniversaryEditor}
+          onSave={() => { void saveAnniversary(); }}
+        />
+      )}
+
       {editingTask && !selectingDateForTask && (
         <TaskEditModal
           task={editingTask}
@@ -818,6 +891,8 @@ function PlannerApp() {
           projects={projects}
           tasks={tasks}
           deadlines={deadlines}
+          anniversaries={anniversaries}
+          routines={routines}
           initialSection={settingsSection}
           initialProjectId={settingsProjectId}
           onClose={() => setIsCategoryModalOpen(false)}

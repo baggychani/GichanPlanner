@@ -4,9 +4,10 @@ import { ArrowRight, CalendarDays, CircleX, Copy, MoreHorizontal, Trash2 } from 
 import clsx from 'clsx';
 import type { ReactNode } from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
-import type { Deadline, Project } from '../lib/db';
+import type { Deadline, Project, Anniversary } from '../lib/db';
 import { db } from '../lib/db';
 import { formatScheduledTime, isSameBirthday, parseDay } from '../lib/datetime';
+import { anniversaryPanelLabel, anniversariesOnDate } from '../lib/anniversaryDisplay';
 import { krHolidayLabel } from '../lib/krHolidays';
 import { EmojiIcon } from './EmojiIcon';
 
@@ -19,6 +20,7 @@ type PlannerPanelProps = {
   isDailyMenuOpen: boolean;
   deadlineNotices: DeadlineNotice[];
   projects: Project[];
+  anniversaries: Anniversary[];
   children: ReactNode;
   onToggleDailyMenu: () => void;
   onMoveIncompleteTomorrow: () => void;
@@ -37,6 +39,7 @@ export function PlannerPanel({
   isDailyMenuOpen,
   deadlineNotices,
   projects,
+  anniversaries,
   children,
   onToggleDailyMenu,
   onMoveIncompleteTomorrow,
@@ -50,6 +53,7 @@ export function PlannerPanel({
   const holidayLabel = viewMode === 'DAILY' ? krHolidayLabel(format(selectedDate, 'yyyy-MM-dd')) : null;
   const profile = useLiveQuery(() => db.profiles.get('#profile'));
   const isBirthday = viewMode === 'DAILY' && isSameBirthday(selectedDate, profile?.birthday_month, profile?.birthday_day);
+  const dayAnniversaries = viewMode === 'DAILY' ? anniversariesOnDate(anniversaries, selectedDate) : [];
   const heading = viewMode === 'DAILY'
     ? format(selectedDate, 'M월 d일 (E)', { locale: ko })
     : weeklyGoalWeekStart
@@ -72,6 +76,11 @@ export function PlannerPanel({
                 생일 축하합니다 💗
               </span>
             )}
+            {dayAnniversaries.map(item => (
+              <span key={item.id} className="min-w-0 truncate text-[13px] font-medium leading-none text-indigo-500 dark:text-indigo-300">
+                {anniversaryPanelLabel(item, selectedDate)}
+              </span>
+            ))}
           </span>
           {viewMode === 'DAILY' && isToday(selectedDate) && (
             <span className="rounded-full bg-primary px-3 py-1 text-[13px] font-semibold leading-none text-on-primary">오늘</span>

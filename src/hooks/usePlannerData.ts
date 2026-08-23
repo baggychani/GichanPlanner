@@ -19,5 +19,8 @@ export function usePlannerData(optimisticTasks: Task[] | null) {
   const deadlines = useLiveQuery(() => db.deadlines.filter(deadline => deadline.deleted_at === null).toArray()) || [];
   const projects = useLiveQuery(() => db.projects.filter(project => project.deleted_at === null).sortBy('order')) ?? [];
 
-  return { tasks, categories, goals, deadlines, projects, calendarTaskCountByDate };
+  const anniversaries = useLiveQuery(() => db.anniversaries.filter(item => item.deleted_at === null).toArray()) || [];
+  const routines = useLiveQuery(() => db.routines.filter(item => item.deleted_at === null).toArray()) || [];
+
+  return { tasks, categories, goals, deadlines, projects, anniversaries, routines, calendarTaskCountByDate };
 }

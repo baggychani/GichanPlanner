@@ -35,6 +35,7 @@ SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합
 8. `20260820170000_keep_newer_rows.sql` ← 더 옛 저장이 최근 완료·수정을 덮지 않게 합니다.
 9. `20260821180000_routine_instances.sql` ← 루틴 종료일·시간, 할 일에 루틴 연결. **사이트가 루틴을 만들기 전에 넣어야 합니다.**
 10. `20260821190000_routine_important.sql` ← 루틴 중요 표시. 사이트가 중요 루틴을 저장하기 전에 넣어야 합니다.
+11. `20260821195000_anniversaries.sql` ← 기념일. 사이트가 기념일을 만들기 전에 넣어야 합니다.
 
 Authentication → URL Configuration:
 
