@@ -17,6 +17,7 @@ import {
   type ShadowTable,
 } from './plannerMerge';
 import {
+  PLANNER_SYNC_TABLES,
   SIMPLE_SYNC_TABLES,
   plannerWriteTables,
   taskFromRemote,
@@ -701,6 +702,36 @@ async function syncNow(onHydrated?: () => void) {
 
 export function syncPlannerWithCloud(onHydrated?: () => void) {
   return enqueue(() => syncNow(onHydrated));
+}
+
+// A device can stay open for hours. Realtime makes cross-device edits visible
+// without polling, while the debounce keeps a burst of row updates to one
+// conflict-aware sync pass.
+export function subscribePlannerRealtime(ownerId: string) {
+  const client = supabase;
+  if (!client) return () => {};
+  let timer: number | null = null;
+  const scheduleSync = () => {
+    if (timer !== null) window.clearTimeout(timer);
+    timer = window.setTimeout(() => {
+      timer = null;
+      void syncPlannerWithCloud().catch(() => {});
+    }, 700);
+  };
+  let channel = client.channel(`gichanplan:${ownerId}`);
+  for (const table of PLANNER_SYNC_TABLES) {
+    channel = channel.on('postgres_changes', {
+      event: '*', schema: 'public', table, filter: `owner_id=eq.${ownerId}`,
+    }, scheduleSync);
+  }
+  channel = channel.on('postgres_changes', {
+    event: '*', schema: 'public', table: 'profiles', filter: `id=eq.${ownerId}`,
+  }, scheduleSync);
+  void channel.subscribe();
+  return () => {
+    if (timer !== null) window.clearTimeout(timer);
+    void client.removeChannel(channel);
+  };
 }
 
 export function installPlannerSync() {

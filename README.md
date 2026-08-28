@@ -49,6 +49,7 @@ GitHub 저장소 Settings → Secrets and variables → Actions에 아래 Secret
 7. `20260820160000_planner_backups.sql` ← 계정 사본 저장. 없으면 설정에 사본 목록이 안 보입니다.
 8. `20260820170000_keep_newer_rows.sql` ← 더 옛 저장이 최근 완료·수정을 덮지 않게 합니다.
 9. `20260820180000_sync_read_indexes.sql` ← 할 일이 1,000개를 넘어도 새 기기에서 빠르게 전부 불러옵니다.
+10. `20260820190000_realtime_planner_tables.sql` ← 열린 다른 기기에도 변경을 바로 반영합니다.
 
 Authentication → URL Configuration:
 

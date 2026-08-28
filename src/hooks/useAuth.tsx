@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { supabase } from '../lib/supabase';
-import { localAccountNeedsCloudHydration, prepareLocalAccount, subscribePlannerSync, syncPlannerWithCloud } from '../lib/supabaseSync';
+import { localAccountNeedsCloudHydration, prepareLocalAccount, subscribePlannerRealtime, subscribePlannerSync, syncPlannerWithCloud } from '../lib/supabaseSync';
 import { authErrorMessage } from '../components/authUi';
 
 type AuthValue = {
@@ -110,6 +110,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.removeEventListener('online', onOnline);
     };
   }, [session?.user.id]);
+
+  useEffect(() => {
+    if (!session || !accountReady) return;
+    return subscribePlannerRealtime(session.user.id);
+  }, [session?.user.id, accountReady]);
 
   return (
     <AuthContext.Provider
