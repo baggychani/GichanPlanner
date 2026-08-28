@@ -9,8 +9,8 @@
 - 작업 브랜치: `production-foundation`
 - 검토할 Draft PR: [#4 동기화 확장성 및 배포 자동화 기반](https://github.com/baggychani/GichanPlanner/pull/4)
 - PR base: `main`. 에이전트가 임의로 merge/Ready for review 하지 않는다.
-- 최신 인수인계 커밋: `e0347a3` (PWA, immutable image sync, Cursor handoff).
-- 그 이전 기반 커밋: `e2eace5` (동기화/백업 안전성), `85ccca9` (Realtime), `494ff7c` (증분 sync 인덱스). 후속 변경은 PR #4에 이어서 새 커밋으로 남긴다.
+- 최신 커밋: `069d1fc` (계정 전환 중 로컬 write의 소유자 가드).
+- 그 이전 기반 커밋: `cd4c093` (모바일 컨트롤/배포 권한), `e0347a3` (PWA, immutable image sync), `e2eace5` (동기화/백업 안전성), `85ccca9` (Realtime), `494ff7c` (증분 sync 인덱스). 후속 변경은 PR #4에 이어서 새 커밋으로 남긴다.
 
 작업 전에는 항상 `git status --short`, `git log --oneline -6`, `git diff`를 확인한다. 다른 사람이 만든 변경을 되돌리거나 넓은 reset/checkout을 하지 않는다.
 
@@ -73,16 +73,23 @@ DB가 과거 SQL을 실제로 갖고 있지 않다면 adoption을 절대 켜지 
 
 ## 현 동기화의 중요한 한계와 다음 우선순위
 
-### P0: 계정 전환 중 지연된 로컬 write 차단
+### 해결됨(P0): 계정 전환 중 지연된 로컬 write 차단 — `069d1fc`
 
-`src/lib/supabaseSync.ts`의 Dexie creating/updating hook은 transaction이 끝난 뒤 `currentUserId()`를 다시 읽는다. A 계정에서 저장한 직후 로그아웃하고 B 계정으로 바꾸면, 늦게 실행된 callback이 아직 남아 있는 A row를 B의 token으로 push해 **A 데이터를 B 계정에 복제할 가능성**이 있다.
+`whenCommitted`가 hook 실행 시점의 `OWNER_KEY`를 capture하고, transaction commit 후 callback에서 `currentUserId()`와 현재 `OWNER_KEY`가 **둘 다** 그 값과 같을 때만 push한다. 다르면 그 push를 버린다. 소유자 판정이 `whenCommitted` 한 곳에 모였으므로 hook을 새로 추가해도 가드를 우회할 수 없다.
 
-수정 방향:
+버려도 유실되지 않는 근거: `syncNow`는 항상 `pushAllLocal`을 호출하고, 그것이 visibility 복귀·online 복귀·Realtime 신호마다 실행된다. 토큰 갱신 중 `currentUserId()`가 일시적으로 `null`이어서 버려진 정당한 write도 다음 sync에서 회수된다. 로그인 전 guest data도 같은 경로로 올라간다. **이 가드를 손대는 사람은 `pushAllLocal` 경로가 살아 있는지 먼저 확인해야 한다.**
 
-1. 각 hook 진입 시 `const ownerAtCommit = localStorage.getItem(OWNER_KEY)`를 capture한다.
-2. `whenCommitted` callback에서는 `currentUserId()` 결과와 현재 `OWNER_KEY`가 모두 `ownerAtCommit`과 같을 때만 `pushTask`, `pushSimpleRow`, `pushProfile`을 호출한다.
-3. owner가 없거나 다르면 callback을 조용히 버린다. 로그인 전 guest data는 이미 `syncNow`의 bulk push가 처리하므로 이 guard와 충돌하지 않는다.
-4. 브라우저 프로필 A/B로 “A에서 write → 즉시 sign out → B sign in” 시나리오를 자동/수동 검증한다.
+재현 시나리오에 대한 정정: 원래 문서에 적힌 “A에서 write → 즉시 sign out → B sign in”은 가드 없이도 이미 통과한다. `signOutPlanner()`가 `waitForPlannerCloud()`로 큐를 먼저 비우고, `clearLocalPlanner()`가 row를 지워서 늦은 callback의 `table.get()`이 `undefined`를 돌려주기 때문이다. 실제로 뚫리던 경로는 다음 세 가지다.
+
+1. **멀티탭.** 탭1에 A를 열어둔 채 탭2에서 B로 로그인하면 세션과 `OWNER_KEY`가 모두 B가 된다. 탭1에서 이후 저장하면 A의 내용이 B 소유로 올라간다. 밀리초 경합이 아니라 탭1이 열려 있는 동안 계속 유지되는 상태이므로 수동으로 재현된다.
+2. **앱 UI를 거치지 않은 sign out.** 세션 만료나 외부에서 발생한 `SIGNED_OUT`은 `signOutPlanner()`를 타지 않아 큐 비우기와 로컬 정리가 실행되지 않는다.
+3. **push가 밀린 상태의 계정 전환.** `waitForPlannerCloud()`는 8회 반복 상한이 있고 `signOutPlanner`는 그 실패를 삼킨다.
+
+검증은 `npm run dev` + `http://localhost:5173/`에서 한다. 절차는 `AFTER_CODEX.md`의 “배포하지 않고 localhost에서 검증하는 방법”에 있다.
+
+### 아직 없는 것: 테스트 인프라
+
+`package.json`에 test script와 test dependency가 없고 `*.test.ts`는 0개다. 위 P0 가드는 멀티탭 경로가 수동 재현되므로 테스트 없이 검증했다. 그러나 `threeWayMerge`, export/import, sync cursor는 수동 검증이 어렵다. Vitest 도입은 별도 작업으로 다루고, 도입할 때 이 가드의 회귀 테스트도 함께 넣는다.
 
 ### P0: 서버 진실의 순서(sequence) + durable outbox
 

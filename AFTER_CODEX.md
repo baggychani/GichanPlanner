@@ -21,7 +21,9 @@ PR은 일부러 Draft 상태다. 아래의 배포 전 설정을 확인한 뒤 �
 2. Supabase 프로젝트의 Owner가 개인 계정인지 확인한다. 학교 계정 소유라면 개인 계정을 Owner/관리자로 옮긴다. **프로젝트를 새로 만들기 전에** 현재 DB와 Storage 데이터를 보존할 방법부터 확인한다.
 3. 비밀값을 비밀번호 관리자에 보관한다. 최소한 `.env.local`의 Supabase URL/anon key, DB 비밀번호, Supabase Access Token을 잃지 않게 한다. `.env.local`은 Git에 올리지 않는다.
 4. GitHub Actions Secrets를 아래 목록대로 확인한다. 이번 작업에서 이미 설정된 것은 그대로 두고, 없는 두 개만 넣는다.
-5. PR #4를 읽고 merge한다. merge 직후 첫 자동 배포의 DB 처리 방법은 다음 절을 따른다.
+5. merge 전에 `npm run dev` + <http://localhost:5173/>으로 브랜치를 직접 확인한다. 절차는 아래 “배포하지 않고 localhost에서 검증하는 방법”에 있다.
+6. `adopt_existing_schema`를 결정하기 위해 읽기 전용 SQL로 현재 DB 상태를 확인한다.
+7. PR #4를 읽고 merge한다. merge 직후 첫 자동 배포의 DB 처리 방법은 아래 절을 따른다.
 
 ## GitHub Actions Secrets: 꼭 필요한 값
 
@@ -39,6 +41,64 @@ GitHub 저장소 → **Settings → Secrets and variables → Actions → Reposi
 `SUPABASE_ACCESS_TOKEN`은 Supabase Dashboard의 Account/Access Tokens에서 만든 토큰을 쓴다. `SUPABASE_DB_PASSWORD`는 **프로젝트 DB 비밀번호**이며 anon key나 서비스 역할 키가 아니다. 두 값은 한 번 표시된 뒤 다시 볼 수 없을 수 있으므로 비밀번호 관리자에 보관한다.
 
 이 두 Secrets가 없는 상태에서 PR을 merge하면 새 GitHub Action은 마이그레이션 단계에서 실패하고, 의도대로 Pages 배포도 멈춘다. 앱 데이터가 망가지지는 않지만 새 사이트는 배포되지 않는다.
+
+## 배포하지 않고 localhost에서 검증하는 방법
+
+**배포는 확인의 전제가 아니다.** PR을 merge하지 않아도 브랜치 코드를 실제 Supabase에 붙여서 그대로 써 볼 수 있다. Supabase Auth의 Redirect URLs에 `http://localhost:5173/`이 들어 있는 이유가 이것이다.
+
+```powershell
+git switch production-foundation
+npm install
+npm run dev
+```
+
+그 다음 브라우저에서 <http://localhost:5173/>을 연다.
+
+**주의: 이것은 운영 데이터베이스에 그대로 쓴다.** staging Supabase 프로젝트는 아직 없다. 그래서 동기화를 시험할 때는 실제 개인 계정이 아니라 시험용 계정 두 개(A, B)를 쓴다. 시작 전에 설정 → 데이터 → JSON 내보내기로 백업을 한 번 받는다.
+
+### 계정 전환 가드(`069d1fc`) 검증 절차
+
+1. **정상 동기화가 살아 있는지 먼저 본다.** A로 로그인해 할 일을 하나 만들고 제목을 고친다. Supabase Table Editor의 `tasks`에서 그 행이 A의 `owner_id`로 보이면 통과다. 이 검사가 가장 중요하다. 가드가 잘못 만들어졌다면 유출이 아니라 **저장 누락**으로 나타나기 때문이다.
+2. **계정 전환.** 로그아웃하고 B로 로그인한다. A의 할 일이 화면에 보이지 않아야 한다.
+3. **멀티탭.** 탭1에 A로 로그인해 두고, 탭2에서 로그아웃 후 B로 로그인한다. 그 뒤 탭1로 돌아가 화면에 남아 있는 A의 할 일 제목을 고친다.
+4. Supabase SQL Editor에서 아래를 실행한다. **행이 하나도 안 나와야 정상이다.**
+
+```sql
+select owner_id, title, updated_at
+from public.tasks
+where title = '<3번에서 고친 제목>';
+```
+
+가드 이전 코드에서는 4번이 B의 `owner_id`로 A의 할 일을 보여준다. 그것이 이 버그의 정체였다.
+
+## merge 전에 DB 상태를 확인하는 읽기 전용 SQL
+
+다음 절의 `adopt_existing_schema`를 켜기 전에, 현재 DB가 정말 예전 마이그레이션을 갖고 있는지 확인한다. 아래는 읽기만 하므로 안전하다.
+
+```sql
+select table_name
+from information_schema.tables
+where table_schema = 'public'
+order by table_name;
+
+select column_name
+from information_schema.columns
+where table_schema = 'public' and table_name = 'deadlines' and column_name = 'project_id';
+
+select version from supabase_migrations.schema_migrations order by version;
+```
+
+판단 기준은 이렇다.
+
+- 첫 쿼리에 `tasks`, `domains`, `goals`, `projects`, `deadlines`, `profiles`, `planner_backups`가 모두 보이고, 두 번째 쿼리가 `project_id` 한 줄을 돌려주면 예전 마이그레이션(`20260820000000`~`20260820170000`)이 실제로 적용된 상태다. 이때만 `adopt_existing_schema`를 켠다.
+- 세 번째 쿼리가 비어 있는 것은 정상이다. SQL Editor로 수동 적용했으면 history에 기록이 없다. adopt가 채우려는 것이 바로 이 표다.
+- 표나 열이 빠져 있으면 **adopt를 켜지 말고 멈춘다.** 켜면 "적용됨"이라는 기록만 남고 빠진 표는 생기지 않는다.
+
+## 지금 merge하면 어떻게 되는가
+
+`.github/workflows/pages.yml`의 build job은 `needs: migrate`다. `SUPABASE_ACCESS_TOKEN`과 `SUPABASE_DB_PASSWORD`가 없는 동안 merge하면 migrate가 실패하고 build/deploy는 시작조차 하지 않는다. 결과는 실패한 Actions 실행 하나와, **옛 버전 그대로인 사이트**다. 앱 데이터는 상하지 않는다.
+
+또한 secret을 넣은 뒤에도 **첫 배포를 평범한 `main` push로 하면 안 된다.** push로 들어온 실행은 adopt 단계를 건너뛰고 `supabase db push`가 마이그레이션 10개를 처음부터 적용하려 들어, 이미 있는 표를 다시 만들다 실패한다. 첫 배포는 반드시 다음 절의 수동 실행으로 한다.
 
 ## PR #4를 처음 배포하는 정확한 절차
 
