@@ -13,8 +13,6 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   # Database migration is stateful. A later push must wait, not cancel a
@@ -74,6 +72,10 @@ jobs:
   deploy:
     needs: build
     runs-on: ubuntu-latest
+    # The DB migration and build jobs never receive Pages/OIDC write tokens.
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}

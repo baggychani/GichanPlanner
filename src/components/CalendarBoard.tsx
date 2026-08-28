@@ -223,8 +223,8 @@ export function CalendarBoard({
 
   return (
     <div ref={rootRef} className="calendar-metrics relative flex h-full min-h-0 min-w-0 w-full max-w-[calc(760px+4rem)] flex-1 flex-col pl-16 max-[900px]:h-auto max-[900px]:max-w-[760px] max-[900px]:flex-none max-[900px]:pl-0">
-      <div className="relative mb-4 flex min-w-0 shrink-0 items-center justify-between pl-4">
-        <div className="flex items-center gap-4">
+      <div className="relative mb-4 flex min-w-0 shrink-0 items-center justify-between pl-4 max-[600px]:flex-wrap max-[600px]:gap-y-2 max-[600px]:pl-0">
+        <div className="flex items-center gap-4 max-[600px]:w-full max-[600px]:justify-between">
           <h1 className="text-3xl font-bold leading-tight">
             <span className="max-[600px]:hidden">{format(currentDate, 'yyyy.')}</span>
             <span className="hidden max-[600px]:inline">{format(currentDate, 'yy.')}</span>
@@ -242,8 +242,8 @@ export function CalendarBoard({
           </div>
         )}
 
-        <div className="flex items-center gap-3 overflow-visible">
-          <button onClick={() => onSelectWeek(startOfWeek(selectedDate, { weekStartsOn: 1 }))} aria-label="주간 목표" title="주간 목표" className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
+        <div className="flex items-center gap-3 overflow-visible max-[600px]:w-full max-[600px]:justify-between max-[600px]:gap-0">
+          <button onClick={() => onSelectWeek(startOfWeek(selectedDate, { weekStartsOn: 1 }))} aria-label="주간 목표" title="주간 목표" className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted max-[600px]:p-1.5">
             <Target size={22} />
           </button>
           {/* 바깥 클릭으로 닫히지 않음. 메뉴를 연 채 달력을 보는 흐름을 유지하기 위한 의도. */}
@@ -252,7 +252,7 @@ export function CalendarBoard({
               onClick={onToggleQuickCreate}
               aria-label="빠른 만들기 메뉴"
               aria-expanded={isQuickCreateOpen}
-              className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted"
+              className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted max-[600px]:p-1.5"
               title="빠른 만들기"
             >
               <Plus size={24} />
@@ -281,7 +281,7 @@ export function CalendarBoard({
               </button>
             </div>
           </div>
-          <button onClick={onOpenCategories} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted" title="설정" aria-label="설정">
+          <button onClick={onOpenCategories} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted max-[600px]:p-1.5" title="설정" aria-label="설정">
             <Settings size={22} />
           </button>
           <ThemeToggle className="max-[560px]:hidden" />
@@ -291,7 +291,7 @@ export function CalendarBoard({
             title={isLoggedIn ? '프로필 및 계정' : '로그인 해주세요!'}
             className={clsx(
               'overflow-visible rounded-full transition-colors hover:bg-surface-hover',
-              isLoggedIn ? 'p-0.5' : 'p-2 text-fg-muted',
+              isLoggedIn ? 'p-0.5' : 'p-2 text-fg-muted max-[600px]:p-1.5',
             )}
           >
             {isLoggedIn ? (
@@ -305,11 +305,11 @@ export function CalendarBoard({
               </span>
             )}
           </button>
-          <div className="w-px h-6 bg-line-strong mx-1" />
-          <button onClick={onPrevMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
+          <div className="w-px h-6 bg-line-strong mx-1 max-[600px]:hidden" />
+          <button onClick={onPrevMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted max-[600px]:p-1.5">
             <ChevronLeft size={24} />
           </button>
-          <button onClick={onNextMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted">
+          <button onClick={onNextMonth} className="p-2 hover:bg-surface-hover rounded-full transition-colors text-fg-muted max-[600px]:p-1.5">
             <ChevronRight size={24} />
           </button>
         </div>

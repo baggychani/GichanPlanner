@@ -73,6 +73,17 @@ DB가 과거 SQL을 실제로 갖고 있지 않다면 adoption을 절대 켜지 
 
 ## 현 동기화의 중요한 한계와 다음 우선순위
 
+### P0: 계정 전환 중 지연된 로컬 write 차단
+
+`src/lib/supabaseSync.ts`의 Dexie creating/updating hook은 transaction이 끝난 뒤 `currentUserId()`를 다시 읽는다. A 계정에서 저장한 직후 로그아웃하고 B 계정으로 바꾸면, 늦게 실행된 callback이 아직 남아 있는 A row를 B의 token으로 push해 **A 데이터를 B 계정에 복제할 가능성**이 있다.
+
+수정 방향:
+
+1. 각 hook 진입 시 `const ownerAtCommit = localStorage.getItem(OWNER_KEY)`를 capture한다.
+2. `whenCommitted` callback에서는 `currentUserId()` 결과와 현재 `OWNER_KEY`가 모두 `ownerAtCommit`과 같을 때만 `pushTask`, `pushSimpleRow`, `pushProfile`을 호출한다.
+3. owner가 없거나 다르면 callback을 조용히 버린다. 로그인 전 guest data는 이미 `syncNow`의 bulk push가 처리하므로 이 guard와 충돌하지 않는다.
+4. 브라우저 프로필 A/B로 “A에서 write → 즉시 sign out → B sign in” 시나리오를 자동/수동 검증한다.
+
 ### P0: 서버 진실의 순서(sequence) + durable outbox
 
 현재 `updated_at`과 revision은 클라이언트가 생성한다. 하루 한 번 full reconciliation은 **영구 누락 완화책**일 뿐, 기기 시계가 틀린 상태에서 “사용자가 나중에 수정한 값”을 서버가 정확히 판정하는 근본 해결은 아니다.
