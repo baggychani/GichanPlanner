@@ -9,7 +9,7 @@ import { EmojiIcon } from './EmojiIcon';
 import { EmojiPickerOverlay } from './EmojiPickerOverlay';
 import { Overlay } from './Overlay';
 import { ProjectSettingsPanel } from './ProjectSettingsPanel';
-import { downloadPortablePlannerExport, parsePortablePlannerExport, type PortablePlannerExport } from '../lib/portablePlannerExport';
+import { downloadPortablePlannerExport, MAX_PORTABLE_EXPORT_BYTES, parsePortablePlannerExport, type PortablePlannerExport } from '../lib/portablePlannerExport';
 import {
   downloadPlannerCloudSnapshot,
   listPlannerCloudSnapshots,
@@ -164,6 +164,10 @@ export function CategoryModal({
                     const file = event.target.files?.[0];
                     event.currentTarget.value = '';
                     if (!file) return;
+                    if (file.size > MAX_PORTABLE_EXPORT_BYTES) {
+                      setBackupStatus('백업 파일은 100MB 이하만 넣을 수 있습니다.');
+                      return;
+                    }
                     void file.text().then(text => {
                       setPendingBackup({ fileName: file.name, archive: parsePortablePlannerExport(text) });
                     }).catch(caught => {

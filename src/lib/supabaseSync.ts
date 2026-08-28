@@ -29,6 +29,10 @@ import { maybeSavePlannerCloudSnapshot } from './plannerBackupSnapshots';
 import { supabase } from './supabase';
 
 const OWNER_KEY = 'gichanplan-sync-owner';
+const SYNC_CURSOR_KEY = 'gichanplan-sync-cursor';
+// PostgREST returns at most 1,000 rows by default. Keep reads paged so a
+// long-lived planner can still be fully hydrated on a new device.
+const REMOTE_READ_PAGE_SIZE = 1_000;
 
 let hooksInstalled = false;
 let syncChain: Promise<void> = Promise.resolve();
@@ -164,6 +168,45 @@ async function upsertRows(table: PlannerSyncTable, rows: object[]) {
   }
 }
 
+function readSyncCursor(ownerId: string) {
+  try {
+    const stored = localStorage.getItem(SYNC_CURSOR_KEY);
+    if (!stored) return null;
+    const value = JSON.parse(stored) as { ownerId?: unknown; updatedSince?: unknown };
+    if (value.ownerId !== ownerId || typeof value.updatedSince !== 'string' || Number.isNaN(Date.parse(value.updatedSince))) return null;
+    return value.updatedSince;
+  } catch {
+    return null;
+  }
+}
+
+function writeSyncCursor(ownerId: string, updatedSince: string) {
+  localStorage.setItem(SYNC_CURSOR_KEY, JSON.stringify({ ownerId, updatedSince }));
+}
+
+function clearSyncCursor() {
+  localStorage.removeItem(SYNC_CURSOR_KEY);
+}
+
+async function fetchAllRemoteRows(table: PlannerSyncTable, updatedSince: string | null): Promise<object[]> {
+  if (!supabase) return [];
+  const rows: object[] = [];
+  for (let start = 0; ; start += REMOTE_READ_PAGE_SIZE) {
+    const request = supabase
+      .from(table)
+      .select('*')
+      .order('id', { ascending: true })
+      .range(start, start + REMOTE_READ_PAGE_SIZE - 1);
+    const { data, error } = updatedSince
+      ? await request.gte('updated_at', updatedSince)
+      : await request;
+    if (error) throw error;
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < REMOTE_READ_PAGE_SIZE) return rows;
+  }
+}
+
 function sameTaskCore(a: Task, b: Task) {
   return a.title === b.title
     && a.target_date === b.target_date
@@ -193,20 +236,54 @@ function skipCloudPush(trans: Transaction) {
   return Boolean((trans as Transaction & { applyingRemote?: boolean }).applyingRemote);
 }
 
-async function repairTasksInDeletedCategories() {
-  const [tasks, domains] = await Promise.all([db.tasks.toArray(), db.domains.toArray()]);
-  const deletedIds = new Set(domains.filter(domain => domain.deleted_at !== null).map(domain => domain.id));
-  const orphanedTasks = tasks.filter(task =>
-    task.deleted_at === null && task.domain_id !== null && deletedIds.has(task.domain_id)
-  );
-  if (orphanedTasks.length === 0) return;
+async function repairRowsWithDeletedParents() {
+  const [tasks, schedules, routines, domains, goals, deadlines, projects] = await Promise.all([
+    db.tasks.toArray(), db.schedules.toArray(), db.routines.toArray(), db.domains.toArray(),
+    db.goals.toArray(), db.deadlines.toArray(), db.projects.toArray(),
+  ]);
+  const deletedDomainIds = new Set(domains.filter(row => row.deleted_at !== null).map(row => row.id));
+  const deletedGoalIds = new Set(goals.filter(row => row.deleted_at !== null).map(row => row.id));
+  const deletedProjectIds = new Set(projects.filter(row => row.deleted_at !== null).map(row => row.id));
   const now = new Date().toISOString();
-  await db.tasks.bulkPut(orphanedTasks.map(task => ({
-    ...task,
-    domain_id: null,
-    updated_at: now,
-    version: task.version + 1,
-  })));
+
+  const repairedTasks = tasks.flatMap(task => {
+    if (task.deleted_at !== null) return [];
+    const domain_id = task.domain_id && deletedDomainIds.has(task.domain_id) ? null : task.domain_id;
+    const goal_id = task.goal_id && deletedGoalIds.has(task.goal_id) ? null : task.goal_id;
+    const project_id = task.project_id && deletedProjectIds.has(task.project_id) ? null : task.project_id;
+    return domain_id !== task.domain_id || goal_id !== task.goal_id || project_id !== task.project_id
+      ? [{ ...task, domain_id, goal_id, project_id, updated_at: now, version: task.version + 1 }]
+      : [];
+  });
+  const repairedSchedules = schedules.flatMap(schedule =>
+    schedule.deleted_at === null && schedule.domain_id && deletedDomainIds.has(schedule.domain_id)
+      ? [{ ...schedule, domain_id: null, updated_at: now, version: schedule.version + 1 }]
+      : []);
+  const repairedRoutines = routines.flatMap(routine =>
+    routine.deleted_at === null && routine.domain_id && deletedDomainIds.has(routine.domain_id)
+      ? [{ ...routine, domain_id: null, updated_at: now, version: routine.version + 1 }]
+      : []);
+  const repairedGoals = goals.flatMap(goal =>
+    goal.deleted_at === null && goal.domain_id && deletedDomainIds.has(goal.domain_id)
+      ? [{ ...goal, domain_id: null, updated_at: now, version: goal.version + 1 }]
+      : []);
+  const repairedDeadlines = deadlines.flatMap(deadline =>
+    deadline.deleted_at === null && deadline.project_id && deletedProjectIds.has(deadline.project_id)
+      ? [{ ...deadline, project_id: null, updated_at: now, version: deadline.version + 1 }]
+      : []);
+  const repairedProjects = projects.flatMap(project =>
+    project.deleted_at === null && project.domain_id && deletedDomainIds.has(project.domain_id)
+      ? [{ ...project, domain_id: null, updated_at: now, version: project.version + 1 }]
+      : []);
+
+  await Promise.all([
+    repairedTasks.length ? db.tasks.bulkPut(repairedTasks) : undefined,
+    repairedSchedules.length ? db.schedules.bulkPut(repairedSchedules) : undefined,
+    repairedRoutines.length ? db.routines.bulkPut(repairedRoutines) : undefined,
+    repairedGoals.length ? db.goals.bulkPut(repairedGoals) : undefined,
+    repairedDeadlines.length ? db.deadlines.bulkPut(repairedDeadlines) : undefined,
+    repairedProjects.length ? db.projects.bulkPut(repairedProjects) : undefined,
+  ]);
 }
 
 function keepNewerLocal<T extends { id: string; updated_at: string; version?: number }>(merged: T[], live: T[]) {
@@ -405,8 +482,14 @@ async function pushSimpleRow(
 }
 
 async function pushAllLocal(ownerId: string) {
-  const [tasks, profile] = await Promise.all([db.tasks.toArray(), db.profiles.get('#profile')]);
-  const resolved = await mapPool(tasks, 4, async task => ({ task, image: await resolveTaskImagePath(task, ownerId, 'bulk') }));
+  const [tasks, profile, shadowRows] = await Promise.all([db.tasks.toArray(), db.profiles.get('#profile'), db.cloudShadows.toArray()]);
+  const shadowById = new Map(shadowRows.map(row => [row.id, row]));
+  const needsPush = (table: ShadowTable, row: { id: string; updated_at: string; version?: number }, fields: Record<string, unknown>) => {
+    const shadow = shadowById.get(`${table}:${row.id}`);
+    return !shadow || isNewer(row, shadow) || shadow.body !== JSON.stringify(fields);
+  };
+  const changedTasks = tasks.filter(task => needsPush('tasks', task, shadowFields(task, TASK_MERGE_KEYS)));
+  const resolved = await mapPool(changedTasks, 4, async task => ({ task, image: await resolveTaskImagePath(task, ownerId, 'bulk') }));
   await mapPool(
     resolved.filter(({ task, image }) => !image.omit && image.path !== task.image_path),
     4,
@@ -422,13 +505,16 @@ async function pushAllLocal(ownerId: string) {
     return shadowRecord('tasks', stored, shadowFields(stored, TASK_MERGE_KEYS));
   });
   for (const spec of SIMPLE_SYNC_TABLES) {
-    const rows = await spec.table.toArray() as Array<{ id: string; updated_at: string; version: number }>;
+    const rows = (await spec.table.toArray() as Array<{ id: string; updated_at: string; version: number }>)
+      .filter(row => needsPush(spec.name, row, shadowFields(row as never, SIMPLE_MERGE_KEYS[spec.name] as never)));
     await upsertRows(spec.name, rows.map(row => spec.toRow(row as never, ownerId)));
     for (const row of rows) {
       shadows.push(shadowRecord(spec.name as ShadowTable, row, shadowFields(row as never, SIMPLE_MERGE_KEYS[spec.name] as never)));
     }
   }
-  if (profile) await pushProfile(profile, ownerId, 'bulk');
+  if (profile && needsPush('profiles', { ...profile, version: 1 }, shadowFields(profile, PROFILE_MERGE_KEYS))) {
+    await pushProfile(profile, ownerId, 'bulk');
+  }
   if (shadows.length) await db.cloudShadows.bulkPut(shadows);
 }
 
@@ -436,17 +522,18 @@ async function pullRemote(ownerId: string, email: string | null) {
   if (!supabase) return;
   const client = supabase;
   const simple = SIMPLE_SYNC_TABLES;
-  const results = await Promise.all([
-    client.from('tasks').select('*'),
-    ...simple.map(spec => client.from(spec.name).select('*')),
+  // With no local merge base we must hydrate everything. Afterwards, retain
+  // the pull's start time as an inclusive cursor: changes made while a pull is
+  // in flight are safely seen on the next pass.
+  const hasMergeBase = (await db.cloudShadows.count()) > 0;
+  const updatedSince = hasMergeBase ? readSyncCursor(ownerId) : null;
+  const pullStartedAt = new Date().toISOString();
+  const [taskRows, simpleRows, profileRes] = await Promise.all([
+    fetchAllRemoteRows('tasks', updatedSince),
+    Promise.all(simple.map(spec => fetchAllRemoteRows(spec.name, updatedSince))),
     client.from('profiles').select('*').eq('id', ownerId).maybeSingle(),
   ]);
-  for (const result of results) {
-    if (result.error) throw result.error;
-  }
-  const tasksRes = results[0];
-  const simpleResults = results.slice(1, 1 + simple.length);
-  const profileRes = results[results.length - 1];
+  if (profileRes.error) throw profileRes.error;
   const shadowRows = await db.cloudShadows.toArray();
   const shadows = new Map(shadowRows.map(row => [row.id, row]));
 
@@ -457,7 +544,7 @@ async function pullRemote(ownerId: string, email: string | null) {
     const keys = SIMPLE_MERGE_KEYS[spec.name];
     const localRows = await spec.table.toArray() as Array<{ id: string; updated_at: string; version: number }>;
     const localById = new Map(localRows.map(row => [row.id, row]));
-    const remoteRows = ((simpleResults[index].data ?? []) as RemoteStamp[]).map(row => spec.fromRemote(row as never) as { id: string; updated_at: string; version: number });
+    const remoteRows = (simpleRows[index] as RemoteStamp[]).map(row => spec.fromRemote(row as never) as { id: string; updated_at: string; version: number });
     const remoteById = new Map(remoteRows.map(row => [row.id, row]));
     const merged: typeof localRows = [];
     for (const id of new Set([...localById.keys(), ...remoteById.keys()])) {
@@ -473,7 +560,7 @@ async function pullRemote(ownerId: string, email: string | null) {
 
   const localTasks = await db.tasks.toArray();
   const localById = new Map(localTasks.map(task => [task.id, task]));
-  const remoteTasks = (tasksRes.data ?? []) as RemoteTask[];
+  const remoteTasks = taskRows as RemoteTask[];
   const remoteTaskById = new Map(remoteTasks.map(row => [row.id, row]));
   const remoteProfileRow = profileRes.data as {
     nickname: string;
@@ -560,8 +647,9 @@ async function pullRemote(ownerId: string, email: string | null) {
     const nextProfile = liveProfile && isNewer(liveProfile, profile) ? liveProfile : profile;
     await db.profiles.put(nextProfile.email === email || !email ? nextProfile : { ...nextProfile, email });
     if (remoteShadows.length) await db.cloudShadows.bulkPut(remoteShadows);
-    await repairTasksInDeletedCategories();
+    await repairRowsWithDeletedParents();
   });
+  writeSyncCursor(ownerId, pullStartedAt);
 }
 
 async function clearLocalPlanner() {
@@ -569,6 +657,7 @@ async function clearLocalPlanner() {
     markApplyingRemote(trans);
     await Promise.all([...plannerWriteTables()].map(table => table.clear()));
   });
+  clearSyncCursor();
 }
 
 export function localAccountNeedsReset(userId: string) {
@@ -584,6 +673,7 @@ export function localAccountNeedsCloudHydration(userId: string) {
 export async function prepareLocalAccount(userId: string) {
   const storedOwner = localStorage.getItem(OWNER_KEY);
   if (storedOwner && storedOwner !== userId) await clearLocalPlanner();
+  if (!storedOwner) clearSyncCursor();
   localStorage.setItem(OWNER_KEY, userId);
 }
 

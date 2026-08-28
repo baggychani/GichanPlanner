@@ -36,6 +36,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const sawInitialSession = useRef(false);
   const pendingLoginSync = useRef(false);
 
+  const retrySync = () => {
+    setIsSyncing(true);
+    void syncPlannerWithCloud(() => setAccountReady(true))
+      .catch(() => {})
+      .finally(() => setIsSyncing(false));
+  };
+
   useEffect(() => {
     if (!supabase) {
       setIsLoading(false);
@@ -87,7 +94,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .catch(() => {})
         .finally(() => {
           if (cancelled) return;
-          setAccountReady(true);
           if (showStatus) setIsSyncing(false);
         });
     };
@@ -113,7 +119,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         accountReady,
         isSyncing,
         syncError,
-        retrySync: () => { void syncPlannerWithCloud().catch(() => {}); },
+        retrySync,
         isPasswordRecovery,
         clearPasswordRecovery: () => setIsPasswordRecovery(false),
       }}

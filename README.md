@@ -21,9 +21,24 @@
 - 라이브에는 `supabase/migrations/`를 **이름 순서대로**, 이미 넣은 파일은 건너뛰고 없는 것만 넣습니다. 빠진 것만 한 번에 맞추려면 `supabase/ADD_MISSING.sql`입니다.
 - `supabase/RESET.sql`은 실행하지 마세요. 예전에는 데이터를 전부 지웠고, 지금은 안내만 합니다. 개발용으로 표를 처음부터 다시 만들 때만 `supabase/DEV_RESET_WIPES_ALL.sql`을 씁니다.
 
-## Supabase에서 해야 하는 것
+## Supabase 자동 배포 설정
 
-SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합니다. 이미 넣은 파일은 건너뛰고, 없는 것만 넣으면 됩니다. 이미 쓰는 프로젝트면 `supabase/ADD_MISSING.sql` 한 번으로도 됩니다.
+`main`에 푸시하면 GitHub Actions가 **Supabase 마이그레이션 → 사이트 빌드 → GitHub Pages 배포** 순서로 실행합니다. 데이터베이스 변경에 실패하면 사이트는 배포하지 않습니다.
+
+GitHub 저장소 Settings → Secrets and variables → Actions에 아래 Secrets를 한 번 넣습니다.
+
+- `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY` — 웹 앱 로그인·동기화용
+- `SUPABASE_ACCESS_TOKEN` — Supabase Access Token (database 권한 포함)
+- `SUPABASE_PROJECT_REF` — `https://<여기>.supabase.co`의 `<여기>`
+- `SUPABASE_DB_PASSWORD` — 해당 Supabase 프로젝트의 데이터베이스 비밀번호
+
+기존처럼 SQL Editor에서 이미 아래 마이그레이션을 실행한 프로젝트는, Secrets를 넣은 뒤 GitHub Actions의 **Deploy GitHub Pages**를 한 번 수동 실행하고 `adopt_existing_schema`를 켭니다. 이 한 번의 등록은 이미 적용된 SQL을 다시 실행하지 않고 migration history에만 기록합니다. 그 다음부터는 `main` 푸시만 하면 새 SQL도 자동 적용됩니다.
+
+새 Supabase 프로젝트는 `adopt_existing_schema`를 켜지 않습니다. 첫 배포가 모든 마이그레이션을 순서대로 적용합니다.
+
+## 수동 Supabase 설정 (자동화 전용 대안)
+
+자동 배포를 아직 설정하지 않았다면 SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합니다. 이미 넣은 파일은 건너뛰고, 없는 것만 넣으면 됩니다. 이미 쓰는 프로젝트면 `supabase/ADD_MISSING.sql` 한 번으로도 됩니다.
 
 1. `20260820000000_initial_schema.sql`
 2. `20260820010000_deadline_due_time.sql`
@@ -33,6 +48,7 @@ SQL Editor에 `supabase/migrations/` 파일을 **이름 순서대로** 실행합
 6. `20260820150000_deadline_project.sql` ← 데드라인에 프로젝트 연결
 7. `20260820160000_planner_backups.sql` ← 계정 사본 저장. 없으면 설정에 사본 목록이 안 보입니다.
 8. `20260820170000_keep_newer_rows.sql` ← 더 옛 저장이 최근 완료·수정을 덮지 않게 합니다.
+9. `20260820180000_sync_read_indexes.sql` ← 할 일이 1,000개를 넘어도 새 기기에서 빠르게 전부 불러옵니다.
 
 Authentication → URL Configuration:
 
@@ -86,7 +102,7 @@ order by t.target_date, t.title;
 npm run build
 ```
 
-`main`에 푸시하면 GitHub Actions가 GitHub Pages로 배포합니다. `VITE_SUPABASE_URL`과 `VITE_SUPABASE_ANON_KEY`는 저장소 Secrets로 넣습니다.
+`main`에 푸시하면 GitHub Actions가 Supabase 마이그레이션을 먼저 적용한 뒤 GitHub Pages로 배포합니다.
 
 ## 스택
 

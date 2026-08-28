@@ -339,7 +339,10 @@ function PlannerApp() {
   };
 
   const requireLogin = () => {
-    if (isLoggedIn) return true;
+    if (isLoggedIn && accountReady) return true;
+    // A different account's local cache is cleared before its cloud data is
+    // hydrated. Do not let an empty, not-yet-hydrated screen create records.
+    if (isLoggedIn) return false;
     setIsQuickCreateMenuOpen(false);
     setIsDailyMenuOpen(false);
     setIsProfileOpen(true);

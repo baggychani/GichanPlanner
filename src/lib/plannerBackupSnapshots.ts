@@ -22,6 +22,14 @@ async function currentUserId() {
   return data.user?.id ?? null;
 }
 
+async function assertOwnedSnapshotPath(path: string) {
+  const ownerId = await currentUserId();
+  const filename = ownerId && path.startsWith(`${ownerId}/`) ? path.slice(ownerId.length + 1) : '';
+  if (!ownerId || !filename || filename.includes('/') || !filename.endsWith('.json')) {
+    throw new Error('이 계정의 사본만 읽을 수 있습니다.');
+  }
+}
+
 function isMissingBucket(error: { message?: string } | null) {
   const message = error?.message ?? '';
   return /bucket not found/i.test(message);
@@ -95,6 +103,7 @@ export async function maybeSavePlannerCloudSnapshot() {
 
 export async function readPlannerCloudSnapshot(path: string): Promise<PortablePlannerExport> {
   if (!supabase) throw new Error('로그인 설정이 되어 있지 않습니다.');
+  await assertOwnedSnapshotPath(path);
   const { data, error } = await supabase.storage.from(BUCKET).download(path);
   if (error || !data) throw error ?? new Error('사본을 읽지 못했습니다.');
   return parsePortablePlannerExport(await data.text());

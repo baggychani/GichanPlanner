@@ -4,6 +4,12 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      adopt_existing_schema:
+        description: '이미 SQL Editor로 적용한 기존 스키마를 Supabase migration history에 한 번만 등록합니다.'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -11,11 +17,40 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
-  cancel-in-progress: true
+  # Database migration is stateful. A later push must wait, not cancel a
+  # migration that may already be holding a database lock.
+  group: gichanplanner-production
+  cancel-in-progress: false
 
 jobs:
+  migrate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+      - name: Link production Supabase project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF" --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      - name: Adopt already-applied migrations once
+        if: github.event_name == 'workflow_dispatch' && inputs.adopt_existing_schema
+        run: |
+          supabase migration repair \
+            20260820000000 20260820010000 20260820020000 20260820030000 \
+            20260820140000 20260820150000 20260820160000 20260820170000 \
+            --status applied --linked --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      - name: Apply pending Supabase migrations
+        run: supabase db push --linked --password "$SUPABASE_DB_PASSWORD"
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
   build:
+    needs: migrate
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

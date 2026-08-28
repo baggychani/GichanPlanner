@@ -121,3 +121,11 @@ create trigger keep_newer_on_projects
   before update on public.projects
   for each row execute procedure public.keep_newer_planner_row();
 
+create index if not exists tasks_owner_id_id_idx on public.tasks (owner_id, id);
+create index if not exists schedules_owner_id_id_idx on public.schedules (owner_id, id);
+create index if not exists routines_owner_id_id_idx on public.routines (owner_id, id);
+create index if not exists domains_owner_id_id_idx on public.domains (owner_id, id);
+create index if not exists goals_owner_id_id_idx on public.goals (owner_id, id);
+create index if not exists deadlines_owner_id_id_idx on public.deadlines (owner_id, id);
+create index if not exists projects_owner_id_id_idx on public.projects (owner_id, id);
+

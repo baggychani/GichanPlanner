@@ -242,17 +242,28 @@ export async function reorderCategories(categories: Domain[], result: DropResult
 
 export async function deleteCategory(categoryId: string) {
   return runPlannerWrite(async () => {
-  await db.transaction('rw', db.tasks, db.domains, async () => {
+  await db.transaction('rw', [db.tasks, db.schedules, db.routines, db.domains, db.goals, db.projects], async () => {
     const now = new Date().toISOString();
-    const categoryTasks = await db.tasks.where('domain_id').equals(categoryId).toArray();
-    if (categoryTasks.length > 0) {
-      await db.tasks.bulkPut(categoryTasks.map(task => ({
+    const [categoryTasks, categorySchedules, categoryRoutines, categoryGoals, categoryProjects] = await Promise.all([
+      db.tasks.where('domain_id').equals(categoryId).toArray(),
+      db.schedules.filter(schedule => schedule.domain_id === categoryId && schedule.deleted_at === null).toArray(),
+      db.routines.filter(routine => routine.domain_id === categoryId && routine.deleted_at === null).toArray(),
+      db.goals.filter(goal => goal.domain_id === categoryId && goal.deleted_at === null).toArray(),
+      db.projects.filter(project => project.domain_id === categoryId && project.deleted_at === null).toArray(),
+    ]);
+    const activeTasks = categoryTasks.filter(task => task.deleted_at === null);
+    if (activeTasks.length > 0) {
+      await db.tasks.bulkPut(activeTasks.map(task => ({
         ...task,
         domain_id: null,
         updated_at: now,
         version: task.version + 1,
       })));
     }
+    if (categorySchedules.length > 0) await db.schedules.bulkPut(categorySchedules.map(schedule => ({ ...schedule, domain_id: null, updated_at: now, version: schedule.version + 1 })));
+    if (categoryRoutines.length > 0) await db.routines.bulkPut(categoryRoutines.map(routine => ({ ...routine, domain_id: null, updated_at: now, version: routine.version + 1 })));
+    if (categoryGoals.length > 0) await db.goals.bulkPut(categoryGoals.map(goal => ({ ...goal, domain_id: null, updated_at: now, version: goal.version + 1 })));
+    if (categoryProjects.length > 0) await db.projects.bulkPut(categoryProjects.map(project => ({ ...project, domain_id: null, updated_at: now, version: project.version + 1 })));
     const category = await db.domains.get(categoryId);
     if (category) await db.domains.put({ ...category, deleted_at: now, updated_at: now, version: category.version + 1 });
   });
@@ -267,16 +278,18 @@ export async function deleteProject(projectId: string) {
       db.tasks.where('project_id').equals(projectId).toArray(),
       db.deadlines.where('project_id').equals(projectId).toArray(),
     ]);
-    if (projectTasks.length > 0) {
-      await db.tasks.bulkPut(projectTasks.map(task => ({
+    const activeTasks = projectTasks.filter(task => task.deleted_at === null);
+    const activeDeadlines = projectDeadlines.filter(deadline => deadline.deleted_at === null);
+    if (activeTasks.length > 0) {
+      await db.tasks.bulkPut(activeTasks.map(task => ({
         ...task,
         project_id: null,
         updated_at: now,
         version: task.version + 1,
       })));
     }
-    if (projectDeadlines.length > 0) {
-      await db.deadlines.bulkPut(projectDeadlines.map(deadline => ({
+    if (activeDeadlines.length > 0) {
+      await db.deadlines.bulkPut(activeDeadlines.map(deadline => ({
         ...deadline,
         project_id: null,
         updated_at: now,
@@ -285,6 +298,27 @@ export async function deleteProject(projectId: string) {
     }
     const project = await db.projects.get(projectId);
     if (project) await db.projects.put({ ...project, deleted_at: now, updated_at: now, version: project.version + 1 });
+  });
+  });
+}
+
+export async function deleteGoal(goalId: string) {
+  return runPlannerWrite(async () => {
+  await db.transaction('rw', db.tasks, db.goals, async () => {
+    const now = new Date().toISOString();
+    const linkedTasks = await db.tasks.filter(task => task.goal_id === goalId && task.deleted_at === null).toArray();
+    if (linkedTasks.length > 0) {
+      await db.tasks.bulkPut(linkedTasks.map(task => ({
+        ...task,
+        goal_id: null,
+        updated_at: now,
+        version: task.version + 1,
+      })));
+    }
+    const goal = await db.goals.get(goalId);
+    if (goal && goal.deleted_at === null) {
+      await db.goals.put({ ...goal, deleted_at: now, updated_at: now, version: goal.version + 1 });
+    }
   });
   });
 }
