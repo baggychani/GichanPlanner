@@ -38,7 +38,24 @@ GitHub 저장소 → **Settings → Secrets and variables → Actions → Reposi
 | `SUPABASE_ACCESS_TOKEN` | GitHub Actions에서 Supabase CLI를 인증 | **직접 추가 필요** |
 | `SUPABASE_DB_PASSWORD` | `supabase db push`가 DB에 연결 | **직접 추가 필요** |
 
-`SUPABASE_ACCESS_TOKEN`은 Supabase Dashboard의 Account/Access Tokens에서 만든 토큰을 쓴다. `SUPABASE_DB_PASSWORD`는 **프로젝트 DB 비밀번호**이며 anon key나 서비스 역할 키가 아니다. 두 값은 한 번 표시된 뒤 다시 볼 수 없을 수 있으므로 비밀번호 관리자에 보관한다.
+### 두 값을 어디서 얻는가
+
+`SUPABASE_ACCESS_TOKEN`은 프로젝트가 아니라 **계정** 설정에 있다. <https://supabase.com/dashboard/account/tokens> → Generate new token. 생성 직후 한 번만 표시되므로 즉시 비밀번호 관리자에 넣는다.
+
+`SUPABASE_DB_PASSWORD`는 프로젝트를 만들 때 정한 **Postgres 비밀번호**다. anon key도 service role key도 아니다. Dashboard → Database → Settings의 `Database password` 항목(<https://supabase.com/dashboard/project/_/database/settings>)에 있다. 예전 경로 Project Settings → Database도 리다이렉트된다. 잊었으면 조회할 수 없고 `Reset password`로 새로 만드는 것뿐이다.
+
+DB 비밀번호를 재설정해도 **배포된 웹앱은 멈추지 않는다.** 웹앱은 `VITE_SUPABASE_ANON_KEY`로 HTTPS 통신하고 이 비밀번호를 쓰지 않는다. PostgREST/Realtime 등 Supabase 관리 서비스는 재설정 시 자동 갱신된다. 이 값을 쓰는 곳은 GitHub Actions 하나뿐이므로, 재설정했으면 위 secret만 새 값으로 갱신한다.
+
+두 값은 채팅·커밋·이슈·로그에 절대 붙여넣지 않는다. AI 에이전트에게도 값을 주지 않는다. 에이전트는 이름만 알면 된다.
+
+### 주의: Access Token 형식과 고정된 CLI 버전
+
+대시보드가 발급하는 새 형식 `sbp_v0_...`를 Supabase CLI가 거부하는 문제가 열려 있다([supabase/cli#6348](https://github.com/supabase/cli/issues/6348), 수정 PR [#6360](https://github.com/supabase/cli/pull/6360)). 2026-08-29 기준 이슈와 PR 모두 open이고 정식 릴리스에 포함되지 않았다. `pages.yml`은 CLI `2.101.0`을 고정하고 있으므로 새 형식 토큰을 넣으면 migrate job이 `LegacyInvalidAccessTokenError`로 실패한다.
+
+토큰을 만든 뒤 접두사만 확인한다. 값 전체를 볼 필요는 없다.
+
+- `sbp_` 뒤에 바로 문자·숫자가 오는 예전 형식이면 그대로 쓴다.
+- `sbp_v0_`로 시작하면 CLI 고정 버전을 올려야 한다. 이것은 운영 DB 동작에 영향을 주는 변경이므로 임의로 `latest`로 바꾸지 않고, 수정이 정식 릴리스에 들어간 뒤 리뷰된 PR에서 버전을 올린다. 그때까지 migrate 실패는 예상된 결과다.
 
 이 두 Secrets가 없는 상태에서 PR을 merge하면 새 GitHub Action은 마이그레이션 단계에서 실패하고, 의도대로 Pages 배포도 멈춘다. 앱 데이터가 망가지지는 않지만 새 사이트는 배포되지 않는다.
 
