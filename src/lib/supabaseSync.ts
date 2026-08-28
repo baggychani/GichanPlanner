@@ -193,14 +193,16 @@ async function fetchAllRemoteRows(table: PlannerSyncTable, updatedSince: string 
   if (!supabase) return [];
   const rows: object[] = [];
   for (let start = 0; ; start += REMOTE_READ_PAGE_SIZE) {
-    const request = supabase
+    const source = supabase
       .from(table)
-      .select('*')
-      .order('id', { ascending: true })
-      .range(start, start + REMOTE_READ_PAGE_SIZE - 1);
-    const { data, error } = updatedSince
-      ? await request.gte('updated_at', updatedSince)
-      : await request;
+      .select('*');
+    // Initial hydration walks a stable id index. Delta hydration starts at the
+    // timestamp cursor, which uses the owner_id/updated_at/id index added in
+    // the production migration.
+    const request = updatedSince
+      ? source.gte('updated_at', updatedSince).order('updated_at', { ascending: true }).order('id', { ascending: true })
+      : source.order('id', { ascending: true });
+    const { data, error } = await request.range(start, start + REMOTE_READ_PAGE_SIZE - 1);
     if (error) throw error;
     const page = data ?? [];
     rows.push(...page);
