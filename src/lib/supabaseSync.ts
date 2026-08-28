@@ -91,8 +91,22 @@ export async function runPlannerWrite<T>(op: () => Promise<T>): Promise<T> {
   }
 }
 
-function whenCommitted(trans: Transaction, work: () => Promise<void>) {
-  trans.on('complete', () => { void enqueue(work); });
+// A hook callback runs after its transaction commits, so the signed-in account
+// can already have changed by then. Capturing the owner while the hook is still
+// running keeps a row produced under one account from being pushed with another
+// account's token, which would copy that row into the wrong planner.
+function whenCommitted(trans: Transaction, work: (ownerId: string) => Promise<void>) {
+  const ownerAtWrite = localStorage.getItem(OWNER_KEY);
+  trans.on('complete', () => {
+    void enqueue(async () => {
+      const ownerId = await currentUserId();
+      if (!ownerId || ownerId !== ownerAtWrite) return;
+      // The session and the local planner owner must agree. Between them the
+      // local data has already been cleared and rehydrated for the new account.
+      if (localStorage.getItem(OWNER_KEY) !== ownerId) return;
+      await work(ownerId);
+    });
+  });
 }
 
 async function currentUserId() {
@@ -758,52 +772,46 @@ export function installPlannerSync() {
 
   db.tasks.hook('creating', (_key, _obj, trans) => {
     if (skipCloudPush(trans)) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
+    whenCommitted(trans, async ownerId => {
       const row = await db.tasks.get(_key);
-      if (ownerId && row) await pushTask(row, ownerId, 'user');
+      if (row) await pushTask(row, ownerId, 'user');
     });
   });
   db.tasks.hook('updating', (_mods, primKey, _obj, trans) => {
     if (skipCloudPush(trans)) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
+    whenCommitted(trans, async ownerId => {
       const row = await db.tasks.get(primKey);
-      if (ownerId && row) await pushTask(row, ownerId, 'user');
+      if (row) await pushTask(row, ownerId, 'user');
     });
   });
   for (const spec of SIMPLE_SYNC_TABLES) {
     spec.table.hook('creating', (_key, _obj, trans) => {
       if (skipCloudPush(trans)) return;
-      whenCommitted(trans, async () => {
-        const ownerId = await currentUserId();
+      whenCommitted(trans, async ownerId => {
         const row = await spec.table.get(_key);
-        if (ownerId && row) await pushSimpleRow(spec, row as { id: string; updated_at: string; version: number }, ownerId, 'user');
+        if (row) await pushSimpleRow(spec, row as { id: string; updated_at: string; version: number }, ownerId, 'user');
       });
     });
     spec.table.hook('updating', (_mods, primKey, _obj, trans) => {
       if (skipCloudPush(trans)) return;
-      whenCommitted(trans, async () => {
-        const ownerId = await currentUserId();
+      whenCommitted(trans, async ownerId => {
         const row = await spec.table.get(primKey);
-        if (ownerId && row) await pushSimpleRow(spec, row as { id: string; updated_at: string; version: number }, ownerId, 'user');
+        if (row) await pushSimpleRow(spec, row as { id: string; updated_at: string; version: number }, ownerId, 'user');
       });
     });
   }
   db.profiles.hook('creating', (_key, _obj, trans) => {
     if (skipCloudPush(trans)) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
+    whenCommitted(trans, async ownerId => {
       const row = await db.profiles.get(_key);
-      if (ownerId && row) await pushProfile(row, ownerId);
+      if (row) await pushProfile(row, ownerId);
     });
   });
   db.profiles.hook('updating', (_mods, primKey, _obj, trans) => {
     if (skipCloudPush(trans)) return;
-    whenCommitted(trans, async () => {
-      const ownerId = await currentUserId();
+    whenCommitted(trans, async ownerId => {
       const row = await db.profiles.get(primKey);
-      if (ownerId && row) await pushProfile(row, ownerId);
+      if (row) await pushProfile(row, ownerId);
     });
   });
 }
