@@ -71,14 +71,20 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
     });
   }, [accountEmail, openedLoggedIn]);
 
-  const saveProfile = async (avatar = profile?.avatar ?? null) => {
+  const saveProfile = async ({
+    avatar = profile?.avatar ?? null,
+    avatarPath = profile?.avatar_path ?? null,
+  }: {
+    avatar?: Blob | null;
+    avatarPath?: string | null;
+  } = {}) => {
     if (!nickname.trim()) return;
     const now = new Date().toISOString();
     await runPlannerWrite(() => db.profiles.put({
       id: '#profile',
       nickname: nickname.trim(),
       avatar,
-      avatar_path: avatar ? profile?.avatar_path : null,
+      avatar_path: avatar ? avatarPath : null,
       legacy_dexie_user_id: profile?.legacy_dexie_user_id ?? null,
       email: accountEmail || profile?.email || null,
       birthday_month: birthdayMonth,
@@ -279,7 +285,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
           onClose={() => setCroppingFile(null)}
           onSave={image => {
             setCroppingFile(null);
-            void saveProfile(image).then(
+            void saveProfile({ avatar: image, avatarPath: null }).then(
               () => setToast('프로필 사진을 저장했습니다.'),
               caught => setToast(authErrorMessage(caught)),
             );

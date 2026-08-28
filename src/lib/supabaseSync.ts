@@ -34,6 +34,11 @@ const SYNC_CURSOR_KEY = 'gichanplan-sync-cursor';
 // PostgREST returns at most 1,000 rows by default. Keep reads paged so a
 // long-lived planner can still be fully hydrated on a new device.
 const REMOTE_READ_PAGE_SIZE = 1_000;
+// The fast path is an updated_at delta, but timestamps originate on devices.
+// A bounded full pass prevents a badly skewed device clock from making a
+// remote edit invisible forever while a server-issued change sequence is not
+// available yet.
+const FULL_RECONCILIATION_INTERVAL_MS = 24 * 60 * 60 * 1_000;
 
 let hooksInstalled = false;
 let syncChain: Promise<void> = Promise.resolve();
@@ -99,24 +104,25 @@ async function currentUserId() {
 async function uploadBlob(bucket: 'profile-images' | 'task-images', path: string, blob: Blob) {
   if (!supabase) return null;
   const { error } = await supabase.storage.from(bucket).upload(path, blob, {
-    upsert: true,
+    // New image paths are immutable. Besides preventing stale CDN/browser
+    // caches, this makes a changed image observable by other devices.
+    upsert: false,
     contentType: blob.type || 'image/webp',
   });
   if (error) throw error;
   return path;
 }
 
-async function removeStorageObjects(bucket: 'profile-images' | 'task-images', paths: string[]) {
-  if (!supabase || paths.length === 0) return;
-  await supabase.storage.from(bucket).remove(paths);
+function imageExtension(blob: Blob) {
+  return blob.type === 'image/png' ? 'png' : blob.type === 'image/jpeg' ? 'jpg' : 'webp';
 }
 
-function taskImagePaths(ownerId: string, taskId: string) {
-  return [`${ownerId}/${taskId}.webp`, `${ownerId}/${taskId}.png`, `${ownerId}/${taskId}.jpg`];
+function newTaskImagePath(ownerId: string, taskId: string, blob: Blob) {
+  return `${ownerId}/tasks/${taskId}/${crypto.randomUUID()}.${imageExtension(blob)}`;
 }
 
-function avatarPaths(ownerId: string) {
-  return [`${ownerId}/avatar.webp`, `${ownerId}/avatar.png`, `${ownerId}/avatar.jpg`];
+function newAvatarPath(ownerId: string, blob: Blob) {
+  return `${ownerId}/avatars/${crypto.randomUUID()}.${imageExtension(blob)}`;
 }
 
 async function downloadBlob(bucket: 'profile-images' | 'task-images', path: string | null) {
@@ -173,16 +179,21 @@ function readSyncCursor(ownerId: string) {
   try {
     const stored = localStorage.getItem(SYNC_CURSOR_KEY);
     if (!stored) return null;
-    const value = JSON.parse(stored) as { ownerId?: unknown; updatedSince?: unknown };
+    const value = JSON.parse(stored) as { ownerId?: unknown; updatedSince?: unknown; fullReconciledAt?: unknown };
     if (value.ownerId !== ownerId || typeof value.updatedSince !== 'string' || Number.isNaN(Date.parse(value.updatedSince))) return null;
-    return value.updatedSince;
+    return {
+      updatedSince: value.updatedSince,
+      fullReconciledAt: typeof value.fullReconciledAt === 'string' && !Number.isNaN(Date.parse(value.fullReconciledAt))
+        ? value.fullReconciledAt
+        : null,
+    };
   } catch {
     return null;
   }
 }
 
-function writeSyncCursor(ownerId: string, updatedSince: string) {
-  localStorage.setItem(SYNC_CURSOR_KEY, JSON.stringify({ ownerId, updatedSince }));
+function writeSyncCursor(ownerId: string, updatedSince: string, fullReconciledAt: string) {
+  localStorage.setItem(SYNC_CURSOR_KEY, JSON.stringify({ ownerId, updatedSince, fullReconciledAt }));
 }
 
 function clearSyncCursor() {
@@ -301,7 +312,12 @@ function keepNewerLocal<T extends { id: string; updated_at: string; version?: nu
 function mergeTask(base: Task | undefined, local: Task, remote: Task, domains: Domain[]) {
   const merged = threeWayMerge(base, local, remote, TASK_MERGE_KEYS);
   merged.created_at = earlierCreatedAt(local.created_at, remote.created_at);
-  merged.image_blob = pickTaskImageBlob(merged.image_path, local, remote);
+  // A just-selected local image deliberately clears image_path until its
+  // immutable Storage object has been uploaded. Preserve that pending blob
+  // through a row merge instead of mistaking it for an image removal.
+  merged.image_blob = merged.image_path == null && local.image_path == null && local.image_blob
+    ? local.image_blob
+    : pickTaskImageBlob(merged.image_path, local, remote);
   merged.image_data = null;
   return preserveDomainIfCleared(preserveDomainIfCleared(merged, local, domains), remote, domains);
 }
@@ -312,7 +328,9 @@ function mergeProfile(base: Profile | undefined, local: Profile, remote: Profile
     ...merged,
     id: '#profile',
     created_at: earlierCreatedAt(local.created_at, remote.created_at),
-    avatar: pickProfileAvatar(merged.avatar_path, local, remote),
+    avatar: merged.avatar_path == null && local.avatar_path == null && local.avatar
+      ? local.avatar
+      : pickProfileAvatar(merged.avatar_path, local, remote),
     legacy_dexie_user_id: local.legacy_dexie_user_id ?? remote.legacy_dexie_user_id,
     email: email ?? local.email ?? remote.email,
   };
@@ -361,15 +379,14 @@ async function rememberShadows() {
   if (shadows.length) await db.cloudShadows.bulkPut(shadows);
 }
 
-async function resolveTaskImagePath(task: Task, ownerId: string, mode: 'user' | 'bulk') {
-  if (task.image_blob) {
-    const extension = task.image_blob.type === 'image/png' ? 'png' : task.image_blob.type === 'image/jpeg' ? 'jpg' : 'webp';
-    const path = await uploadBlob('task-images', `${ownerId}/${task.id}.${extension}`, task.image_blob);
-    if (mode === 'user') await removeStorageObjects('task-images', taskImagePaths(ownerId, task.id).filter(candidate => candidate !== path));
+async function resolveTaskImagePath(task: Task, ownerId: string) {
+  if (task.image_blob && task.image_path == null) {
+    const path = await uploadBlob('task-images', newTaskImagePath(ownerId, task.id, task.image_blob), task.image_blob);
     return { path, omit: false as const };
   }
   if (task.image_path === null) {
-    if (mode === 'user') await removeStorageObjects('task-images', taskImagePaths(ownerId, task.id));
+    // Do not immediately remove the previous object. Another device can still
+    // be reading the old row. A server-side, age-based orphan cleanup is safer.
     return { path: null, omit: false as const };
   }
   if (task.image_path) return { path: task.image_path, omit: false as const };
@@ -410,7 +427,7 @@ async function pushTask(task: Task, ownerId: string, mode: 'user' | 'bulk') {
       }
     }
   }
-  const image = await resolveTaskImagePath(next, ownerId, mode);
+  const image = await resolveTaskImagePath(next, ownerId);
   const row = taskRow(next, ownerId, image.path);
   if (image.omit) delete (row as { image_path?: string | null }).image_path;
   await upsertRows('tasks', [row]);
@@ -419,7 +436,7 @@ async function pushTask(task: Task, ownerId: string, mode: 'user' | 'bulk') {
   await writeShadow('tasks', stored, shadowFields(stored, TASK_MERGE_KEYS));
 }
 
-async function pushProfile(profile: Profile, ownerId: string, mode: 'user' | 'bulk') {
+async function pushProfile(profile: Profile, ownerId: string) {
   if (!supabase) return;
   const payload: {
     id: string;
@@ -435,15 +452,10 @@ async function pushProfile(profile: Profile, ownerId: string, mode: 'user' | 'bu
     birthday_day: profile.birthday_day,
     updated_at: profile.updated_at,
   };
-  if (profile.avatar) {
-    const extension = profile.avatar.type === 'image/png' ? 'png' : profile.avatar.type === 'image/jpeg' ? 'jpg' : 'webp';
-    payload.avatar_path = await uploadBlob('profile-images', `${ownerId}/avatar.${extension}`, profile.avatar);
-    if (mode === 'user') {
-      await removeStorageObjects('profile-images', avatarPaths(ownerId).filter(path => path !== payload.avatar_path));
-    }
+  if (profile.avatar && profile.avatar_path == null) {
+    payload.avatar_path = await uploadBlob('profile-images', newAvatarPath(ownerId, profile.avatar), profile.avatar);
   } else if (profile.avatar_path === null) {
     payload.avatar_path = null;
-    if (mode === 'user') await removeStorageObjects('profile-images', avatarPaths(ownerId));
   } else if (profile.avatar_path) {
     payload.avatar_path = profile.avatar_path;
   }
@@ -492,7 +504,7 @@ async function pushAllLocal(ownerId: string) {
     return !shadow || isNewer(row, shadow) || shadow.body !== JSON.stringify(fields);
   };
   const changedTasks = tasks.filter(task => needsPush('tasks', task, shadowFields(task, TASK_MERGE_KEYS)));
-  const resolved = await mapPool(changedTasks, 4, async task => ({ task, image: await resolveTaskImagePath(task, ownerId, 'bulk') }));
+  const resolved = await mapPool(changedTasks, 4, async task => ({ task, image: await resolveTaskImagePath(task, ownerId) }));
   await mapPool(
     resolved.filter(({ task, image }) => !image.omit && image.path !== task.image_path),
     4,
@@ -516,7 +528,7 @@ async function pushAllLocal(ownerId: string) {
     }
   }
   if (profile && needsPush('profiles', { ...profile, version: 1 }, shadowFields(profile, PROFILE_MERGE_KEYS))) {
-    await pushProfile(profile, ownerId, 'bulk');
+    await pushProfile(profile, ownerId);
   }
   if (shadows.length) await db.cloudShadows.bulkPut(shadows);
 }
@@ -529,7 +541,11 @@ async function pullRemote(ownerId: string, email: string | null) {
   // the pull's start time as an inclusive cursor: changes made while a pull is
   // in flight are safely seen on the next pass.
   const hasMergeBase = (await db.cloudShadows.count()) > 0;
-  const updatedSince = hasMergeBase ? readSyncCursor(ownerId) : null;
+  const cursor = hasMergeBase ? readSyncCursor(ownerId) : null;
+  const needsFullReconciliation = !cursor
+    || !cursor.fullReconciledAt
+    || Date.now() - Date.parse(cursor.fullReconciledAt) >= FULL_RECONCILIATION_INTERVAL_MS;
+  const updatedSince = hasMergeBase && !needsFullReconciliation ? cursor.updatedSince : null;
   const pullStartedAt = new Date().toISOString();
   const [taskRows, simpleRows, profileRes] = await Promise.all([
     fetchAllRemoteRows('tasks', updatedSince),
@@ -652,7 +668,7 @@ async function pullRemote(ownerId: string, email: string | null) {
     if (remoteShadows.length) await db.cloudShadows.bulkPut(remoteShadows);
     await repairRowsWithDeletedParents();
   });
-  writeSyncCursor(ownerId, pullStartedAt);
+  writeSyncCursor(ownerId, pullStartedAt, updatedSince === null ? pullStartedAt : cursor!.fullReconciledAt!);
 }
 
 async function clearLocalPlanner() {
@@ -779,7 +795,7 @@ export function installPlannerSync() {
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.profiles.get(_key);
-      if (ownerId && row) await pushProfile(row, ownerId, 'user');
+      if (ownerId && row) await pushProfile(row, ownerId);
     });
   });
   db.profiles.hook('updating', (_mods, primKey, _obj, trans) => {
@@ -787,7 +803,7 @@ export function installPlannerSync() {
     whenCommitted(trans, async () => {
       const ownerId = await currentUserId();
       const row = await db.profiles.get(primKey);
-      if (ownerId && row) await pushProfile(row, ownerId, 'user');
+      if (ownerId && row) await pushProfile(row, ownerId);
     });
   });
 }

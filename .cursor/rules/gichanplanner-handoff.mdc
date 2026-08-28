@@ -1,0 +1,14 @@
+---
+description: "Persistent GichanPlanner architecture, production safety, and handoff rules for every Cursor Agent task."
+alwaysApply: true
+---
+
+Read `AGENTS.md`, `CURSOR_HANDOFF.md`, and `AFTER_CODEX.md` before making substantial changes.
+
+- This is a React/TypeScript personal planner with Dexie offline storage and Supabase Auth/Postgres/Storage/Realtime sync.
+- Protect data and owner boundaries. Never expose or commit secret values.
+- Production migrations are append-only. Never use reset/wipe commands on the live project.
+- Run `npm run lint`, `npm run build`, and `git diff --check` after code, migration, workflow, or PWA changes.
+- Treat `src/lib/supabaseSync.ts`, `src/lib/plannerMerge.ts`, `supabase/migrations/`, and `.github/workflows/pages.yml` as high-risk files: explain the synchronization/deployment consequence and preserve backwards compatibility.
+- Task/profile images must receive immutable Storage paths when changed. The service worker must cache only static same-origin app shell/assets, never Supabase/Auth/Storage data.
+- Ask the user before any production secret change, destructive DB/Storage action, PR merge, or deployment migration repair.

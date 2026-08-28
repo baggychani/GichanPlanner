@@ -1,0 +1,19 @@
+{
+  "name": "기찬플랜",
+  "short_name": "기찬플랜",
+  "description": "할 일, 일정, 목표, 데드라인을 한곳에서 관리하는 개인 플래너",
+  "lang": "ko",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f8f7ff",
+  "theme_color": "#863bff",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

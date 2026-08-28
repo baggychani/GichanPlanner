@@ -85,7 +85,7 @@ export function DeadlineCreateModal({
 }: DeadlineCreateModalProps) {
   return (
     <Overlay onEscape={onClose}>
-      <div className="flex max-h-[90vh] w-[440px] flex-col rounded-3xl bg-surface shadow-xl">
+      <div className="flex max-h-[90vh] w-full max-w-[440px] flex-col rounded-3xl bg-surface shadow-xl">
         <div className="flex shrink-0 items-center justify-between p-6 pb-4">
           <div className="flex items-center gap-2 text-red-500"><AlertCircle size={20} /><h3 className="text-lg font-medium text-fg">데드라인 만들기</h3></div>
           <button onClick={onClose} aria-label="데드라인 만들기 닫기" className="rounded-full p-1 text-fg-subtle hover:bg-surface-hover hover:text-fg"><X size={20} /></button>
@@ -164,7 +164,7 @@ export function DeadlineEditModal({
   };
   return (
     <Overlay onEscape={requestClose}>
-      <div className="flex max-h-[90vh] w-[440px] flex-col rounded-3xl bg-surface shadow-xl">
+      <div className="flex max-h-[90vh] w-full max-w-[440px] flex-col rounded-3xl bg-surface shadow-xl">
         <div className="flex shrink-0 items-center justify-between p-6 pb-4">
           <div className="flex items-center gap-2 text-red-500"><AlertCircle size={20} /><h3 className="text-lg font-medium text-fg">데드라인 상세</h3></div>
           <button onClick={requestClose} aria-label="데드라인 상세 닫기" className="rounded-full p-1 text-fg-subtle hover:bg-surface-hover hover:text-fg"><X size={20} /></button>

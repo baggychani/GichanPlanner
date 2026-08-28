@@ -65,7 +65,9 @@ export function TaskEditModal({
     setImageError(null);
     try {
       const image_blob = await compressImage(file);
-      onChange({ ...task, image_blob, image_data: null });
+      // A replacement must receive a new immutable Storage path during sync.
+      // Keeping the old path would make other devices reuse their old blob.
+      onChange({ ...task, image_blob, image_data: null, image_path: null });
     } catch {
       setImageError('사진을 압축하지 못했습니다. 다른 이미지 파일을 선택해 주세요.');
     }
