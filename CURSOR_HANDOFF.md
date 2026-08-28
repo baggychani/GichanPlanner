@@ -9,7 +9,8 @@
 - 작업 브랜치: `production-foundation`
 - 검토할 Draft PR: [#4 동기화 확장성 및 배포 자동화 기반](https://github.com/baggychani/GichanPlanner/pull/4)
 - PR base: `main`. 에이전트가 임의로 merge/Ready for review 하지 않는다.
-- 최근 기반 커밋: `e2eace5` (동기화/백업 안전성), `85ccca9` (Realtime), `494ff7c` (증분 sync 인덱스). 이 파일이 있는 작업의 새 변경은 PR #4에 이어서 커밋한다.
+- 최신 인수인계 커밋: `e0347a3` (PWA, immutable image sync, Cursor handoff).
+- 그 이전 기반 커밋: `e2eace5` (동기화/백업 안전성), `85ccca9` (Realtime), `494ff7c` (증분 sync 인덱스). 후속 변경은 PR #4에 이어서 새 커밋으로 남긴다.
 
 작업 전에는 항상 `git status --short`, `git log --oneline -6`, `git diff`를 확인한다. 다른 사람이 만든 변경을 되돌리거나 넓은 reset/checkout을 하지 않는다.
 
