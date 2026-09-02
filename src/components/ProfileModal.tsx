@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
-import { Camera, ChevronLeft, LogOut, UserRound, X, Calendar as CalendarIcon } from 'lucide-react';
+import { Camera, ChevronLeft, LogOut, UserRound, UsersRound, X, Calendar as CalendarIcon } from 'lucide-react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import clsx from 'clsx';
 import { AvatarCropDialog } from './AvatarCropDialog';
 import { Overlay } from './Overlay';
+import { PartnerLinkModal } from './PartnerLinkModal';
 import { db } from '../lib/db';
 import { useAuth } from '../hooks/useAuth';
 import { supabase } from '../lib/supabase';
@@ -17,6 +18,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
   const [openedLoggedIn, setOpenedLoggedIn] = useState<boolean | null>(() => (isLoading ? null : Boolean(session)));
   const profile = useLiveQuery(() => db.profiles.get('#profile'));
   const [view, setView] = useState<'profile' | 'password'>('profile');
+  const [isPartnerModalOpen, setIsPartnerModalOpen] = useState(false);
   const [nickname, setNickname] = useState('');
   const [birthdayMonth, setBirthdayMonth] = useState<number | null>(null);
   const [birthdayDay, setBirthdayDay] = useState<number | null>(null);
@@ -240,6 +242,14 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
             <div className="mt-6 border-t border-line pt-2">
               <button
                 type="button"
+                onClick={() => setIsPartnerModalOpen(true)}
+                className="flex w-full items-center justify-between rounded-xl px-1 py-3 text-[15px] font-medium text-fg hover:bg-surface-muted"
+              >
+                <span className="flex items-center gap-2"><UsersRound size={16} strokeWidth={1.75} />파트너 연결</span>
+                <ChevronLeft size={18} className="rotate-180 text-fg-subtle" />
+              </button>
+              <button
+                type="button"
                 onClick={() => { setView('password'); setError(null); }}
                 className="flex w-full items-center justify-between rounded-xl px-1 py-3 text-[15px] font-medium text-fg hover:bg-surface-muted"
               >
@@ -311,6 +321,7 @@ export function ProfileModal({ onClose }: { onClose: () => void }) {
           }}
         />
       )}
+      {isPartnerModalOpen && <PartnerLinkModal onClose={() => setIsPartnerModalOpen(false)} />}
     </Overlay>
   );
 }
