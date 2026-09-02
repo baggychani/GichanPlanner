@@ -1,4 +1,5 @@
 import { db, type Deadline, type Domain, type Goal, type Profile, type Project, type Routine, type Schedule, type Task } from './db';
+import { isNewer } from './plannerMerge';
 import { validatePortablePlannerExport, type PortableAttachment, type PortablePlannerExport } from './portablePlannerExport';
 import { supabase } from './supabase';
 import { syncPlannerWithCloud, waitForPlannerCloud } from './supabaseSync';
@@ -11,13 +12,6 @@ function attachmentToBlob(attachment: PortableAttachment) {
   const binary = atob(attachment.base64);
   const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
   return new Blob([bytes], { type: attachment.mimeType });
-}
-
-function isNewer(candidate: { updated_at: string; version?: number }, current: { updated_at: string; version?: number }) {
-  const candidateTime = Date.parse(candidate.updated_at);
-  const currentTime = Date.parse(current.updated_at);
-  if (candidateTime !== currentTime) return candidateTime > currentTime;
-  return (candidate.version ?? 0) > (current.version ?? 0);
 }
 
 async function takeNewer<T extends { id: string; updated_at: string; version: number }>(

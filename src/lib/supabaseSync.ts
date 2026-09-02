@@ -27,6 +27,7 @@ import {
   type RemoteTask,
 } from './plannerSyncSchema';
 import { maybeSavePlannerCloudSnapshot } from './plannerBackupSnapshots';
+import { maybeCleanupOrphanedImages } from './imageCleanup';
 import { supabase } from './supabase';
 
 const OWNER_KEY = 'gichanplan-sync-owner';
@@ -180,13 +181,20 @@ function localHasImage(localPath: string | null | undefined, localBlob: Blob | n
   return Boolean(remotePath && localBlob && localPath === remotePath);
 }
 
-async function upsertRows(table: PlannerSyncTable, rows: object[]) {
-  if (!supabase || rows.length === 0) return;
+// Returns the ids the server actually wrote. A row the keep-newer-row trigger
+// silently skipped (its incoming value was stale) is absent from `data` even
+// though the request itself succeeds, since upsert requests a representation
+// of the rows it touched.
+async function upsertRows(table: PlannerSyncTable, rows: object[]): Promise<Set<string>> {
+  const written = new Set<string>();
+  if (!supabase || rows.length === 0) return written;
   for (let offset = 0; offset < rows.length; offset += 250) {
     const chunk = rows.slice(offset, offset + 250);
-    const { error } = await supabase.from(table).upsert(chunk, { onConflict: 'id' });
+    const { data, error } = await supabase.from(table).upsert(chunk, { onConflict: 'id' }).select('id');
     if (error) throw error;
+    for (const row of (data ?? []) as Array<{ id: string }>) written.add(row.id);
   }
+  return written;
 }
 
 function readSyncCursor(ownerId: string) {
@@ -323,7 +331,7 @@ function keepNewerLocal<T extends { id: string; updated_at: string; version?: nu
   return [...byId.values()];
 }
 
-function mergeTask(base: Task | undefined, local: Task, remote: Task, domains: Domain[]) {
+function mergeTask(base: Task | undefined, local: Task, remote: Task, domains: Domain[], options: { trustLocalIntent?: boolean } = {}) {
   const merged = threeWayMerge(base, local, remote, TASK_MERGE_KEYS);
   merged.created_at = earlierCreatedAt(local.created_at, remote.created_at);
   // A just-selected local image deliberately clears image_path until its
@@ -333,7 +341,14 @@ function mergeTask(base: Task | undefined, local: Task, remote: Task, domains: D
     ? local.image_blob
     : pickTaskImageBlob(merged.image_path, local, remote);
   merged.image_data = null;
-  return preserveDomainIfCleared(preserveDomainIfCleared(merged, local, domains), remote, domains);
+  const withLocalGuard = preserveDomainIfCleared(merged, local, domains);
+  // When this merge is resolving a push of a change local just made, local's
+  // own domain_id is the authoritative, freshly-authored intent (e.g. the user
+  // deliberately cleared the category). Comparing it against remote's
+  // not-yet-updated copy would otherwise indistinguishably look like the
+  // stale-row race below and silently revert the user's own edit.
+  if (options.trustLocalIntent) return withLocalGuard;
+  return preserveDomainIfCleared(withLocalGuard, remote, domains);
 }
 
 function mergeProfile(base: Profile | undefined, local: Profile, remote: Profile, email: string | null): Profile {
@@ -421,24 +436,22 @@ async function fetchRemoteTask(taskId: string): Promise<RemoteTask | null> {
   return (data as RemoteTask | null) ?? null;
 }
 
-async function pushTask(task: Task, ownerId: string, mode: 'user' | 'bulk') {
+async function pushTask(task: Task, ownerId: string) {
   let next = task;
-  if (mode === 'user') {
-    const remote = await fetchRemoteTask(task.id);
-    if (remote) {
-      const downloaded = remote.image_path && remote.image_path !== task.image_path
-        ? await downloadBlob('task-images', remote.image_path)
-        : null;
-      const remoteTask = taskFromRemote(remote, downloaded ?? (remote.image_path === task.image_path ? task.image_blob ?? null : null));
-      const base = rowFromShadow<Task>(await db.cloudShadows.get(`tasks:${task.id}`), task.id);
-      const domains = await db.domains.toArray();
-      next = mergeTask(base, task, remoteTask, domains);
-      if (next.updated_at !== task.updated_at || next.version !== task.version) {
-        await db.transaction('rw', db.tasks, async trans => {
-          markApplyingRemote(trans);
-          await db.tasks.put(next);
-        });
-      }
+  const remote = await fetchRemoteTask(task.id);
+  if (remote) {
+    const downloaded = remote.image_path && remote.image_path !== task.image_path
+      ? await downloadBlob('task-images', remote.image_path)
+      : null;
+    const remoteTask = taskFromRemote(remote, downloaded ?? (remote.image_path === task.image_path ? task.image_blob ?? null : null));
+    const base = rowFromShadow<Task>(await db.cloudShadows.get(`tasks:${task.id}`), task.id);
+    const domains = await db.domains.toArray();
+    next = mergeTask(base, task, remoteTask, domains, { trustLocalIntent: true });
+    if (next.updated_at !== task.updated_at || next.version !== task.version) {
+      await db.transaction('rw', db.tasks, async trans => {
+        markApplyingRemote(trans);
+        await db.tasks.put(next);
+      });
     }
   }
   const image = await resolveTaskImagePath(next, ownerId);
@@ -488,10 +501,9 @@ async function pushSimpleRow(
   spec: (typeof SIMPLE_SYNC_TABLES)[number],
   local: { id: string; updated_at: string; version: number },
   ownerId: string,
-  mode: 'user' | 'bulk',
 ) {
   let next = local;
-  if (mode === 'user' && supabase) {
+  if (supabase) {
     const { data, error } = await supabase.from(spec.name).select('*').eq('id', local.id).maybeSingle();
     if (error) throw error;
     if (data) {
@@ -524,22 +536,37 @@ async function pushAllLocal(ownerId: string) {
     4,
     ({ task, image }) => persistTaskImagePath(task.id, image.path),
   );
-  await upsertRows('tasks', resolved.map(({ task, image }) => {
+  const writtenTaskIds = await upsertRows('tasks', resolved.map(({ task, image }) => {
     const row = taskRow(task, ownerId, image.path);
     if (image.omit) delete (row as { image_path?: string | null }).image_path;
     return row;
   }));
-  const shadows: CloudShadow[] = resolved.map(({ task, image }) => {
+  const shadows: CloudShadow[] = [];
+  const rejectedTasks: Task[] = [];
+  for (const { task, image } of resolved) {
+    if (!writtenTaskIds.has(task.id)) { rejectedTasks.push(task); continue; }
     const stored = { ...task, image_path: image.omit ? task.image_path : image.path };
-    return shadowRecord('tasks', stored, shadowFields(stored, TASK_MERGE_KEYS));
+    shadows.push(shadowRecord('tasks', stored, shadowFields(stored, TASK_MERGE_KEYS)));
+  }
+  // A row the keep-newer-row trigger silently skipped means another device
+  // already pushed something newer for it. Route just that row through the
+  // safe fetch-merge-push path instead of recording a shadow for a write that
+  // never actually landed. Re-read from Dexie first: an image already
+  // resolved to a Storage path above should not be uploaded a second time.
+  await mapPool(rejectedTasks, 4, async task => {
+    const fresh = await db.tasks.get(task.id);
+    if (fresh) await pushTask(fresh, ownerId);
   });
   for (const spec of SIMPLE_SYNC_TABLES) {
     const rows = (await spec.table.toArray() as Array<{ id: string; updated_at: string; version: number }>)
       .filter(row => needsPush(spec.name, row, shadowFields(row as never, SIMPLE_MERGE_KEYS[spec.name] as never)));
-    await upsertRows(spec.name, rows.map(row => spec.toRow(row as never, ownerId)));
+    const writtenIds = await upsertRows(spec.name, rows.map(row => spec.toRow(row as never, ownerId)));
+    const rejectedRows = rows.filter(row => !writtenIds.has(row.id));
     for (const row of rows) {
+      if (!writtenIds.has(row.id)) continue;
       shadows.push(shadowRecord(spec.name as ShadowTable, row, shadowFields(row as never, SIMPLE_MERGE_KEYS[spec.name] as never)));
     }
+    await mapPool(rejectedRows, 4, row => pushSimpleRow(spec, row, ownerId));
   }
   if (profile && needsPush('profiles', { ...profile, version: 1 }, shadowFields(profile, PROFILE_MERGE_KEYS))) {
     await pushProfile(profile, ownerId);
@@ -730,6 +757,9 @@ async function syncNow(onHydrated?: () => void) {
   void maybeSavePlannerCloudSnapshot().catch(error => {
     console.warn('[gichanplanner] 계정 사본을 남기지 못했습니다', error);
   });
+  void maybeCleanupOrphanedImages().catch(error => {
+    console.warn('[gichanplanner] 오래된 사진 정리를 하지 못했습니다', error);
+  });
 }
 
 export function syncPlannerWithCloud(onHydrated?: () => void) {
@@ -774,14 +804,14 @@ export function installPlannerSync() {
     if (skipCloudPush(trans)) return;
     whenCommitted(trans, async ownerId => {
       const row = await db.tasks.get(_key);
-      if (row) await pushTask(row, ownerId, 'user');
+      if (row) await pushTask(row, ownerId);
     });
   });
   db.tasks.hook('updating', (_mods, primKey, _obj, trans) => {
     if (skipCloudPush(trans)) return;
     whenCommitted(trans, async ownerId => {
       const row = await db.tasks.get(primKey);
-      if (row) await pushTask(row, ownerId, 'user');
+      if (row) await pushTask(row, ownerId);
     });
   });
   for (const spec of SIMPLE_SYNC_TABLES) {
@@ -789,14 +819,14 @@ export function installPlannerSync() {
       if (skipCloudPush(trans)) return;
       whenCommitted(trans, async ownerId => {
         const row = await spec.table.get(_key);
-        if (row) await pushSimpleRow(spec, row as { id: string; updated_at: string; version: number }, ownerId, 'user');
+        if (row) await pushSimpleRow(spec, row as { id: string; updated_at: string; version: number }, ownerId);
       });
     });
     spec.table.hook('updating', (_mods, primKey, _obj, trans) => {
       if (skipCloudPush(trans)) return;
       whenCommitted(trans, async ownerId => {
         const row = await spec.table.get(primKey);
-        if (row) await pushSimpleRow(spec, row as { id: string; updated_at: string; version: number }, ownerId, 'user');
+        if (row) await pushSimpleRow(spec, row as { id: string; updated_at: string; version: number }, ownerId);
       });
     });
   }
